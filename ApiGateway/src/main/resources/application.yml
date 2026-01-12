@@ -1,0 +1,120 @@
+spring:
+  application:
+    name: ApiGateway
+  cloud:
+    gateway:
+      routes:
+        # CommonService Routes
+        - id: common-service-users
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/users/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-posts
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/posts/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-groups
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/groups/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-events
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/events/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-friends
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/friends/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-notifications
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/notifications/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-all
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/**
+          filters:
+            - StripPrefix=2
+        
+        # MessegeService Routes
+        - id: message-service-conversations
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/conversations/**
+          filters:
+            - StripPrefix=2
+        
+        - id: message-service-messages
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/messages/**
+          filters:
+            - StripPrefix=2
+        
+        - id: message-service-calls
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/calls/**
+          filters:
+            - StripPrefix=2
+        
+        - id: message-service-all
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/**
+          filters:
+            - StripPrefix=2
+      
+      # Global CORS Configuration
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+server:
+  port: 8080
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: INFO
+
