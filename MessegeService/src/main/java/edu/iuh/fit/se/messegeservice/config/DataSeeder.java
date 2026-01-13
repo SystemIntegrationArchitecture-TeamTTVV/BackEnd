@@ -39,15 +39,15 @@ public class DataSeeder implements CommandLineRunner {
         System.out.println("🌱 Starting data seeding...");
 
         // participants mock (khớp với CommonService user ids nếu đồng bộ, còn không thì dùng mock)
-        var sarah = user("u1", "Sarah Johnson", "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400");
-        var mike  = user("u2", "Mike Chen", "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400");
-        var emma  = user("u3", "Emma Davis", "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400");
+        var lan = user("u1", "Nguyễn Thị Lan", "https://picsum.photos/400/400?random=70");
+        var minh  = user("u2", "Trần Văn Minh", "https://picsum.photos/400/400?random=71");
+        var hong  = user("u3", "Lê Thị Hồng", "https://picsum.photos/400/400?random=72");
 
-        // Conversation 1: Sarah - Mike
+        // Conversation 1: Lan - Minh
         Conversation c1 = new Conversation();
-        c1.setParticipantIds(List.of(sarah.id, mike.id));
-        c1.setParticipantNames(List.of(sarah.name, mike.name));
-        c1.setParticipantAvatars(List.of(sarah.avatar, mike.avatar));
+        c1.setParticipantIds(List.of(lan.id, minh.id));
+        c1.setParticipantNames(List.of(lan.name, minh.name));
+        c1.setParticipantAvatars(List.of(lan.avatar, minh.avatar));
         c1.setGroup(false);
         c1.setLastMessagePreview("Đi biển nhé! Bạn nghĩ sao? 🌊");
         c1.setLastMessageAt(LocalDateTime.now().minusMinutes(5));
@@ -56,12 +56,12 @@ public class DataSeeder implements CommandLineRunner {
 
         // Conversation 2: Nhóm 3 người
         Conversation c2 = new Conversation();
-        c2.setParticipantIds(List.of(sarah.id, mike.id, emma.id));
-        c2.setParticipantNames(List.of(sarah.name, mike.name, emma.name));
-        c2.setParticipantAvatars(List.of(sarah.avatar, mike.avatar, emma.avatar));
+        c2.setParticipantIds(List.of(lan.id, minh.id, hong.id));
+        c2.setParticipantNames(List.of(lan.name, minh.name, hong.name));
+        c2.setParticipantAvatars(List.of(lan.avatar, minh.avatar, hong.avatar));
         c2.setGroup(true);
         c2.setGroupName("Nhóm bạn thân 🎉");
-        c2.setGroupAvatar("https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=400");
+        c2.setGroupAvatar("https://picsum.photos/400/400?random=73");
         c2.setLastMessagePreview("Tối nay 7h meetup nhé!");
         c2.setLastMessageAt(LocalDateTime.now().minusHours(2));
         c2.setCreatedAt(LocalDateTime.now().minusDays(3));
@@ -71,54 +71,54 @@ public class DataSeeder implements CommandLineRunner {
 
         // Messages for c1
         List<Message> messages = new ArrayList<>();
-        messages.add(buildMessage(c1, sarah, "Chào bạn! Hôm nay thế nào?\n😊", null));
-        messages.add(buildMessage(c1, mike, "Mình rất tốt, cảm ơn bạn!\nCòn bạn thì sao?", null));
-        messages.add(buildMessage(c1, sarah, "Tuyệt vời! Cuối tuần này có kế hoạch gì chưa? 🎉", null));
-        messages.add(buildMessage(c1, mike, "Chưa có kế hoạch cụ thể!\nMình đang nghĩ đi chơi đâu đó thư giãn 😎",
+        messages.add(buildMessage(c1, lan, "Chào bạn! Hôm nay thế nào?\n😊", null));
+        messages.add(buildMessage(c1, minh, "Mình rất tốt, cảm ơn bạn!\nCòn bạn thì sao?", null));
+        messages.add(buildMessage(c1, lan, "Tuyệt vời! Cuối tuần này có kế hoạch gì chưa? 🎉", null));
+        messages.add(buildMessage(c1, minh, "Chưa có kế hoạch cụ thể!\nMình đang nghĩ đi chơi đâu đó thư giãn 😎",
                 null));
-        messages.add(buildMessage(c1, sarah, "Đi biển nhé! Bạn nghĩ sao? 🌊",
+        messages.add(buildMessage(c1, lan, "Đi biển nhé! Bạn nghĩ sao? 🌊",
                 List.of(new MessageAttachment("IMAGE",
-                        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200",
+                        "https://picsum.photos/1200/900?random=80",
                         "bien-nha-trang.jpg", 350000, 1600, 900))));
-        messages.add(buildMessage(c1, mike, "Đồng ý luôn! Đi đâu vậy bạn?", null));
-        messages.add(buildMessage(c1, sarah, "Nha Trang nhé, mình đã book khách sạn rồi 🏖️", null));
-        messages.add(buildMessage(c1, mike, "Perfect! Cảm ơn bạn nhiều 😊", null));
+        messages.add(buildMessage(c1, minh, "Đồng ý luôn! Đi đâu vậy bạn?", null));
+        messages.add(buildMessage(c1, lan, "Nha Trang nhé, mình đã đặt khách sạn rồi 🏖️", null));
+        messages.add(buildMessage(c1, minh, "Tuyệt vời! Cảm ơn bạn nhiều 😊", null));
 
         // Messages for c2 (group)
-        messages.add(buildMessage(c2, emma, "Tối nay 7h meetup nhé!", null));
-        messages.add(buildMessage(c2, sarah, "Ok nha, quán cà phê cũ nhé?", null));
-        messages.add(buildMessage(c2, mike, "Mang theo laptop để demo luôn 💻", null));
-        messages.add(buildMessage(c2, emma, "Được rồi, mình sẽ chuẩn bị slide!", null));
-        messages.add(buildMessage(c2, sarah, "Có ai muốn đi ăn sau meetup không?", null));
-        messages.add(buildMessage(c2, mike, "Mình đồng ý! 🍕", null));
+        messages.add(buildMessage(c2, hong, "Tối nay 7h meetup nhé!", null));
+        messages.add(buildMessage(c2, lan, "Ok nha, quán cà phê cũ nhé?", null));
+        messages.add(buildMessage(c2, minh, "Mang theo laptop để demo luôn 💻", null));
+        messages.add(buildMessage(c2, hong, "Được rồi, mình sẽ chuẩn bị slide!", null));
+        messages.add(buildMessage(c2, lan, "Có ai muốn đi ăn sau meetup không?", null));
+        messages.add(buildMessage(c2, minh, "Mình đồng ý! 🍕", null));
 
         mongoTemplate.insert(messages, Message.class);
 
         // Reactions
         List<MessageReaction> reactions = new ArrayList<>();
-        reactions.add(buildReaction(messages.get(4), mike, "❤️"));
-        reactions.add(buildReaction(messages.get(4), emma, "👍"));
-        reactions.add(buildReaction(messages.get(1), sarah, "😂"));
+        reactions.add(buildReaction(messages.get(4), minh, "❤️"));
+        reactions.add(buildReaction(messages.get(4), hong, "👍"));
+        reactions.add(buildReaction(messages.get(1), lan, "😂"));
         if (messages.size() > 6) {
-            reactions.add(buildReaction(messages.get(6), mike, "😊"));
+            reactions.add(buildReaction(messages.get(6), minh, "😊"));
         }
         if (messages.size() > 8) {
-            reactions.add(buildReaction(messages.get(8), sarah, "👍"));
+            reactions.add(buildReaction(messages.get(8), lan, "👍"));
         }
         if (messages.size() > 9) {
-            reactions.add(buildReaction(messages.get(9), emma, "❤️"));
+            reactions.add(buildReaction(messages.get(9), hong, "❤️"));
         }
         if (messages.size() > 11) {
-            reactions.add(buildReaction(messages.get(11), mike, "👍"));
+            reactions.add(buildReaction(messages.get(11), minh, "👍"));
         }
         mongoTemplate.insert(reactions, MessageReaction.class);
 
         // Calls
         List<Call> calls = new ArrayList<>();
-        calls.add(buildCall(c1, sarah, List.of(mike.id), "VOICE", "COMPLETED", 420));
-        calls.add(buildCall(c1, mike, List.of(sarah.id), "VIDEO", "COMPLETED", 1200));
-        calls.add(buildCall(c2, mike, List.of(sarah.id, emma.id), "VIDEO", "MISSED", 0));
-        calls.add(buildCall(c2, emma, List.of(sarah.id, mike.id), "VOICE", "COMPLETED", 600));
+        calls.add(buildCall(c1, lan, List.of(minh.id), "VOICE", "COMPLETED", 420));
+        calls.add(buildCall(c1, minh, List.of(lan.id), "VIDEO", "COMPLETED", 1200));
+        calls.add(buildCall(c2, minh, List.of(lan.id, hong.id), "VIDEO", "MISSED", 0));
+        calls.add(buildCall(c2, hong, List.of(lan.id, minh.id), "VOICE", "COMPLETED", 600));
         mongoTemplate.insert(calls, Call.class);
 
         System.out.println("✅ Data seeding completed successfully!");

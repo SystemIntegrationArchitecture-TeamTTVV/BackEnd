@@ -27,7 +27,7 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         // Kiểm tra property để quyết định có seed hay không
         if (!seedEnabled) {
-            System.out.println("⚠️  Data seeding is DISABLED. Set 'app.data.seed.enabled=true' to enable.");
+            System.out.println("⚠Bi Tat  Data seeding is DISABLED. Set 'app.data.seed.enabled=true' to enable.");
             return;
         }
 
@@ -94,30 +94,30 @@ public class DataSeeder implements CommandLineRunner {
 
     private List<User> seedUsers() {
         List<User> list = new ArrayList<>();
-        list.add(buildUser("sarah.johnson@example.com", "sarahj", "Sarah", "Johnson",
-                "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400",
-                "Kết nối & chia sẻ cảm hứng du lịch.", "Hà Nội"));
-        list.add(buildUser("mike.chen@example.com", "mikechen", "Mike", "Chen",
-                "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400",
-                "Yêu công nghệ, mê cà phê.", "TP. HCM"));
-        list.add(buildUser("emma.davis@example.com", "emmad", "Emma", "Davis",
-                "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
-                "Foodie & travel blogger.", "Đà Nẵng"));
-        list.add(buildUser("alex.park@example.com", "alexpark", "Alex", "Park",
-                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400",
-                "Sản phẩm số & startup.", "Hà Nội"));
-        list.add(buildUser("lisa.nguyen@example.com", "lisanguyen", "Lisa", "Nguyễn",
-                "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&sat=-50",
-                "Designer thích tối giản.", "Cần Thơ"));
-        list.add(buildUser("david.kim@example.com", "davidkim", "David", "Kim",
-                "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400",
-                "Nhiếp ảnh & leo núi.", "Đà Lạt"));
-        list.add(buildUser("maria.garcia@example.com", "mariag", "Maria", "Garcia",
-                "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&sat=-20",
-                "Chạy bộ & thiền.", "Hải Phòng"));
-        list.add(buildUser("john.doe@example.com", "johnd", "John", "Doe",
-                "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&sat=10",
-                "Kỹ sư phần mềm & đọc sách.", "Huế"));
+        list.add(buildUser("nguyen.thi.lan@example.vn", "nguyenlan", "Nguyễn", "Thị Lan",
+                "https://picsum.photos/400/400?random=1",
+                "Kết nối & chia sẻ cảm hứng du lịch Việt Nam.", "Hà Nội"));
+        list.add(buildUser("tran.van.minh@example.vn", "tranminh", "Trần", "Văn Minh",
+                "https://picsum.photos/400/400?random=2",
+                "Yêu công nghệ, mê cà phê sáng.", "TP. HCM"));
+        list.add(buildUser("le.thi.hong@example.vn", "lehong", "Lê", "Thị Hồng",
+                "https://picsum.photos/400/400?random=3",
+                "Foodie đam mê ẩm thực Việt Nam.", "Đà Nẵng"));
+        list.add(buildUser("pham.van.duc@example.vn", "phamduc", "Phạm", "Văn Đức",
+                "https://picsum.photos/400/400?random=4",
+                "Sản phẩm số & startup Việt Nam.", "Hà Nội"));
+        list.add(buildUser("hoang.thi.linh@example.vn", "hoanglinh", "Hoàng", "Thị Linh",
+                "https://picsum.photos/400/400?random=5",
+                "Designer thích phong cách tối giản.", "Cần Thơ"));
+        list.add(buildUser("vu.van.tuan@example.vn", "vutuan", "Vũ", "Văn Tuấn",
+                "https://picsum.photos/400/400?random=6",
+                "Nhiếp ảnh & leo núi Việt Nam.", "Đà Lạt"));
+        list.add(buildUser("dang.thi.huyen@example.vn", "danghuyen", "Đặng", "Thị Huyền",
+                "https://picsum.photos/400/400?random=7",
+                "Chạy bộ & thiền định mỗi sáng.", "Hải Phòng"));
+        list.add(buildUser("bui.van.hung@example.vn", "buihung", "Bùi", "Văn Hùng",
+                "https://picsum.photos/400/400?random=8",
+                "Kỹ sư phần mềm & đọc sách công nghệ.", "Huế"));
         return list;
     }
 
@@ -130,7 +130,7 @@ public class DataSeeder implements CommandLineRunner {
         u.setLastName(last);
         u.setFullName(first + " " + last);
         u.setAvatar(avatar);
-        u.setCoverPhoto("https://images.unsplash.com/photo-1503264116251-35a269479413?w=1200");
+        u.setCoverPhoto("https://picsum.photos/1200/400?random=" + random.nextInt(100));
         u.setBio(bio);
         u.setCity(city);
         u.setCountry("Việt Nam");
@@ -179,15 +179,15 @@ public class DataSeeder implements CommandLineRunner {
 
     private List<Group> seedGroups(List<User> users) {
         List<Group> groups = new ArrayList<>();
-        Group travel = new Group(null, "Hội mê du lịch", "Chia sẻ kinh nghiệm phượt & săn vé rẻ",
-                "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200",
-                "https://images.unsplash.com/photo-1503264116251-35a269479413?w=800",
+        Group travel = new Group(null, "Hội mê du lịch Việt Nam", "Chia sẻ kinh nghiệm phượt & săn vé rẻ",
+                "https://picsum.photos/1200/400?random=10",
+                "https://picsum.photos/800/800?random=11",
                 users.get(0), "PUBLIC", "VISIBLE", 0, 0,
-                List.of("travel", "phuot", "review"), "Lifestyle",
+                List.of("du-lich", "phuot", "review"), "Lifestyle",
                 LocalDateTime.now().minusDays(10), LocalDateTime.now(), true);
-        Group tech = new Group(null, "Dev & Product Việt", "Cộng đồng chia sẻ công nghệ, sản phẩm số",
-                "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200",
-                "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800",
+        Group tech = new Group(null, "Dev & Product Việt Nam", "Cộng đồng chia sẻ công nghệ, sản phẩm số",
+                "https://picsum.photos/1200/400?random=12",
+                "https://picsum.photos/800/800?random=13",
                 users.get(3), "PRIVATE", "VISIBLE", 0, 0,
                 List.of("tech", "dev", "product"), "Technology",
                 LocalDateTime.now().minusDays(7), LocalDateTime.now(), true);
@@ -223,21 +223,21 @@ public class DataSeeder implements CommandLineRunner {
 
     private List<Page> seedPages(List<User> users) {
         List<Page> pages = new ArrayList<>();
-        Page cafe = new Page(null, "The Coffee House VN", "thecoffeehouse",
+        Page cafe = new Page(null, "Cà Phê Việt Nam", "caphevietnam",
                 "Quán cà phê thân thiện, không gian chill.",
-                "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200",
-                "https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=400",
-                users.get(1), "Café & Đồ uống", "https://thecoffeehouse.vn",
-                "+84 888 999 111", "contact@tch.vn",
+                "https://picsum.photos/1200/400?random=14",
+                "https://picsum.photos/400/400?random=15",
+                users.get(1), "Café & Đồ uống", "https://caphevietnam.vn",
+                "+84 888 999 111", "contact@caphevietnam.vn",
                 "86-88 Cao Thắng, Q3", "TP. HCM", "Việt Nam",
                 12400, 19800, 560,
-                List.of("coffee", "drink", "workspace"), true,
+                List.of("ca-phe", "do-uong", "workspace"), true,
                 LocalDateTime.now().minusDays(30), LocalDateTime.now(), true);
 
-        Page gear = new Page(null, "GearHub VN", "gearhubvn",
+        Page gear = new Page(null, "GearHub Việt Nam", "gearhubvn",
                 "Thiết bị công nghệ & phụ kiện chính hãng.",
-                "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200",
-                "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400",
+                "https://picsum.photos/1200/400?random=16",
+                "https://picsum.photos/400/400?random=17",
                 users.get(3), "Shopping & Bán lẻ", "https://gearhub.vn",
                 "+84 777 555 222", "hello@gearhub.vn",
                 "12 Nguyễn Huệ, Q1", "TP. HCM", "Việt Nam",
@@ -289,25 +289,20 @@ public class DataSeeder implements CommandLineRunner {
     private List<Post> seedPosts(List<User> users, List<Group> groups, List<Page> pages) {
         List<Post> posts = new ArrayList<>();
         posts.add(buildPost(users.get(0), "Vừa săn được vé đi Đà Lạt 299k/chiều, ai đi cùng không? 🌲",
-                List.of("https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200"),
+                List.of("https://picsum.photos/1200/800?random=20"),
                 "Đà Lạt, Lâm Đồng", null, null, null));
         posts.add(buildPost(users.get(1), "Test MacBook Air M3 cả ngày pin vẫn trâu 😎", List.of(), "",
                 null, null, pages.get(1)));
-        posts.add(buildPost(users.get(2), "Món phở gà này ngon xuất sắc, quán ngay hồ Gươm!", List.of(
-                "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200",
-                "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=1200"),
+        posts.add(buildPost(users.get(2), "Món phở gà này ngon xuất sắc, quán ngay hồ Gươm!",
+                List.of("https://picsum.photos/1200/800?random=21", "https://picsum.photos/1200/800?random=22"),
                 "Hà Nội", "Hạnh phúc", "Ăn uống", null));
-        posts.add(buildPost(users.get(3), "Checklist launch MVP: user flow, tracking, support!", List.of(), "",
+        posts.add(buildPost(users.get(3), "Checklist launch MVP: luồng người dùng, tracking, hỗ trợ!", List.of(), "",
                 null, "Làm việc", groups.get(1)));
-        posts.add(buildPost(users.get(4), "Template poster mới, mọi người góp ý nhé 💙", List.of(
-                "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200"),
+        posts.add(buildPost(users.get(4), "Template poster mới, mọi người góp ý nhé 💙", List.of("https://picsum.photos/1200/800?random=23"),
                 "", "Hào hứng", "Thiết kế", null));
-        posts.add(buildPost(users.get(5), "Chạy bộ sáng nay ở công viên, không khí trong lành quá! 🏃", List.of(
-                "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200"),
+        posts.add(buildPost(users.get(5), "Chạy bộ sáng nay ở công viên, không khí trong lành quá! 🏃", List.of("https://picsum.photos/1200/800?random=24"),
                 "Công viên Lê Văn Tám", "Năng động", "Tập thể dục", null));
-        posts.add(buildPost(users.get(6), "Review quán cà phê mới mở, view đẹp lắm! ☕", List.of(
-                "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200",
-                "https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=1200"),
+        posts.add(buildPost(users.get(6), "Review quán cà phê mới mở, view đẹp lắm! ☕", List.of("https://picsum.photos/1200/800?random=25", "https://picsum.photos/1200/800?random=26"),
                 "Quận 1, TP.HCM", "Hạnh phúc", "Ăn uống", null));
         posts.add(buildPost(users.get(7), "Đọc sách cuối tuần, recommend cuốn này cho mọi người 📚", List.of(),
                 "", "Bình yên", "Đọc sách", null));
@@ -345,8 +340,9 @@ public class DataSeeder implements CommandLineRunner {
         Comment c1 = new Comment(null, posts.get(0), users.get(1),
                 "Cho xin lịch trình với bạn ơi!", List.of(), null,
                 3, 1, LocalDateTime.now().minusHours(5), LocalDateTime.now(), null, false);
+        // Tránh tham chiếu tới comment khác chưa có id (gây lỗi NULL id DBRef)
         Comment c2 = new Comment(null, posts.get(0), users.get(2),
-                "Đi Đà Lạt nhớ mang áo ấm nha 🧥", List.of(), c1,
+                "Đi Đà Lạt nhớ mang áo ấm nha 🧥", List.of(), null,
                 1, 0, LocalDateTime.now().minusHours(3), LocalDateTime.now(), null, false);
         comments.add(c1);
         comments.add(c2);
@@ -439,7 +435,7 @@ public class DataSeeder implements CommandLineRunner {
         Event e = new Event();
         e.setName(name);
         e.setDescription("Sự kiện kết nối & chia sẻ kinh nghiệm.");
-        e.setCoverPhoto("https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200");
+        e.setCoverPhoto("https://picsum.photos/1200/400?random=30");
         e.setHost(host);
         e.setGroup(group);
         e.setStartTime(start);
@@ -483,10 +479,10 @@ public class DataSeeder implements CommandLineRunner {
 
     private List<Story> seedStories(List<User> users) {
         List<Story> stories = new ArrayList<>();
-        stories.add(buildStory(users.get(0), "IMAGE", "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=900", null));
-        stories.add(buildStory(users.get(2), "IMAGE", "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900", null));
-        stories.add(buildStory(users.get(5), "VIDEO", "https://videos.pexels.com/video-files/856861/856861-hd_1920_1080_25fps.mp4",
-                "https://images.unsplash.com/photo-1503264116251-35a269479413?w=600"));
+        stories.add(buildStory(users.get(0), "IMAGE", "https://picsum.photos/900/1600?random=40", "https://picsum.photos/600/600?random=41"));
+        stories.add(buildStory(users.get(2), "IMAGE", "https://picsum.photos/900/1600?random=42", "https://picsum.photos/600/600?random=43"));
+        stories.add(buildStory(users.get(5), "VIDEO", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                "https://picsum.photos/600/600?random=44"));
         return stories;
     }
 
@@ -512,7 +508,7 @@ public class DataSeeder implements CommandLineRunner {
         Album a1 = new Album(null, "Ký ức Đà Lạt", "Album chuyến đi Đà Lạt 2026",
                 users.get(0), null, 0, "FRIENDS",
                 LocalDateTime.now().minusDays(12), LocalDateTime.now());
-        Album a2 = new Album(null, "Food tour Hà Nội", "Những món ăn must-try",
+        Album a2 = new Album(null, "Food tour Hà Nội", "Những món ăn nên thử",
                 users.get(2), null, 0, "PUBLIC",
                 LocalDateTime.now().minusDays(8), LocalDateTime.now());
         albums.add(a1);
@@ -520,17 +516,17 @@ public class DataSeeder implements CommandLineRunner {
         mongoTemplate.insert(albums, Album.class);
 
         List<Photo> photos = new ArrayList<>();
-        photos.add(buildPhoto("https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200", a1, posts.get(0), users.get(0)));
-        photos.add(buildPhoto("https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200", a1, null, users.get(0)));
-        photos.add(buildPhoto("https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200", a2, posts.get(2), users.get(2)));
-        photos.add(buildPhoto("https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&sat=-30", a2, null, users.get(2)));
+        photos.add(buildPhoto("https://picsum.photos/1200/900?random=50", a1, posts.get(0), users.get(0)));
+        photos.add(buildPhoto("https://picsum.photos/1200/900?random=51", a1, null, users.get(0)));
+        photos.add(buildPhoto("https://picsum.photos/1200/900?random=52", a2, posts.get(2), users.get(2)));
+        photos.add(buildPhoto("https://picsum.photos/1200/900?random=53", a2, null, users.get(2)));
         mongoTemplate.insert(photos, Photo.class);
     }
 
     private Photo buildPhoto(String url, Album album, Post post, User owner) {
         Photo p = new Photo();
         p.setUrl(url);
-        p.setThumbnailUrl(url + "&w=400");
+        p.setThumbnailUrl(url.replace("1200/900", "400/300"));
         p.setCaption("Ảnh kỷ niệm");
         p.setOwner(owner);
         p.setAlbum(album);
@@ -545,10 +541,10 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedSavedItems(List<User> users, List<Post> posts) {
         List<SavedItem> saved = new ArrayList<>();
-        saved.add(buildSaved(users.get(0), posts.get(0).getId(), "POST", "Travel"));
+        saved.add(buildSaved(users.get(0), posts.get(0).getId(), "POST", "Du lịch"));
         saved.add(buildSaved(users.get(1), posts.get(2).getId(), "POST", "Ẩm thực"));
         saved.add(buildSaved(users.get(2), posts.get(1).getId(), "POST", "Công nghệ"));
-        saved.add(buildSaved(users.get(3), posts.get(3).getId(), "POST", "Startup"));
+        saved.add(buildSaved(users.get(3), posts.get(3).getId(), "POST", "Khởi nghiệp"));
         saved.add(buildSaved(users.get(4), posts.get(5).getId(), "POST", "Sức khỏe"));
         if (posts.size() > 6) {
             saved.add(buildSaved(users.get(5), posts.get(6).getId(), "POST", "Ẩm thực"));
@@ -574,19 +570,16 @@ public class DataSeeder implements CommandLineRunner {
         List<Product> products = new ArrayList<>();
         products.add(buildProduct(users.get(1), "MacBook Air M3 13 inch", new BigDecimal("24990000"),
                 "Như mới 99%, full box.", "Electronics",
-                List.of(
-                        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200",
-                        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800"
-                )));
+                List.of("https://picsum.photos/1200/800?random=60", "https://picsum.photos/800/600?random=61")));
         products.add(buildProduct(users.get(4), "iPhone 15 Pro 256GB", new BigDecimal("27990000"),
                 "Hàng chính hãng VN/A, bảo hành 11 tháng.", "Electronics",
-                List.of("https://images.unsplash.com/photo-1512499617640-c2f999098c01?w=1200")));
+                List.of("https://picsum.photos/1200/800?random=62")));
         products.add(buildProduct(users.get(5), "Xe đạp road Giant", new BigDecimal("8500000"),
                 "Đạp mượt, mới bảo dưỡng.", "Vehicles",
-                List.of("https://images.unsplash.com/photo-1502877828070-33c90eec2827?w=1200")));
+                List.of("https://picsum.photos/1200/800?random=63")));
         products.add(buildProduct(users.get(2), "Căn hộ studio Q7", new BigDecimal("820000000"),
                 "35m2, full nội thất, view sông.", "Property",
-                List.of("https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=1200")));
+                List.of("https://picsum.photos/1200/800?random=64")));
         return products;
     }
 
