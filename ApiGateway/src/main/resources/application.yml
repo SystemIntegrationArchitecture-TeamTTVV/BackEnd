@@ -19,6 +19,13 @@ spring:
           filters:
             - StripPrefix=2
         
+        - id: common-service-comments
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/comments/**
+          filters:
+            - StripPrefix=2
+        
         - id: common-service-groups
           uri: http://localhost:8081
           predicates:
@@ -26,24 +33,10 @@ spring:
           filters:
             - StripPrefix=2
         
-        - id: common-service-events
-          uri: http://localhost:8081
-          predicates:
-            - Path=/api/common/events/**
-          filters:
-            - StripPrefix=2
-        
         - id: common-service-friends
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/friends/**
-          filters:
-            - StripPrefix=2
-        
-        - id: common-service-notifications
-          uri: http://localhost:8081
-          predicates:
-            - Path=/api/common/notifications/**
           filters:
             - StripPrefix=2
         

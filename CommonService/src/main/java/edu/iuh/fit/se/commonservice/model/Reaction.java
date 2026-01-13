@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @CompoundIndex(name = "user_post_idx", def = "{'userId': 1, 'postId': 1}", unique = true)
-@CompoundIndex(name = "user_comment_idx", def = "{'userId': 1, 'commentId': 1}", unique = true)
+// Note: user_comment_idx removed to avoid conflict with post reactions (commentId = null)
+// If needed, create partial index manually: db.reactions.createIndex({userId: 1, commentId: 1}, {unique: true, partialFilterExpression: {commentId: {$ne: null}}})
 public class Reaction {
     @Id
     private String id;
