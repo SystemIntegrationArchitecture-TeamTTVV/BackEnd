@@ -87,7 +87,7 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOrigins: "*"
+            allowedOriginPatterns: "*"  # Changed from allowedOrigins to allowedOriginPatterns
             allowedMethods:
               - GET
               - POST
@@ -117,4 +117,3 @@ logging:
   level:
     org.springframework.cloud.gateway: DEBUG
     org.springframework.web: INFO
-
