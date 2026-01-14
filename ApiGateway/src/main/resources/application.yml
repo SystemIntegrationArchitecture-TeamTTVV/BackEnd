@@ -4,6 +4,21 @@ spring:
   cloud:
     gateway:
       routes:
+        # Swagger API Docs Routes
+        - id: common-service-api-docs
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/v3/api-docs
+          filters:
+            - RewritePath=/api/common/v3/api-docs, /api-docs
+        
+        - id: message-service-api-docs
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/v3/api-docs
+          filters:
+            - RewritePath=/api/message/v3/api-docs, /api-docs
+        
         # CommonService Routes
         - id: common-service-users
           uri: http://localhost:8081
@@ -110,3 +125,17 @@ logging:
   level:
     org.springframework.cloud.gateway: DEBUG
     org.springframework.web: INFO
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    urls:
+      - name: Common Service
+        url: /api/common/v3/api-docs
+      - name: Message Service
+        url: /api/message/v3/api-docs
+    urls-primary-name: Common Service

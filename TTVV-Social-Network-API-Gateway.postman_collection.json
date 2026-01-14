@@ -1,0 +1,855 @@
+{
+	"info": {
+		"name": "TTVV Social Network - API Gateway",
+		"description": "Complete API collection for TTVV Social Network via API Gateway",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "gateway_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Common Service",
+			"item": [
+				{
+					"name": "Users",
+					"item": [
+						{
+							"name": "Get All Users",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/users",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "users"]
+								}
+							}
+						},
+						{
+							"name": "Get User By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/users/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "users", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Create User",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"test@example.com\",\n  \"username\": \"testuser\",\n  \"password\": \"password123\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"bio\": \"Test bio\",\n  \"city\": \"Hanoi\",\n  \"country\": \"Vietnam\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/users",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "users"]
+								}
+							}
+						},
+						{
+							"name": "Update User",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"bio\": \"Updated bio\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/users/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "users", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete User",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/users/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "users", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Posts",
+					"item": [
+						{
+							"name": "Get All Posts",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/posts",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "posts"]
+								}
+							}
+						},
+						{
+							"name": "Get Post By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/posts/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "posts", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Post",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"content\": \"This is a new post\",\n  \"images\": [\"https://example.com/image.jpg\"],\n  \"location\": \"Hanoi\",\n  \"feeling\": \"Happy\",\n  \"privacy\": \"PUBLIC\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/posts",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "posts"]
+								}
+							}
+						},
+						{
+							"name": "Update Post",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"content\": \"Updated post content\",\n  \"privacy\": \"FRIENDS\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/posts/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "posts", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete Post",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/posts/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "posts", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Comments",
+					"item": [
+						{
+							"name": "Get All Comments",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/comments",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "comments"]
+								}
+							}
+						},
+						{
+							"name": "Get Comments By Post",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/comments/post/:postId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "comments", "post", ":postId"],
+									"variable": [
+										{
+											"key": "postId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Comment",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"postId\": \"1\",\n  \"content\": \"Great post!\",\n  \"parentId\": null\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/comments",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "comments"]
+								}
+							}
+						},
+						{
+							"name": "Update Comment",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"content\": \"Updated comment\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/comments/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "comments", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete Comment",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/comments/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "comments", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Groups",
+					"item": [
+						{
+							"name": "Get All Groups",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/groups",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "groups"]
+								}
+							}
+						},
+						{
+							"name": "Get Group By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/groups/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "groups", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Group",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"New Group\",\n  \"description\": \"Group description\",\n  \"privacy\": \"PUBLIC\",\n  \"category\": \"Technology\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/groups",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "groups"]
+								}
+							}
+						},
+						{
+							"name": "Update Group",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Updated Group Name\",\n  \"description\": \"Updated description\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/groups/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "groups", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete Group",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/groups/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "groups", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Friends",
+					"item": [
+						{
+							"name": "Get All Friends",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/friends",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "friends"]
+								}
+							}
+						},
+						{
+							"name": "Get Friends By User",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/friends/user/:userId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "friends", "user", ":userId"],
+									"variable": [
+										{
+											"key": "userId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Send Friend Request",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"receiverId\": \"2\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/common/friends/request",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "friends", "request"]
+								}
+							}
+						},
+						{
+							"name": "Accept Friend Request",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/friends/accept/:requestId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "friends", "accept", ":requestId"],
+									"variable": [
+										{
+											"key": "requestId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Reject Friend Request",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/friends/reject/:requestId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "friends", "reject", ":requestId"],
+									"variable": [
+										{
+											"key": "requestId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Unfriend",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/common/friends/:friendId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "common", "friends", ":friendId"],
+									"variable": [
+										{
+											"key": "friendId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Message Service",
+			"item": [
+				{
+					"name": "Conversations",
+					"item": [
+						{
+							"name": "Get All Conversations",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/conversations",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "conversations"]
+								}
+							}
+						},
+						{
+							"name": "Get Conversation By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/conversations/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "conversations", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Conversations By User",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/conversations/user/:userId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "conversations", "user", ":userId"],
+									"variable": [
+										{
+											"key": "userId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Conversation",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"New Conversation\",\n  \"type\": \"PRIVATE\",\n  \"participantIds\": [\"1\", \"2\"]\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/message/conversations",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "conversations"]
+								}
+							}
+						},
+						{
+							"name": "Update Conversation",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Updated Conversation Name\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/message/conversations/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "conversations", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete Conversation",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/conversations/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "conversations", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Messages",
+					"item": [
+						{
+							"name": "Get All Messages",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/messages",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "messages"]
+								}
+							}
+						},
+						{
+							"name": "Get Messages By Conversation",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/messages/conversation/:conversationId",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "messages", "conversation", ":conversationId"],
+									"variable": [
+										{
+											"key": "conversationId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Send Message",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"conversationId\": \"1\",\n  \"content\": \"Hello! This is a test message\",\n  \"type\": \"TEXT\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/message/messages",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "messages"]
+								}
+							}
+						},
+						{
+							"name": "Send Message with Attachment",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"conversationId\": \"1\",\n  \"content\": \"Check out this image\",\n  \"type\": \"IMAGE\",\n  \"attachments\": [\n    {\n      \"url\": \"https://example.com/image.jpg\",\n      \"type\": \"IMAGE\",\n      \"fileName\": \"photo.jpg\",\n      \"fileSize\": 250000\n    }\n  ]\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/message/messages",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "messages"]
+								}
+							}
+						},
+						{
+							"name": "Update Message",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"content\": \"Updated message content\"\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/message/messages/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "messages", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete Message",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/messages/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "messages", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Calls",
+					"item": [
+						{
+							"name": "Get All Calls",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/calls",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "calls"]
+								}
+							}
+						},
+						{
+							"name": "Get Call By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/calls/:id",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "calls", ":id"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Start Call",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"conversationId\": \"1\",\n  \"callType\": \"VIDEO\",\n  \"participantIds\": [\"1\", \"2\"]\n}"
+								},
+								"url": {
+									"raw": "{{gateway_url}}/api/message/calls",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "calls"]
+								}
+							}
+						},
+						{
+							"name": "End Call",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{gateway_url}}/api/message/calls/:id/end",
+									"host": ["{{gateway_url}}"],
+									"path": ["api", "message", "calls", ":id", "end"],
+									"variable": [
+										{
+											"key": "id",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
