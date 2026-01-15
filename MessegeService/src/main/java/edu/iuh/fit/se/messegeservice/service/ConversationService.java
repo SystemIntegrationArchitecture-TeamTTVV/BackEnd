@@ -22,6 +22,34 @@ public class ConversationService {
                 .collect(Collectors.toList());
     }
 
+    public List<ConversationDTO> getGroupConversations() {
+        return conversationRepository.findByIsGroupTrueOrderByLastMessageAtDesc().stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ConversationDTO> getDirectConversations() {
+        return conversationRepository.findByIsGroupFalseOrderByLastMessageAtDesc().stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public ConversationDTO getOrCreateDirectConversation(String userId1, String userId2) {
+        // Try to find existing conversation
+        List<Conversation> conversations = conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId1);
+        for (Conversation conv : conversations) {
+            if (!conv.isGroup() && conv.getParticipantIds().contains(userId1) && conv.getParticipantIds().contains(userId2)) {
+                return toDTO(conv);
+            }
+        }
+        
+        // Create new conversation
+        ConversationDTO newConv = new ConversationDTO();
+        newConv.setParticipantIds(java.util.Arrays.asList(userId1, userId2));
+        newConv.setGroup(false);
+        return createConversation(newConv);
+    }
+
     public ConversationDTO getConversationById(String id) {
         return conversationRepository.findById(id)
                 .map(this::toDTO)

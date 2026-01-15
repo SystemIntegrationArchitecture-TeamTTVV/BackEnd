@@ -55,6 +55,34 @@ spring:
           filters:
             - StripPrefix=2
         
+        - id: common-service-reactions
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/reactions/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-friend-requests
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/friend-requests/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-notifications
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/notifications/**
+          filters:
+            - StripPrefix=2
+        
+        - id: common-service-stories
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/stories/**
+          filters:
+            - StripPrefix=2
+        
         - id: common-service-all
           uri: http://localhost:8081
           predicates:

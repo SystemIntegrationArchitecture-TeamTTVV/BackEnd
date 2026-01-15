@@ -26,6 +26,16 @@ public class GroupController {
         return ResponseEntity.ok(groupService.getGroupById(id));
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<GroupDTO>> searchGroups(@RequestParam String name) {
+        return ResponseEntity.ok(groupService.searchGroups(name));
+    }
+
+    @GetMapping("/admin/{adminId}")
+    public ResponseEntity<List<GroupDTO>> getGroupsByAdminId(@PathVariable String adminId) {
+        return ResponseEntity.ok(groupService.getGroupsByAdminId(adminId));
+    }
+
     @PostMapping
     public ResponseEntity<GroupDTO> createGroup(@RequestBody GroupDTO groupDTO) {
         return ResponseEntity.status(HttpStatus.CREATED).body(groupService.createGroup(groupDTO));

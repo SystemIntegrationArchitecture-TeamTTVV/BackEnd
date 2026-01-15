@@ -53,6 +53,37 @@ public class FriendService {
         friendRepository.delete(friend);
     }
 
+    public boolean checkIfFriends(String userId, String friendId) {
+        return friendRepository.existsByUserIdAndFriendId(userId, friendId) ||
+               friendRepository.existsByUserIdAndFriendId(friendId, userId);
+    }
+
+    public List<FriendDTO> getMutualFriends(String userId1, String userId2) {
+        List<Friend> friends1 = friendRepository.findByUserId(userId1);
+        List<Friend> friends2 = friendRepository.findByUserId(userId2);
+        
+        List<String> friendIds1 = friends1.stream()
+                .map(Friend::getFriendId)
+                .collect(Collectors.toList());
+        List<String> friendIds2 = friends2.stream()
+                .map(Friend::getFriendId)
+                .collect(Collectors.toList());
+        
+        // Find mutual friends
+        List<String> mutualFriendIds = friendIds1.stream()
+                .filter(friendIds2::contains)
+                .collect(Collectors.toList());
+        
+        return mutualFriendIds.stream()
+                .map(friendId -> {
+                    Friend friend = friendRepository.findByUserIdAndFriendId(userId1, friendId)
+                            .orElse(null);
+                    return friend != null ? toDTO(friend) : null;
+                })
+                .filter(friendDTO -> friendDTO != null)
+                .collect(Collectors.toList());
+    }
+
     private FriendDTO toDTO(Friend friend) {
         FriendDTO dto = new FriendDTO();
         dto.setId(friend.getId());

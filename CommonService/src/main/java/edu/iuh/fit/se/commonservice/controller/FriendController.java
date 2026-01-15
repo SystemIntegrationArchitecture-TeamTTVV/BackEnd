@@ -31,5 +31,15 @@ public class FriendController {
         friendService.removeFriend(userId, friendId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/check")
+    public ResponseEntity<Boolean> checkIfFriends(@RequestParam String userId, @RequestParam String friendId) {
+        return ResponseEntity.ok(friendService.checkIfFriends(userId, friendId));
+    }
+
+    @GetMapping("/mutual")
+    public ResponseEntity<List<FriendDTO>> getMutualFriends(@RequestParam String userId1, @RequestParam String userId2) {
+        return ResponseEntity.ok(friendService.getMutualFriends(userId1, userId2));
+    }
 }
 

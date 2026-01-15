@@ -37,6 +37,18 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
+    public List<PostDTO> getPostsByGroupId(String groupId) {
+        return postRepository.findByGroupIdOrderByCreatedAtDesc(groupId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<PostDTO> getPostsByPageId(String pageId) {
+        return postRepository.findByPageIdOrderByCreatedAtDesc(pageId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public PostDTO createPost(PostDTO postDTO) {
         Post post = toEntity(postDTO);
         post.setCreatedAt(LocalDateTime.now());

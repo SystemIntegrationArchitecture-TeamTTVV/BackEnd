@@ -34,6 +34,24 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
     }
 
+    public UserDTO getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(this::toDTO)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+    }
+
+    public List<UserDTO> searchUsers(String query) {
+        List<User> byName = userRepository.findByFullNameContainingIgnoreCase(query);
+        List<User> byUsername = userRepository.findByUsernameContainingIgnoreCase(query);
+        
+        // Combine and remove duplicates
+        java.util.Set<String> seenIds = new java.util.HashSet<>();
+        return java.util.stream.Stream.concat(byName.stream(), byUsername.stream())
+                .filter(user -> seenIds.add(user.getId()))
+                .map(this::toDTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     public UserDTO createUser(UserDTO userDTO) {
         User user = toEntity(userDTO);
         user.setCreatedAt(LocalDateTime.now());

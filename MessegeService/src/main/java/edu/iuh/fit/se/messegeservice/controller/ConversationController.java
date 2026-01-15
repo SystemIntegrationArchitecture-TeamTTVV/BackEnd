@@ -21,6 +21,23 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.getConversationsByUserId(userId));
     }
 
+    @GetMapping("/groups")
+    public ResponseEntity<List<ConversationDTO>> getGroupConversations() {
+        return ResponseEntity.ok(conversationService.getGroupConversations());
+    }
+
+    @GetMapping("/direct")
+    public ResponseEntity<List<ConversationDTO>> getDirectConversations() {
+        return ResponseEntity.ok(conversationService.getDirectConversations());
+    }
+
+    @GetMapping("/direct/{userId1}/{userId2}")
+    public ResponseEntity<ConversationDTO> getOrCreateDirectConversation(
+            @PathVariable String userId1, 
+            @PathVariable String userId2) {
+        return ResponseEntity.ok(conversationService.getOrCreateDirectConversation(userId1, userId2));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ConversationDTO> getConversationById(@PathVariable String id) {
         return ResponseEntity.ok(conversationService.getConversationById(id));
