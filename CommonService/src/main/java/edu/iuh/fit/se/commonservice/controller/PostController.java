@@ -31,6 +31,16 @@ public class PostController {
         return ResponseEntity.ok(postService.getPostsByUserId(userId));
     }
 
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<PostDTO>> getPostsByGroupId(@PathVariable String groupId) {
+        return ResponseEntity.ok(postService.getPostsByGroupId(groupId));
+    }
+
+    @GetMapping("/page/{pageId}")
+    public ResponseEntity<List<PostDTO>> getPostsByPageId(@PathVariable String pageId) {
+        return ResponseEntity.ok(postService.getPostsByPageId(pageId));
+    }
+
     @PostMapping
     public ResponseEntity<PostDTO> createPost(@RequestBody PostDTO postDTO) {
         return ResponseEntity.status(HttpStatus.CREATED).body(postService.createPost(postDTO));

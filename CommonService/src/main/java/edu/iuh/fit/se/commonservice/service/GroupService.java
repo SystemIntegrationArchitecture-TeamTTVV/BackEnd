@@ -31,6 +31,19 @@ public class GroupService {
                 .orElseThrow(() -> new RuntimeException("Group not found with id: " + id));
     }
 
+    public List<GroupDTO> searchGroups(String name) {
+        return groupRepository.findByNameContainingIgnoreCase(name).stream()
+                .filter(Group::isActive)
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<GroupDTO> getGroupsByAdminId(String adminId) {
+        return groupRepository.findByAdminIdAndIsActiveTrueOrderByCreatedAtDesc(adminId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public GroupDTO createGroup(GroupDTO groupDTO) {
         Group group = toEntity(groupDTO);
         group.setCreatedAt(LocalDateTime.now());

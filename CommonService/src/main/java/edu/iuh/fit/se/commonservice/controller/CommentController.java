@@ -21,6 +21,11 @@ public class CommentController {
         return ResponseEntity.ok(commentService.getCommentsByPostId(postId));
     }
 
+    @GetMapping("/parent/{parentCommentId}/replies")
+    public ResponseEntity<List<CommentDTO>> getRepliesByParentCommentId(@PathVariable String parentCommentId) {
+        return ResponseEntity.ok(commentService.getRepliesByParentCommentId(parentCommentId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<CommentDTO> getCommentById(@PathVariable String id) {
         return ResponseEntity.ok(commentService.getCommentById(id));

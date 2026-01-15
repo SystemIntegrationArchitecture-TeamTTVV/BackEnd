@@ -21,6 +21,11 @@ public class CallController {
         return ResponseEntity.ok(callService.getCallsByConversationId(conversationId));
     }
 
+    @GetMapping("/caller/{callerId}")
+    public ResponseEntity<List<CallDTO>> getCallsByCallerId(@PathVariable String callerId) {
+        return ResponseEntity.ok(callService.getCallsByCallerId(callerId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<CallDTO> getCallById(@PathVariable String id) {
         return ResponseEntity.ok(callService.getCallById(id));

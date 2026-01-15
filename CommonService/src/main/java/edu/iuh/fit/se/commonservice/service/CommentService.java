@@ -24,6 +24,13 @@ public class CommentService {
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
+                .filter(comment -> comment.getParentComment() == null) // Only root comments
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<CommentDTO> getRepliesByParentCommentId(String parentCommentId) {
+        return commentRepository.findByParentCommentIdOrderByCreatedAtAsc(parentCommentId).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -45,6 +52,11 @@ public class CommentService {
                 .orElseThrow(() -> new RuntimeException("Post not found"));
         post.setCommentCount(post.getCommentCount() + 1);
         postRepository.save(post);
+        
+        // Update reply count if it's a reply
+        if (commentDTO.getParentCommentId() != null) {
+            updateReplyCount(commentDTO.getParentCommentId());
+        }
         
         return toDTO(saved);
     }
@@ -119,6 +131,13 @@ public class CommentService {
         comment.setLikeCount(0);
         comment.setReplyCount(0);
         return comment;
+    }
+
+    public void updateReplyCount(String parentCommentId) {
+        Comment parent = commentRepository.findById(parentCommentId)
+                .orElseThrow(() -> new RuntimeException("Parent comment not found"));
+        parent.setReplyCount((int) commentRepository.findByParentCommentIdOrderByCreatedAtAsc(parentCommentId).stream().count());
+        commentRepository.save(parent);
     }
 }
 

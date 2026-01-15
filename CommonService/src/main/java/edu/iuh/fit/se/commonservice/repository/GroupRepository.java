@@ -10,5 +10,6 @@ import java.util.List;
 public interface GroupRepository extends MongoRepository<Group, String> {
     List<Group> findByIsActiveTrueOrderByCreatedAtDesc();
     List<Group> findByNameContainingIgnoreCase(String name);
+    List<Group> findByAdminIdAndIsActiveTrueOrderByCreatedAtDesc(String adminId);
 }
 

@@ -22,6 +22,12 @@ public class CallService {
                 .collect(Collectors.toList());
     }
 
+    public List<CallDTO> getCallsByCallerId(String callerId) {
+        return callRepository.findByCallerIdOrderByStartedAtDesc(callerId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public CallDTO getCallById(String id) {
         return callRepository.findById(id)
                 .map(this::toDTO)

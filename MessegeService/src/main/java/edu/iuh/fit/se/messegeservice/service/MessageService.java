@@ -26,6 +26,17 @@ public class MessageService {
                 .collect(Collectors.toList());
     }
 
+    public List<MessageDTO> getMessagesBySenderId(String senderId) {
+        return messageRepository.findBySenderIdOrderByCreatedAtDesc(senderId).stream()
+                .filter(msg -> !msg.isDeleted())
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public long getMessageCountByConversationId(String conversationId) {
+        return messageRepository.countByConversationId(conversationId);
+    }
+
     public MessageDTO getMessageById(String id) {
         return messageRepository.findById(id)
                 .map(this::toDTO)

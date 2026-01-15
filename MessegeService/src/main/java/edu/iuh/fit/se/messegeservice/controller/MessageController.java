@@ -21,6 +21,16 @@ public class MessageController {
         return ResponseEntity.ok(messageService.getMessagesByConversationId(conversationId));
     }
 
+    @GetMapping("/sender/{senderId}")
+    public ResponseEntity<List<MessageDTO>> getMessagesBySenderId(@PathVariable String senderId) {
+        return ResponseEntity.ok(messageService.getMessagesBySenderId(senderId));
+    }
+
+    @GetMapping("/conversation/{conversationId}/count")
+    public ResponseEntity<Long> getMessageCountByConversationId(@PathVariable String conversationId) {
+        return ResponseEntity.ok(messageService.getMessageCountByConversationId(conversationId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<MessageDTO> getMessageById(@PathVariable String id) {
         return ResponseEntity.ok(messageService.getMessageById(id));
