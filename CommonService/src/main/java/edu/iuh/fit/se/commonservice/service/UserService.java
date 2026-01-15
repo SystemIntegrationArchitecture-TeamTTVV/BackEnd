@@ -1,9 +1,13 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.model.Role;
 import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.repository.RoleRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -15,6 +19,8 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll().stream()
@@ -52,12 +58,10 @@ public class UserService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public UserDTO createUser(UserDTO userDTO) {
-        User user = toEntity(userDTO);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
-        User saved = userRepository.save(user);
-        return toDTO(saved);
+        // For admin creating users, use default password
+        return createUserWithPassword(userDTO, "123456");
     }
 
     public UserDTO updateUser(String id, UserDTO userDTO) {
@@ -103,7 +107,7 @@ public class UserService {
         dto.setRelationshipStatus(user.getRelationshipStatus());
         dto.setActive(user.isActive());
         dto.setVerified(user.isVerified());
-        dto.setRole(user.getRole());
+        dto.setRole(user.getRole() != null ? user.getRole().getName() : "USER");
         dto.setInterests(user.getInterests());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setUpdatedAt(user.getUpdatedAt());
@@ -118,7 +122,7 @@ public class UserService {
         User user = new User();
         user.setEmail(dto.getEmail());
         user.setUsername(dto.getUsername());
-        user.setPassword("{noop}123456"); // Default password, should be set separately
+        // Password should be set separately, not from DTO
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
         user.setFullName(dto.getFullName());
@@ -129,7 +133,56 @@ public class UserService {
         user.setCountry(dto.getCountry());
         user.setGender(dto.getGender());
         user.setInterests(dto.getInterests());
+        
+        // Set role
+        String roleName = dto.getRole() != null ? dto.getRole() : "USER";
+        Role role = roleRepository.findByName(roleName)
+                .orElseGet(() -> {
+                    // Create default USER role if not exists
+                    Role newRole = new Role();
+                    newRole.setName("USER");
+                    newRole.setDescription("Regular user");
+                    newRole.setActive(true);
+                    newRole.setCreatedAt(LocalDateTime.now());
+                    newRole.setUpdatedAt(LocalDateTime.now());
+                    return roleRepository.save(newRole);
+                });
+        user.setRole(role);
+        user.setRoleId(role.getId());
+        
         return user;
+    }
+    
+    public UserDTO createUserWithPassword(UserDTO userDTO, String password) {
+        User user = toEntity(userDTO);
+        user.setPassword(passwordEncoder.encode(password != null ? password : "123456"));
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+        User saved = userRepository.save(user);
+        return toDTO(saved);
+    }
+    
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserDTO updateUserRole(String id, String roleName) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
+        
+        user.setRole(role);
+        user.setRoleId(role.getId());
+        user.setUpdatedAt(LocalDateTime.now());
+        User updated = userRepository.save(user);
+        return toDTO(updated);
+    }
+    
+    @PreAuthorize("hasRole('ADMIN')")
+    public void deactivateUser(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        user.setActive(false);
+        userRepository.save(user);
     }
 }
 

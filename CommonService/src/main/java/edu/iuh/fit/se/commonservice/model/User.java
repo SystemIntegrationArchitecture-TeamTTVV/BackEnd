@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -42,7 +43,10 @@ public class User {
     
     private boolean isActive = true;
     private boolean isVerified = false;
-    private String role = "USER"; // USER, ADMIN, MODERATOR
+    
+    @DBRef
+    private Role role; // Reference to Role entity
+    private String roleId; // For easier querying
     
     private List<String> interests; // Sở thích
     private LocalDateTime createdAt;

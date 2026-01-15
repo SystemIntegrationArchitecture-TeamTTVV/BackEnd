@@ -6,10 +6,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -18,6 +20,7 @@ import java.util.Random;
 public class DataSeeder implements CommandLineRunner {
 
     private final MongoTemplate mongoTemplate;
+    private final PasswordEncoder passwordEncoder;
     private final Random random = new Random();
 
     @Value("${app.data.seed.enabled:false}")
@@ -39,8 +42,12 @@ public class DataSeeder implements CommandLineRunner {
 
         System.out.println("🌱 Starting data seeding...");
 
+        // ==== Roles ====
+        List<Role> roles = seedRoles();
+        mongoTemplate.insert(roles, Role.class);
+
         // ==== Users ====
-        List<User> users = seedUsers();
+        List<User> users = seedUsers(roles);
         mongoTemplate.insert(users, User.class);
 
         // ==== Friends & Friend Requests ====
@@ -92,40 +99,95 @@ public class DataSeeder implements CommandLineRunner {
         System.out.println("💡 To disable seeding on next run, set 'app.data.seed.enabled=false' in application.properties");
     }
 
-    private List<User> seedUsers() {
+    private List<Role> seedRoles() {
+        List<Role> roles = new ArrayList<>();
+        
+        Role adminRole = new Role();
+        adminRole.setName("ADMIN");
+        adminRole.setDescription("System Administrator - Full access to all features");
+        adminRole.setPermissions(Arrays.asList(
+                "READ_POST", "WRITE_POST", "DELETE_POST", "MANAGE_USERS", 
+                "MANAGE_GROUPS", "MANAGE_COMMENTS", "VIEW_REPORTS", "MANAGE_ROLES"
+        ));
+        adminRole.setActive(true);
+        adminRole.setCreatedAt(LocalDateTime.now());
+        adminRole.setUpdatedAt(LocalDateTime.now());
+        roles.add(adminRole);
+        
+        Role moderatorRole = new Role();
+        moderatorRole.setName("MODERATOR");
+        moderatorRole.setDescription("Content Moderator - Can moderate content and manage groups");
+        moderatorRole.setPermissions(Arrays.asList(
+                "READ_POST", "WRITE_POST", "DELETE_POST", "MANAGE_GROUPS", 
+                "MANAGE_COMMENTS", "VIEW_REPORTS"
+        ));
+        moderatorRole.setActive(true);
+        moderatorRole.setCreatedAt(LocalDateTime.now());
+        moderatorRole.setUpdatedAt(LocalDateTime.now());
+        roles.add(moderatorRole);
+        
+        Role userRole = new Role();
+        userRole.setName("USER");
+        userRole.setDescription("Regular User - Standard user permissions");
+        userRole.setPermissions(Arrays.asList(
+                "READ_POST", "WRITE_POST", "READ_COMMENT", "WRITE_COMMENT",
+                "MANAGE_OWN_POST", "MANAGE_OWN_COMMENT"
+        ));
+        userRole.setActive(true);
+        userRole.setCreatedAt(LocalDateTime.now());
+        userRole.setUpdatedAt(LocalDateTime.now());
+        roles.add(userRole);
+        
+        return roles;
+    }
+
+    private List<User> seedUsers(List<Role> roles) {
+        Role adminRole = roles.stream().filter(r -> r.getName().equals("ADMIN")).findFirst().orElse(null);
+        Role moderatorRole = roles.stream().filter(r -> r.getName().equals("MODERATOR")).findFirst().orElse(null);
+        Role userRole = roles.stream().filter(r -> r.getName().equals("USER")).findFirst().orElse(null);
+        
         List<User> list = new ArrayList<>();
-        list.add(buildUser("nguyen.thi.lan@example.vn", "nguyenlan", "Nguyễn", "Thị Lan",
+        // Admin user
+        list.add(buildUser("admin@ttvv.vn", "admin", "Admin", "System", adminRole,
                 "https://picsum.photos/400/400?random=1",
-                "Kết nối & chia sẻ cảm hứng du lịch Việt Nam.", "Hà Nội"));
-        list.add(buildUser("tran.van.minh@example.vn", "tranminh", "Trần", "Văn Minh",
+                "System Administrator", "Hà Nội"));
+        // Moderator user
+        list.add(buildUser("moderator@ttvv.vn", "moderator", "Moderator", "System", moderatorRole,
                 "https://picsum.photos/400/400?random=2",
-                "Yêu công nghệ, mê cà phê sáng.", "TP. HCM"));
-        list.add(buildUser("le.thi.hong@example.vn", "lehong", "Lê", "Thị Hồng",
+                "Content Moderator", "TP. HCM"));
+        // Regular users
+        list.add(buildUser("nguyen.thi.lan@example.vn", "nguyenlan", "Nguyễn", "Thị Lan", userRole,
                 "https://picsum.photos/400/400?random=3",
-                "Foodie đam mê ẩm thực Việt Nam.", "Đà Nẵng"));
-        list.add(buildUser("pham.van.duc@example.vn", "phamduc", "Phạm", "Văn Đức",
+                "Kết nối & chia sẻ cảm hứng du lịch Việt Nam.", "Hà Nội"));
+        list.add(buildUser("tran.van.minh@example.vn", "tranminh", "Trần", "Văn Minh", userRole,
                 "https://picsum.photos/400/400?random=4",
-                "Sản phẩm số & startup Việt Nam.", "Hà Nội"));
-        list.add(buildUser("hoang.thi.linh@example.vn", "hoanglinh", "Hoàng", "Thị Linh",
+                "Yêu công nghệ, mê cà phê sáng.", "TP. HCM"));
+        list.add(buildUser("le.thi.hong@example.vn", "lehong", "Lê", "Thị Hồng", userRole,
                 "https://picsum.photos/400/400?random=5",
-                "Designer thích phong cách tối giản.", "Cần Thơ"));
-        list.add(buildUser("vu.van.tuan@example.vn", "vutuan", "Vũ", "Văn Tuấn",
+                "Foodie đam mê ẩm thực Việt Nam.", "Đà Nẵng"));
+        list.add(buildUser("pham.van.duc@example.vn", "phamduc", "Phạm", "Văn Đức", userRole,
                 "https://picsum.photos/400/400?random=6",
-                "Nhiếp ảnh & leo núi Việt Nam.", "Đà Lạt"));
-        list.add(buildUser("dang.thi.huyen@example.vn", "danghuyen", "Đặng", "Thị Huyền",
+                "Sản phẩm số & startup Việt Nam.", "Hà Nội"));
+        list.add(buildUser("hoang.thi.linh@example.vn", "hoanglinh", "Hoàng", "Thị Linh", userRole,
                 "https://picsum.photos/400/400?random=7",
-                "Chạy bộ & thiền định mỗi sáng.", "Hải Phòng"));
-        list.add(buildUser("bui.van.hung@example.vn", "buihung", "Bùi", "Văn Hùng",
+                "Designer thích phong cách tối giản.", "Cần Thơ"));
+        list.add(buildUser("vu.van.tuan@example.vn", "vutuan", "Vũ", "Văn Tuấn", userRole,
                 "https://picsum.photos/400/400?random=8",
+                "Nhiếp ảnh & leo núi Việt Nam.", "Đà Lạt"));
+        list.add(buildUser("dang.thi.huyen@example.vn", "danghuyen", "Đặng", "Thị Huyền", userRole,
+                "https://picsum.photos/400/400?random=9",
+                "Chạy bộ & thiền định mỗi sáng.", "Hải Phòng"));
+        list.add(buildUser("bui.van.hung@example.vn", "buihung", "Bùi", "Văn Hùng", userRole,
+                "https://picsum.photos/400/400?random=10",
                 "Kỹ sư phần mềm & đọc sách công nghệ.", "Huế"));
         return list;
     }
 
-    private User buildUser(String email, String username, String first, String last, String avatar, String bio, String city) {
+    private User buildUser(String email, String username, String first, String last, Role role, String avatar, String bio, String city) {
         User u = new User();
         u.setEmail(email);
         u.setUsername(username);
-        u.setPassword("{noop}123456"); // placeholder
+        u.setPassword(passwordEncoder.encode("123456")); // Encoded password
         u.setFirstName(first);
         u.setLastName(last);
         u.setFullName(first + " " + last);
@@ -135,6 +197,10 @@ public class DataSeeder implements CommandLineRunner {
         u.setCity(city);
         u.setCountry("Việt Nam");
         u.setGender("Khác");
+        u.setRole(role);
+        u.setRoleId(role != null ? role.getId() : null);
+        u.setActive(true);
+        u.setVerified(role != null && (role.getName().equals("ADMIN") || role.getName().equals("MODERATOR")));
         u.setInterests(List.of("du lịch", "ẩm thực", "công nghệ"));
         u.setCreatedAt(LocalDateTime.now().minusDays(random.nextInt(30)));
         u.setUpdatedAt(LocalDateTime.now());

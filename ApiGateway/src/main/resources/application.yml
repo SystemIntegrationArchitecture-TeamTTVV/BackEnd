@@ -83,6 +83,13 @@ spring:
           filters:
             - StripPrefix=2
         
+        - id: common-service-roles
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/roles/**
+          filters:
+            - StripPrefix=2
+        
         - id: common-service-all
           uri: http://localhost:8081
           predicates:
