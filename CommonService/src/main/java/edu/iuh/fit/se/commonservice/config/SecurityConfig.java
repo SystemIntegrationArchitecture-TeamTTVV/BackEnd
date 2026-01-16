@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.config;
 
 import edu.iuh.fit.se.commonservice.security.JwtAuthenticationFilter;
+import edu.iuh.fit.se.commonservice.security.SwaggerBypassFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 @EnableWebSecurity
@@ -23,7 +25,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final SwaggerBypassFilter swaggerBypassFilter;
     private final UserDetailsService userDetailsService;
+    
+    @Value("${app.security.enabled:true}")
+    private boolean securityEnabled;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -39,18 +45,27 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        
+        if (!securityEnabled) {
+            // Development mode: Allow all requests without authentication
+            http.authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()
+            );
+        } else {
+            // Production mode: Require authentication
+            // But allow Swagger requests to bypass (handled by SwaggerBypassFilter)
+            http.authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 
-                // Admin only endpoints
+                // All API endpoints require authentication (but SwaggerBypassFilter will handle Swagger requests)
+                .requestMatchers("/api/groups/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/posts/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/comments/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
-                .requestMatchers("/api/groups/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/friends/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/friend-requests/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/reactions/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
@@ -60,7 +75,9 @@ public class SecurityConfig {
                 // All other requests need authentication
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(swaggerBypassFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        }
         
         return http.build();
     }
