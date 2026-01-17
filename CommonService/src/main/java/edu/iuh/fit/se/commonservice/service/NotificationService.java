@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
+import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Notification;
 import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.NotificationRepository;
@@ -18,6 +19,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final SocketService socketService;
 
     public List<NotificationDTO> getNotificationsByRecipientId(String recipientId) {
         return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId).stream()
@@ -46,7 +48,17 @@ public class NotificationService {
         notification.setRead(false);
         notification.setCreatedAt(LocalDateTime.now());
         Notification saved = notificationRepository.save(notification);
-        return toDTO(saved);
+        NotificationDTO savedDTO = toDTO(saved);
+        
+        // Send socket event to recipient
+        if (savedDTO.getRecipientId() != null) {
+            socketService.sendNotification(
+                savedDTO.getRecipientId(),
+                SocketEventDTO.notification(savedDTO.getRecipientId(), savedDTO)
+            );
+        }
+        
+        return savedDTO;
     }
 
     public NotificationDTO markAsRead(String id) {

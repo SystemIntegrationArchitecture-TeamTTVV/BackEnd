@@ -1,6 +1,8 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.FriendRequestDTO;
+import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
+import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.FriendRequest;
 import edu.iuh.fit.se.commonservice.model.User;
@@ -21,6 +23,8 @@ public class FriendRequestService {
     private final FriendRequestRepository friendRequestRepository;
     private final FriendRepository friendRepository;
     private final UserRepository userRepository;
+    private final SocketService socketService;
+    private final NotificationService notificationService;
 
     public List<FriendRequestDTO> getFriendRequestsBySenderId(String senderId) {
         return friendRequestRepository.findBySenderId(senderId).stream()
@@ -66,7 +70,34 @@ public class FriendRequestService {
         friendRequest.setCreatedAt(LocalDateTime.now());
         friendRequest.setUpdatedAt(LocalDateTime.now());
         FriendRequest saved = friendRequestRepository.save(friendRequest);
-        return toDTO(saved);
+        FriendRequestDTO savedDTO = toDTO(saved);
+        
+        // Send notification to receiver via socket
+        User sender = userRepository.findById(savedDTO.getSenderId())
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        
+        NotificationDTO notification = new NotificationDTO();
+        notification.setRecipientId(savedDTO.getReceiverId());
+        notification.setActorId(savedDTO.getSenderId());
+        notification.setActorName(savedDTO.getSenderName());
+        notification.setActorAvatar(savedDTO.getSenderAvatar());
+        notification.setType("FRIEND_REQUEST");
+        notification.setTitle("Friend Request");
+        notification.setContent(sender.getFullName() + " sent you a friend request");
+        notification.setRelatedId(savedDTO.getId());
+        notification.setRelatedType("FRIEND_REQUEST");
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        
+        notificationService.createNotification(notification);
+        
+        // Send socket event
+        socketService.sendNotification(
+            savedDTO.getReceiverId(),
+            SocketEventDTO.notification(savedDTO.getReceiverId(), notification)
+        );
+        
+        return savedDTO;
     }
 
     public FriendRequestDTO acceptFriendRequest(String id) {
@@ -107,7 +138,31 @@ public class FriendRequestService {
         friend2.setUpdatedAt(LocalDateTime.now());
         friendRepository.save(friend2);
 
-        return toDTO(friendRequest);
+        FriendRequestDTO friendRequestDTO = toDTO(friendRequest);
+        
+        // Send notification to sender via socket
+        NotificationDTO notification = new NotificationDTO();
+        notification.setRecipientId(friendRequestDTO.getSenderId());
+        notification.setActorId(friendRequestDTO.getReceiverId());
+        notification.setActorName(friendRequestDTO.getReceiverName());
+        notification.setActorAvatar(friendRequestDTO.getReceiverAvatar());
+        notification.setType("FRIEND_ACCEPTED");
+        notification.setTitle("Friend Request Accepted");
+        notification.setContent(receiver.getFullName() + " accepted your friend request");
+        notification.setRelatedId(friendRequestDTO.getId());
+        notification.setRelatedType("FRIEND_REQUEST");
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        
+        notificationService.createNotification(notification);
+        
+        // Send socket event
+        socketService.sendNotification(
+            friendRequestDTO.getSenderId(),
+            SocketEventDTO.notification(friendRequestDTO.getSenderId(), notification)
+        );
+        
+        return friendRequestDTO;
     }
 
     public FriendRequestDTO rejectFriendRequest(String id) {

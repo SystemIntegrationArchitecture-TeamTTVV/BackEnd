@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.ReactionDTO;
+import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Comment;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.model.Reaction;
@@ -24,6 +25,7 @@ public class ReactionService {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
+    private final SocketService socketService;
 
     public List<ReactionDTO> getReactionsByPostId(String postId) {
         return reactionRepository.findByPostId(postId).stream()
@@ -65,7 +67,12 @@ public class ReactionService {
             existingReaction.setType(reactionDTO.getType());
             Reaction updated = reactionRepository.save(existingReaction);
             updateReactionCounts(reactionDTO);
-            return toDTO(updated);
+            ReactionDTO updatedDTO = toDTO(updated);
+            
+            // Send socket event
+            sendReactionEvent(reactionDTO, updatedDTO);
+            
+            return updatedDTO;
         }
 
         // Create new reaction
@@ -73,7 +80,29 @@ public class ReactionService {
         reaction.setCreatedAt(LocalDateTime.now());
         Reaction saved = reactionRepository.save(reaction);
         updateReactionCounts(reactionDTO);
-        return toDTO(saved);
+        ReactionDTO savedDTO = toDTO(saved);
+        
+        // Send socket event
+        sendReactionEvent(reactionDTO, savedDTO);
+        
+        return savedDTO;
+    }
+    
+    private void sendReactionEvent(ReactionDTO reactionDTO, ReactionDTO savedDTO) {
+        String postAuthorId = null;
+        if (reactionDTO.getPostId() != null) {
+            Post post = postRepository.findById(reactionDTO.getPostId()).orElse(null);
+            if (post != null && post.getAuthor() != null) {
+                postAuthorId = post.getAuthor().getId();
+            }
+        }
+        
+        if (postAuthorId != null && !postAuthorId.equals(reactionDTO.getUserId())) {
+            socketService.notifyReactionAdded(
+                postAuthorId,
+                SocketEventDTO.reactionAdded(reactionDTO.getUserId(), savedDTO)
+            );
+        }
     }
 
     public void deleteReaction(String id) {

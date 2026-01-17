@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.CommentDTO;
+import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Comment;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.model.User;
@@ -21,6 +22,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final SocketService socketService;
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
@@ -58,7 +60,18 @@ public class CommentService {
             updateReplyCount(commentDTO.getParentCommentId());
         }
         
-        return toDTO(saved);
+        CommentDTO savedDTO = toDTO(saved);
+        
+        // Send socket event - notify post author
+        String postAuthorId = post.getAuthor() != null ? post.getAuthor().getId() : null;
+        if (postAuthorId != null && !postAuthorId.equals(commentDTO.getUserId())) {
+            socketService.notifyCommentCreated(
+                postAuthorId,
+                SocketEventDTO.commentCreated(commentDTO.getUserId(), savedDTO)
+            );
+        }
+        
+        return savedDTO;
     }
 
     public CommentDTO updateComment(String id, CommentDTO commentDTO) {
