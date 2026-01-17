@@ -15,10 +15,15 @@ public class SocketService {
 
     /**
      * Send notification to specific user
+     * @param username The username (principal name) of the user, not userId
+     * @param event The socket event to send
      */
-    public void sendNotification(String userId, SocketEventDTO event) {
-        log.debug("Sending notification to user {}: {}", userId, event.getType());
-        messagingTemplate.convertAndSendToUser(userId, "/queue/notifications", event);
+    public void sendNotification(String username, SocketEventDTO event) {
+        log.info("📤 Sending notification to username {}: type={}, data={}", username, event.getType(), event.getData());
+        // convertAndSendToUser uses the user's principal name (username), not userId
+        // This will send to /user/{username}/queue/notifications
+        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", event);
+        log.info("✅ Notification sent to username {} via /user/{}/queue/notifications", username, username);
     }
 
     /**

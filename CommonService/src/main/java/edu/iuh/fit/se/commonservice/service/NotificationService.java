@@ -83,6 +83,14 @@ public class NotificationService {
         notificationRepository.deleteByRecipientId(recipientId);
     }
 
+    public void deleteNotificationsByRelatedIdAndType(String relatedId, String type) {
+        notificationRepository.deleteByRelatedIdAndType(relatedId, type);
+    }
+
+    public void deleteNotificationByRecipientAndRelatedIdAndType(String recipientId, String relatedId, String type) {
+        notificationRepository.deleteByRecipientIdAndRelatedIdAndType(recipientId, relatedId, type);
+    }
+
     private NotificationDTO toDTO(Notification notification) {
         NotificationDTO dto = new NotificationDTO();
         dto.setId(notification.getId());

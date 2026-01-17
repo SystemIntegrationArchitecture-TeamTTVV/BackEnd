@@ -10,12 +10,15 @@ import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.FriendRequestRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FriendRequestService {
@@ -51,19 +54,44 @@ public class FriendRequestService {
     }
 
     public FriendRequestDTO createFriendRequest(FriendRequestDTO friendRequestDTO) {
-        // Check if request already exists
-        if (friendRequestRepository.existsBySenderIdAndReceiverId(
-                friendRequestDTO.getSenderId(), friendRequestDTO.getReceiverId())) {
+        // Check if pending request already exists
+        if (friendRequestRepository.existsBySenderIdAndReceiverIdAndStatus(
+                friendRequestDTO.getSenderId(), friendRequestDTO.getReceiverId(), "PENDING")) {
+            throw new RuntimeException("Friend request already exists");
+        }
+        
+        // Check if reverse pending request exists (receiver sent to sender)
+        if (friendRequestRepository.existsBySenderIdAndReceiverIdAndStatus(
+                friendRequestDTO.getReceiverId(), friendRequestDTO.getSenderId(), "PENDING")) {
             throw new RuntimeException("Friend request already exists");
         }
 
-        // Check if already friends
-        if (friendRepository.existsByUserIdAndFriendId(
+        // Check if already friends (check FriendRequest ACTIVE or Friend entity)
+        Optional<FriendRequest> existingAccepted = friendRequestRepository.findBySenderIdAndReceiverId(
+                friendRequestDTO.getSenderId(), friendRequestDTO.getReceiverId())
+                .filter(fr -> "ACTIVE".equals(fr.getStatus()));
+        
+        Optional<FriendRequest> reverseAccepted = friendRequestRepository.findBySenderIdAndReceiverId(
+                friendRequestDTO.getReceiverId(), friendRequestDTO.getSenderId())
+                .filter(fr -> "ACTIVE".equals(fr.getStatus()));
+        
+        if (existingAccepted.isPresent() || reverseAccepted.isPresent() ||
+            friendRepository.existsByUserIdAndFriendId(
                 friendRequestDTO.getSenderId(), friendRequestDTO.getReceiverId()) ||
             friendRepository.existsByUserIdAndFriendId(
                 friendRequestDTO.getReceiverId(), friendRequestDTO.getSenderId())) {
             throw new RuntimeException("Users are already friends");
         }
+
+        // Xóa bất kỳ friend request cũ nào có cùng sender/receiver (nếu có)
+        // Để tránh duplicate key error do unique index
+        friendRequestRepository.findBySenderIdAndReceiverId(
+                friendRequestDTO.getSenderId(), friendRequestDTO.getReceiverId())
+                .ifPresent(friendRequestRepository::delete);
+        
+        friendRequestRepository.findBySenderIdAndReceiverId(
+                friendRequestDTO.getReceiverId(), friendRequestDTO.getSenderId())
+                .ifPresent(friendRequestRepository::delete);
 
         FriendRequest friendRequest = toEntity(friendRequestDTO);
         friendRequest.setStatus("PENDING");
@@ -108,7 +136,7 @@ public class FriendRequestService {
             throw new RuntimeException("Friend request is not pending");
         }
 
-        friendRequest.setStatus("ACCEPTED");
+        friendRequest.setStatus("ACTIVE");
         friendRequest.setUpdatedAt(LocalDateTime.now());
         friendRequestRepository.save(friendRequest);
 
@@ -154,35 +182,83 @@ public class FriendRequestService {
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
         
-        notificationService.createNotification(notification);
+        NotificationDTO savedNotification = notificationService.createNotification(notification);
+        log.info("📨 Created notification: id={}, recipientId={}, type={}", 
+            savedNotification.getId(), savedNotification.getRecipientId(), savedNotification.getType());
+        
+        // Xóa notification FRIEND_REQUEST của receiver (vì đã accept rồi)
+        // Xóa notification của receiver cụ thể với relatedId = friendRequestId
+        notificationService.deleteNotificationByRecipientAndRelatedIdAndType(
+            friendRequestDTO.getReceiverId(), 
+            friendRequestDTO.getId(), 
+            "FRIEND_REQUEST"
+        );
+        log.info("🗑️ Deleted FRIEND_REQUEST notification for receiver {} after acceptance: relatedId={}", 
+            friendRequestDTO.getReceiverId(), friendRequestDTO.getId());
+        
+        // Get sender username for WebSocket (convertAndSendToUser uses username, not userId)
+        // Note: sender was already loaded above, but we need username for WebSocket
+        String senderUsername = sender.getUsername();
         
         // Send socket event
-        socketService.sendNotification(
-            friendRequestDTO.getSenderId(),
-            SocketEventDTO.notification(friendRequestDTO.getSenderId(), notification)
-        );
+        SocketEventDTO socketEvent = SocketEventDTO.notification(friendRequestDTO.getSenderId(), savedNotification);
+        log.info("📤 Sending socket notification to user {} (username={}): {}", 
+            friendRequestDTO.getSenderId(), senderUsername, socketEvent.getType());
+        socketService.sendNotification(senderUsername, socketEvent);
         
         return friendRequestDTO;
     }
 
-    public FriendRequestDTO rejectFriendRequest(String id) {
+    public void rejectFriendRequest(String id) {
+        // Xóa friend request thay vì set status REJECTED
         FriendRequest friendRequest = friendRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Friend request not found with id: " + id));
-
-        friendRequest.setStatus("REJECTED");
-        friendRequest.setUpdatedAt(LocalDateTime.now());
-        FriendRequest saved = friendRequestRepository.save(friendRequest);
-        return toDTO(saved);
+        
+        friendRequestRepository.delete(friendRequest);
+        log.info("🗑️ Rejected (deleted) friend request: id={}", id);
     }
 
-    public FriendRequestDTO cancelFriendRequest(String id) {
+    public void cancelFriendRequest(String id) {
+        // Xóa friend request thay vì set status CANCELLED
         FriendRequest friendRequest = friendRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Friend request not found with id: " + id));
-
-        friendRequest.setStatus("CANCELLED");
-        friendRequest.setUpdatedAt(LocalDateTime.now());
-        FriendRequest saved = friendRequestRepository.save(friendRequest);
-        return toDTO(saved);
+        
+        friendRequestRepository.delete(friendRequest);
+        log.info("🗑️ Cancelled (deleted) friend request: id={}", id);
+    }
+    
+    /**
+     * Xóa bạn (unfriend) - Xóa FriendRequest ACTIVE và Friend entities
+     */
+    public void unfriend(String userId1, String userId2) {
+        // Xóa FriendRequest ACTIVE (cả 2 chiều)
+        List<FriendRequest> friendRequests = friendRequestRepository.findBySenderId(userId1);
+        friendRequests.addAll(friendRequestRepository.findBySenderId(userId2));
+        
+        friendRequests.stream()
+                .filter(fr -> ("ACTIVE".equals(fr.getStatus())) &&
+                             ((fr.getSenderId().equals(userId1) && fr.getReceiverId().equals(userId2)) ||
+                              (fr.getSenderId().equals(userId2) && fr.getReceiverId().equals(userId1))))
+                .forEach(fr -> {
+                    friendRequestRepository.delete(fr);
+                    log.info("🗑️ Deleted friend request: id={}, sender={}, receiver={}", 
+                        fr.getId(), fr.getSenderId(), fr.getReceiverId());
+                });
+        
+        // Xóa Friend entities (cả 2 chiều)
+        friendRepository.findByUserIdAndFriendId(userId1, userId2)
+                .ifPresent(friend -> {
+                    friendRepository.delete(friend);
+                    log.info("🗑️ Deleted friend relationship: userId={}, friendId={}", userId1, userId2);
+                });
+        
+        friendRepository.findByUserIdAndFriendId(userId2, userId1)
+                .ifPresent(friend -> {
+                    friendRepository.delete(friend);
+                    log.info("🗑️ Deleted friend relationship: userId={}, friendId={}", userId2, userId1);
+                });
+        
+        log.info("✅ Unfriended: user1={}, user2={}", userId1, userId2);
     }
 
     public void deleteFriendRequest(String id) {

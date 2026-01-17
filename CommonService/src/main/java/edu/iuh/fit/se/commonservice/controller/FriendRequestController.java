@@ -47,13 +47,21 @@ public class FriendRequestController {
     }
 
     @PutMapping("/{id}/reject")
-    public ResponseEntity<FriendRequestDTO> rejectFriendRequest(@PathVariable String id) {
-        return ResponseEntity.ok(friendRequestService.rejectFriendRequest(id));
+    public ResponseEntity<Void> rejectFriendRequest(@PathVariable String id) {
+        friendRequestService.rejectFriendRequest(id);
+        return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<FriendRequestDTO> cancelFriendRequest(@PathVariable String id) {
-        return ResponseEntity.ok(friendRequestService.cancelFriendRequest(id));
+    public ResponseEntity<Void> cancelFriendRequest(@PathVariable String id) {
+        friendRequestService.cancelFriendRequest(id);
+        return ResponseEntity.ok().build();
+    }
+    
+    @DeleteMapping("/unfriend")
+    public ResponseEntity<Void> unfriend(@RequestParam String userId1, @RequestParam String userId2) {
+        friendRequestService.unfriend(userId1, userId2);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
