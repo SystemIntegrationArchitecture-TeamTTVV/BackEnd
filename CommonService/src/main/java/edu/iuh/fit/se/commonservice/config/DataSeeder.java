@@ -180,6 +180,16 @@ public class DataSeeder implements CommandLineRunner {
         list.add(buildUser("bui.van.hung@example.vn", "buihung", "Bùi", "Văn Hùng", userRole,
                 "https://picsum.photos/400/400?random=10",
                 "Kỹ sư phần mềm & đọc sách công nghệ.", "Huế"));
+        // Test users - easy to login
+        list.add(buildUser("user1@test.vn", "user1", "User", "One", userRole,
+                "https://picsum.photos/400/400?random=11",
+                "Test user 1", "Hà Nội"));
+        list.add(buildUser("test@test.vn", "test", "Test", "User", userRole,
+                "https://picsum.photos/400/400?random=12",
+                "Test user", "TP. HCM"));
+        list.add(buildUser("demo@test.vn", "demo", "Demo", "User", userRole,
+                "https://picsum.photos/400/400?random=13",
+                "Demo user", "Đà Nẵng"));
         return list;
     }
 
@@ -187,7 +197,7 @@ public class DataSeeder implements CommandLineRunner {
         User u = new User();
         u.setEmail(email);
         u.setUsername(username);
-        u.setPassword(passwordEncoder.encode("123456")); // Encoded password
+        u.setPassword(passwordEncoder.encode("123")); // Encoded password - easy to remember for testing
         u.setFirstName(first);
         u.setLastName(last);
         u.setFullName(first + " " + last);
