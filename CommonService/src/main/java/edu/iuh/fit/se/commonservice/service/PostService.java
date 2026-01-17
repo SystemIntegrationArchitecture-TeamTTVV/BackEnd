@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
+import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
@@ -18,6 +19,7 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final SocketService socketService;
 
     public List<PostDTO> getAllPosts() {
         return postRepository.findByIsDeletedFalseOrderByCreatedAtDesc().stream()
@@ -55,7 +57,17 @@ public class PostService {
         post.setUpdatedAt(LocalDateTime.now());
         post.setDeleted(false);
         Post saved = postRepository.save(post);
-        return toDTO(saved);
+        PostDTO savedDTO = toDTO(saved);
+        
+        // Send socket event
+        if (savedDTO.getAuthorId() != null) {
+            socketService.notifyPostCreated(
+                savedDTO.getAuthorId(),
+                SocketEventDTO.postCreated(savedDTO.getAuthorId(), savedDTO)
+            );
+        }
+        
+        return savedDTO;
     }
 
     public PostDTO updatePost(String id, PostDTO postDTO) {

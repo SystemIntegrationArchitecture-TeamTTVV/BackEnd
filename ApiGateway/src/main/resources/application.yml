@@ -25,7 +25,16 @@ spring:
           predicates:
             - Path=/api/common/auth/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/auth(/.*)?, /api/auth$1
+        
+        # CommonService WebSocket Route - Must be before common-service-all
+        # WebSocket routes need to be explicitly configured
+        - id: common-service-websocket
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/ws/**
+          filters:
+            - RewritePath=/api/common/ws(/.*)?, /ws$1
         
         # CommonService Routes
         - id: common-service-users
@@ -33,70 +42,70 @@ spring:
           predicates:
             - Path=/api/common/users/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/users(/.*)?, /api/users$1
         
         - id: common-service-posts
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/posts/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/posts(/.*)?, /api/posts$1
         
         - id: common-service-comments
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/comments/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/comments(/.*)?, /api/comments$1
         
         - id: common-service-groups
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/groups/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/groups(/.*)?, /api/groups$1
         
         - id: common-service-friends
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/friends/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/friends(/.*)?, /api/friends$1
         
         - id: common-service-reactions
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/reactions/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/reactions(/.*)?, /api/reactions$1
         
         - id: common-service-friend-requests
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/friend-requests/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/friend-requests(/.*)?, /api/friend-requests$1
         
         - id: common-service-notifications
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/notifications/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/notifications(/.*)?, /api/notifications$1
         
         - id: common-service-stories
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/stories/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/stories(/.*)?, /api/stories$1
         
         - id: common-service-roles
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/roles/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common/roles(/.*)?, /api/roles$1
         
         - id: common-service-all
           uri: http://localhost:8081

@@ -60,6 +60,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
+                // WebSocket endpoints - allow all including SockJS info requests
+                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/ws").permitAll()
                 
                 // All API endpoints require authentication (but SwaggerBypassFilter will handle Swagger requests)
                 .requestMatchers("/api/groups/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
