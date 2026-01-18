@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/messages")
+@RequestMapping("/messages")
 @RequiredArgsConstructor
 public class MessageController {
 
@@ -38,7 +38,14 @@ public class MessageController {
 
     @PostMapping
     public ResponseEntity<MessageDTO> createMessage(@RequestBody MessageDTO messageDTO) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(messageService.createMessage(messageDTO));
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED).body(messageService.createMessage(messageDTO));
+        } catch (Exception e) {
+            // Log error for debugging
+            System.err.println("❌ Error creating message: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @PutMapping("/{id}")

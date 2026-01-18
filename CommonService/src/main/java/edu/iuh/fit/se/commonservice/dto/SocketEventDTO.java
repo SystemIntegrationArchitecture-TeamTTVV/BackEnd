@@ -73,5 +73,51 @@ public class SocketEventDTO {
         event.setTimestamp(LocalDateTime.now());
         return event;
     }
+    
+    // WebRTC Call specific
+    public static SocketEventDTO callOffer(String userId, Object callData) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType("CALL_OFFER");
+        event.setUserId(userId);
+        event.setData(callData);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
+    
+    public static SocketEventDTO callAnswer(String userId, Object answerData) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType("CALL_ANSWER");
+        event.setUserId(userId);
+        event.setData(answerData);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
+    
+    public static SocketEventDTO callIceCandidate(String userId, Object candidateData) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType("CALL_ICE_CANDIDATE");
+        event.setUserId(userId);
+        event.setData(candidateData);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
+    
+    public static SocketEventDTO callReject(String userId, Object rejectData) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType("CALL_REJECT");
+        event.setUserId(userId);
+        event.setData(rejectData);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
+    
+    public static SocketEventDTO callEnd(String userId, Object endData) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType("CALL_END");
+        event.setUserId(userId);
+        event.setData(endData);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
 }
 

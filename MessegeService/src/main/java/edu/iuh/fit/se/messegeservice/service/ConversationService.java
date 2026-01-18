@@ -1,20 +1,30 @@
 package edu.iuh.fit.se.messegeservice.service;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
+import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
+    private final RestTemplate restTemplate;
+    
+    @Value("${common.service.url:http://localhost:8081}")
+    private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
         return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
@@ -86,8 +96,31 @@ public class ConversationService {
         ConversationDTO dto = new ConversationDTO();
         dto.setId(conversation.getId());
         dto.setParticipantIds(conversation.getParticipantIds());
-        dto.setParticipantNames(conversation.getParticipantNames());
-        dto.setParticipantAvatars(conversation.getParticipantAvatars());
+        
+        // 🔥 Populate participant names and avatars from CommonService
+        List<String> participantNames = new ArrayList<>();
+        List<String> participantAvatars = new ArrayList<>();
+        
+        for (String participantId : conversation.getParticipantIds()) {
+            try {
+                String url = commonServiceUrl + "/api/users/" + participantId;
+                UserDTO user = restTemplate.getForObject(url, UserDTO.class);
+                if (user != null) {
+                    participantNames.add(user.getFullName() != null ? user.getFullName() : user.getUsername());
+                    participantAvatars.add(user.getAvatar());
+                } else {
+                    participantNames.add("Unknown User");
+                    participantAvatars.add(null);
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to fetch user info for {}: {}", participantId, e.getMessage());
+                participantNames.add("Unknown User");
+                participantAvatars.add(null);
+            }
+        }
+        
+        dto.setParticipantNames(participantNames);
+        dto.setParticipantAvatars(participantAvatars);
         dto.setGroup(conversation.isGroup());
         dto.setGroupName(conversation.getGroupName());
         dto.setGroupAvatar(conversation.getGroupAvatar());
