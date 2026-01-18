@@ -79,7 +79,7 @@ public class DataSeeder implements CommandLineRunner {
         messages.add(buildMessage(c1, lan, "Đi biển nhé! Bạn nghĩ sao? 🌊",
                 List.of(new MessageAttachment("IMAGE",
                         "https://picsum.photos/1200/900?random=80",
-                        "bien-nha-trang.jpg", 350000, 1600, 900))));
+                        "bien-nha-trang.jpg", 350000L, 1600, 900))));
         messages.add(buildMessage(c1, minh, "Đồng ý luôn! Đi đâu vậy bạn?", null));
         messages.add(buildMessage(c1, lan, "Nha Trang nhé, mình đã đặt khách sạn rồi 🏖️", null));
         messages.add(buildMessage(c1, minh, "Tuyệt vời! Cảm ơn bạn nhiều 😊", null));

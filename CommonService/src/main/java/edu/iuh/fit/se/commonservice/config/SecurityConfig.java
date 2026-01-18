@@ -60,6 +60,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/api/upload/**").permitAll() // Allow upload without role check
+                .requestMatchers("/api/files/**").permitAll() // Allow public access to uploaded files
                 // WebSocket endpoints - allow all including SockJS info requests
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/ws").permitAll()
