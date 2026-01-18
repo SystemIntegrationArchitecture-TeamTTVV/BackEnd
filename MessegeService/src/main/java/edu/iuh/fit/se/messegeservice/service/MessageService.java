@@ -1,23 +1,27 @@
 package edu.iuh.fit.se.messegeservice.service;
 
 import edu.iuh.fit.se.messegeservice.dto.MessageDTO;
+import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
 import edu.iuh.fit.se.messegeservice.model.Message;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
+    private final SocketEmitterService socketEmitterService;
 
     public List<MessageDTO> getMessagesByConversationId(String conversationId) {
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
@@ -44,22 +48,84 @@ public class MessageService {
     }
 
     public MessageDTO createMessage(MessageDTO messageDTO) {
+        log.info("📥 Creating message: conversationId={}, senderId={}, content={}", 
+            messageDTO.getConversationId(), messageDTO.getSenderId(), 
+            messageDTO.getContent() != null ? messageDTO.getContent().substring(0, Math.min(50, messageDTO.getContent().length())) : "null");
+        
+        // Validate required fields
+        if (messageDTO.getConversationId() == null || messageDTO.getConversationId().isEmpty()) {
+            log.error("❌ conversationId is null or empty");
+            throw new IllegalArgumentException("conversationId is required");
+        }
+        if (messageDTO.getSenderId() == null || messageDTO.getSenderId().isEmpty()) {
+            log.error("❌ senderId is null or empty");
+            throw new IllegalArgumentException("senderId is required");
+        }
+        
         Message message = toEntity(messageDTO);
         message.setCreatedAt(LocalDateTime.now());
         message.setUpdatedAt(LocalDateTime.now());
         message.setDeleted(false);
         message.setEdited(false);
+        
+        log.info("💾 Before save - conversationId: {}, conversation: {}", 
+            message.getConversationId(), 
+            message.getConversation() != null ? message.getConversation().getId() : "null");
+        
         Message saved = messageRepository.save(message);
+        
+        log.info("✅ After save - id: {}, conversationId: {}, conversation: {}", 
+            saved.getId(),
+            saved.getConversationId(), 
+            saved.getConversation() != null ? saved.getConversation().getId() : "null");
+        
+        log.info("✅ Message saved with id: {}", saved.getId());
         
         // Update conversation last message
         Conversation conversation = conversationRepository.findById(messageDTO.getConversationId())
-                .orElseThrow(() -> new RuntimeException("Conversation not found"));
+                .orElseThrow(() -> {
+                    log.error("❌ Conversation not found: {}", messageDTO.getConversationId());
+                    return new RuntimeException("Conversation not found: " + messageDTO.getConversationId());
+                });
         conversation.setLastMessagePreview(messageDTO.getContent());
         conversation.setLastMessageAt(LocalDateTime.now());
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
         
-        return toDTO(saved);
+        MessageDTO savedDTO = toDTO(saved);
+        
+        log.info("📤 DTO after conversion - id: {}, conversationId: {}", 
+            savedDTO.getId(), savedDTO.getConversationId());
+        
+        // 🚀 Emit socket event to all participants via /topic/public
+        // Frontend will receive and filter based on conversationId and senderId
+        try {
+            SocketEventDTO socketEvent = SocketEventDTO.messageReceived(
+                messageDTO.getSenderId(), 
+                savedDTO
+            );
+            
+            log.info("� Socket event data before emit - MessageDTO: id={}, conversationId={}, senderId={}, content={}", 
+                savedDTO.getId(), 
+                savedDTO.getConversationId(), 
+                savedDTO.getSenderId(), 
+                savedDTO.getContent());
+            
+            log.info("�📨 Broadcasting MESSAGE_RECEIVED event for conversation: {} via /topic/public", 
+                messageDTO.getConversationId());
+            
+            // Emit to all users via /topic/public
+            // Frontend subscribers will filter messages based on:
+            // 1. conversationId (only show in relevant conversation)
+            // 2. senderId (avoid duplicate for sender)
+            socketEmitterService.emitToAll(socketEvent);
+            
+        } catch (Exception e) {
+            log.error("❌ Failed to emit socket event for new message: {}", e.getMessage());
+            // Don't fail the entire operation if socket emit fails
+        }
+        
+        return savedDTO;
     }
 
     public MessageDTO updateMessage(String id, MessageDTO messageDTO) {
@@ -85,7 +151,14 @@ public class MessageService {
     private MessageDTO toDTO(Message message) {
         MessageDTO dto = new MessageDTO();
         dto.setId(message.getId());
-        dto.setConversationId(message.getConversationId());
+        
+        // 🔥 Get conversationId from either field or DBRef
+        String conversationId = message.getConversationId();
+        if (conversationId == null && message.getConversation() != null) {
+            conversationId = message.getConversation().getId();
+        }
+        dto.setConversationId(conversationId);
+        
         dto.setSenderId(message.getSenderId());
         dto.setSenderName(message.getSenderName());
         dto.setSenderAvatar(message.getSenderAvatar());
@@ -105,6 +178,7 @@ public class MessageService {
             Conversation conversation = conversationRepository.findById(dto.getConversationId())
                     .orElseThrow(() -> new RuntimeException("Conversation not found"));
             message.setConversation(conversation);
+            message.setConversationId(dto.getConversationId()); // 🔥 Set conversationId explicitly
         }
         message.setSenderId(dto.getSenderId());
         message.setSenderName(dto.getSenderName());

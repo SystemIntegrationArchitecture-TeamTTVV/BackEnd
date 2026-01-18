@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.messegeservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,8 +21,13 @@ public class MessageDTO {
     private String content;
     private List<String> emojis;
     private List<MessageAttachment> attachments;
-    private boolean isDeleted;
-    private boolean isEdited;
+    
+    @JsonProperty(defaultValue = "false")
+    private Boolean deleted;
+    
+    @JsonProperty(defaultValue = "false")
+    private Boolean edited;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

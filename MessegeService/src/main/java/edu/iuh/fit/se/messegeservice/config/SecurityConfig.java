@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.messegeservice.config;
 
+import edu.iuh.fit.se.messegeservice.security.JwtAuthenticationFilter;
 import edu.iuh.fit.se.messegeservice.security.SwaggerBypassFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final SwaggerBypassFilter swaggerBypassFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
     
     @Value("${app.security.enabled:true}")
     private boolean securityEnabled;
@@ -42,15 +44,16 @@ public class SecurityConfig {
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 
-                // All API endpoints require authentication (but SwaggerBypassFilter will handle Swagger requests)
-                .requestMatchers("/api/conversations/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
-                .requestMatchers("/api/messages/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
-                .requestMatchers("/api/calls/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
+                // All API endpoints require authentication only (no specific role required)
+                .requestMatchers("/conversations/**").authenticated()
+                .requestMatchers("/messages/**").authenticated()
+                .requestMatchers("/calls/**").authenticated()
                 
                 // All other requests need authentication
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(swaggerBypassFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(swaggerBypassFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         }
         
         return http.build();
