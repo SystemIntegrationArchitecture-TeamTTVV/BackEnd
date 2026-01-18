@@ -39,6 +39,8 @@ public class FileController {
                     contentType = "application/pdf";
                 } else if (filename.endsWith(".mp4")) {
                     contentType = "video/mp4";
+                } else if (filename.endsWith(".webm")) {
+                    contentType = "audio/webm"; // For voice messages
                 }
 
                 return ResponseEntity.ok()
