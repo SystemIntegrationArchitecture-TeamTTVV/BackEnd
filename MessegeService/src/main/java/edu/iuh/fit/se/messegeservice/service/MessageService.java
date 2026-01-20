@@ -106,10 +106,8 @@ public class MessageService {
         // 🚀 Emit socket event to all participants via /topic/public
         // Frontend will receive and filter based on conversationId and senderId
         try {
-            SocketEventDTO socketEvent = SocketEventDTO.messageReceived(
-                messageDTO.getSenderId(), 
-                savedDTO
-            );
+            // Removed: Old code that broadcasted to all users (security issue)
+            // SocketEventDTO socketEvent = SocketEventDTO.messageReceived(...);
             
             log.info("� Socket event data before emit - MessageDTO: id={}, conversationId={}, senderId={}, content={}", 
                 savedDTO.getId(), 
@@ -124,10 +122,42 @@ public class MessageService {
             // Frontend subscribers will filter messages based on:
             // 1. conversationId (only show in relevant conversation)
             // 2. senderId (avoid duplicate for sender)
-            socketEmitterService.emitToAll(socketEvent);
+            // 🔒 SECURITY FIX: Emit socket event ONLY to conversation participants
+            // This prevents other users from seeing private conversations
+            List<String> participantIds = conversation.getParticipantIds();
+            if (participantIds != null && !participantIds.isEmpty()) {
+                log.info("📨 Emitting MESSAGE_RECEIVED event to {} participants of conversation: {} (sender: {})", 
+                    participantIds.size(), 
+                    messageDTO.getConversationId(),
+                    messageDTO.getSenderId());
+                
+                int emittedCount = 0;
+                // Emit to each participant (except the sender, who already sent the message)
+                for (String participantId : participantIds) {
+                    if (!participantId.equals(messageDTO.getSenderId())) {
+                        try {
+                            SocketEventDTO participantEvent = SocketEventDTO.messageReceived(
+                                participantId, // Target recipient
+                                savedDTO
+                            );
+                            socketEmitterService.emitToUserById(participantId, participantEvent);
+                            emittedCount++;
+                            log.debug("✅ Emitted MESSAGE_RECEIVED to participant: {}", participantId);
+                        } catch (Exception e) {
+                            log.error("❌ Failed to emit to participant {}: {}", participantId, e.getMessage());
+                            // Continue with other participants
+                        }
+                    }
+                }
+                
+                log.info("✅ Successfully emitted MESSAGE_RECEIVED to {}/{} participants", 
+                    emittedCount, participantIds.size() - 1);
+            } else {
+                log.warn("⚠️ Conversation has no participants, skipping socket emit");
+            }
             
         } catch (Exception e) {
-            log.error("❌ Failed to emit socket event for new message: {}", e.getMessage());
+            log.error("❌ Failed to emit socket event for new message: {}", e.getMessage(), e);
             // Don't fail the entire operation if socket emit fails
         }
         
@@ -145,6 +175,56 @@ public class MessageService {
         
         Message updated = messageRepository.save(message);
         return toDTO(updated);
+    }
+
+    public MessageDTO togglePin(String id) {
+        Message message = messageRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+        message.setPinned(!message.isPinned());
+        message.setUpdatedAt(LocalDateTime.now());
+        return toDTO(messageRepository.save(message));
+    }
+
+    public MessageDTO toggleStar(String id, String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required to star a message");
+        }
+        Message message = messageRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+
+        List<String> starredBy = message.getStarredByUserIds();
+        if (starredBy == null) {
+            starredBy = new java.util.ArrayList<>();
+        }
+        if (starredBy.contains(userId)) {
+            starredBy.remove(userId);
+        } else {
+            starredBy.add(userId);
+        }
+        message.setStarredByUserIds(starredBy);
+        message.setUpdatedAt(LocalDateTime.now());
+        return toDTO(messageRepository.save(message));
+    }
+
+    public MessageDTO toggleReaction(String id, String emoji) {
+        if (emoji == null || emoji.isBlank()) {
+            throw new IllegalArgumentException("emoji is required");
+        }
+        Message message = messageRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+
+        List<String> emojis = message.getEmojis();
+        if (emojis == null) {
+            emojis = new java.util.ArrayList<>();
+        }
+        if (emojis.contains(emoji)) {
+            emojis.remove(emoji);
+        } else {
+            emojis.add(emoji);
+        }
+        message.setEmojis(emojis);
+        message.setUpdatedAt(LocalDateTime.now());
+        return toDTO(messageRepository.save(message));
     }
 
     public void deleteMessage(String id) {
@@ -171,6 +251,8 @@ public class MessageService {
         dto.setContent(message.getContent());
         dto.setEmojis(message.getEmojis());
         dto.setAttachments(message.getAttachments());
+        dto.setPinned(message.isPinned());
+        dto.setStarredByUserIds(message.getStarredByUserIds());
         dto.setDeleted(message.isDeleted());
         dto.setEdited(message.isEdited());
         dto.setCreatedAt(message.getCreatedAt());
@@ -188,6 +270,8 @@ public class MessageService {
         message.setContent(dto.getContent());
         message.setEmojis(dto.getEmojis());
         message.setAttachments(dto.getAttachments());
+        message.setPinned(dto.getPinned() != null && dto.getPinned());
+        message.setStarredByUserIds(dto.getStarredByUserIds());
         return message;
     }
 }

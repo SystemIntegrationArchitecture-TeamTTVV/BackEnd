@@ -1,8 +1,11 @@
 package edu.iuh.fit.se.messegeservice.controller;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
+import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.LeaveGroupRequest;
+import edu.iuh.fit.se.messegeservice.dto.JoinRequestUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.RemoveMemberRequest;
 import edu.iuh.fit.se.messegeservice.service.ConversationService;
 import lombok.RequiredArgsConstructor;
@@ -83,9 +86,40 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.updateConversation(id, conversationDTO));
     }
 
+    /**
+     * Update group name/avatar with permission checks (owner/admin for groups).
+     */
+    @PutMapping("/{id}/meta")
+    public ResponseEntity<ConversationDTO> updateConversationMeta(@PathVariable String id, @RequestBody ConversationMetaUpdateRequest request) {
+        return ResponseEntity.ok(conversationService.updateConversationMeta(id, request));
+    }
+
+    /**
+     * Leave a group. If requester is owner, must transfer ownership first (newOwnerId).
+     */
+    @PostMapping("/{id}/leave")
+    public ResponseEntity<ConversationDTO> leaveGroup(@PathVariable String id, @RequestBody LeaveGroupRequest request) {
+        return ResponseEntity.ok(conversationService.leaveGroup(id, request));
+    }
+
+    @PostMapping("/{id}/join-requests")
+    public ResponseEntity<ConversationDTO> requestToJoin(@PathVariable String id, @RequestParam String requesterId) {
+        return ResponseEntity.ok(conversationService.requestToJoin(id, requesterId));
+    }
+
+    @GetMapping("/{id}/join-requests")
+    public ResponseEntity<List<String>> getPendingJoinRequests(@PathVariable String id, @RequestParam String requesterId) {
+        return ResponseEntity.ok(conversationService.getPendingJoinRequests(id, requesterId));
+    }
+
+    @PatchMapping("/{id}/join-requests")
+    public ResponseEntity<ConversationDTO> handleJoinRequest(@PathVariable String id, @RequestBody JoinRequestUpdateRequest request) {
+        return ResponseEntity.ok(conversationService.handleJoinRequest(id, request));
+    }
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteConversation(@PathVariable String id) {
-        conversationService.deleteConversation(id);
+    public ResponseEntity<Void> deleteConversation(@PathVariable String id, @RequestParam(required = false) String requesterId) {
+        conversationService.deleteConversation(id, requesterId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,9 +1,13 @@
 package edu.iuh.fit.se.messegeservice.service;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
+import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.JoinRequestUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.LeaveGroupRequest;
 import edu.iuh.fit.se.messegeservice.dto.RemoveMemberRequest;
+import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
@@ -27,6 +31,7 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final RestTemplate restTemplate;
+    private final SocketEmitterService socketEmitterService;
     
     @Value("${common.service.url:http://localhost:8081}")
     private String commonServiceUrl;
@@ -115,7 +120,232 @@ public class ConversationService {
         return toDTO(updated);
     }
 
-    public void deleteConversation(String id) {
+    public ConversationDTO updateConversationMeta(String conversationId, ConversationMetaUpdateRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (request.getRequesterId() == null || request.getRequesterId().isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        if (conversation.isGroup()) {
+            ensureManager(conversation, request.getRequesterId());
+        } else {
+            if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(request.getRequesterId())) {
+                throw new IllegalArgumentException("Requester is not a participant of this conversation");
+            }
+        }
+
+        if (request.getGroupName() != null) {
+            String name = request.getGroupName().trim();
+            conversation.setGroupName(name.isBlank() ? conversation.getGroupName() : name);
+        }
+        if (request.getGroupAvatar() != null) {
+            String avatar = request.getGroupAvatar().trim();
+            conversation.setGroupAvatar(avatar.isBlank() ? conversation.getGroupAvatar() : avatar);
+        }
+        if (request.getApprovalsRequired() != null && conversation.isGroup()) {
+            conversation.setApprovalsRequired(request.getApprovalsRequired());
+        }
+
+        conversation.setUpdatedAt(LocalDateTime.now());
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO leaveGroup(String conversationId, LeaveGroupRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Cannot leave a direct conversation using this endpoint");
+        }
+
+        if (request.getRequesterId() == null || request.getRequesterId().isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(request.getRequesterId())) {
+            throw new IllegalArgumentException("Requester is not a participant of this group");
+        }
+
+        boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getRequesterId());
+        if (isOwner) {
+            String newOwnerId = request.getNewOwnerId();
+            if (newOwnerId == null || newOwnerId.isBlank()) {
+                throw new IllegalArgumentException("Owner must transfer ownership before leaving (newOwnerId is required)");
+            }
+            newOwnerId = newOwnerId.trim();
+            if (newOwnerId.equals(request.getRequesterId())) {
+                throw new IllegalArgumentException("newOwnerId must be different from requesterId");
+            }
+            if (!conversation.getParticipantIds().contains(newOwnerId)) {
+                throw new IllegalArgumentException("New owner must be a participant");
+            }
+            conversation.setOwnerId(newOwnerId);
+            // Ensure owner is not in admin list
+            if (conversation.getAdminIds() != null) {
+                conversation.getAdminIds().remove(newOwnerId);
+            }
+        }
+
+        Set<String> participants = new HashSet<>(conversation.getParticipantIds());
+        participants.remove(request.getRequesterId());
+
+        if (participants.size() < 3) {
+            throw new IllegalStateException("Group must have at least 3 members. You cannot leave right now.");
+        }
+
+        conversation.setParticipantIds(new ArrayList<>(participants));
+        if (conversation.getAdminIds() != null) {
+            conversation.getAdminIds().remove(request.getRequesterId());
+        }
+        conversation.setUpdatedAt(LocalDateTime.now());
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO requestToJoin(String conversationId, String requesterId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Join requests are only supported for group conversations");
+        }
+        if (!conversation.isApprovalsRequired()) {
+            throw new IllegalStateException("This group does not require join approvals");
+        }
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+        if (conversation.getParticipantIds() != null && conversation.getParticipantIds().contains(requesterId)) {
+            throw new IllegalStateException("Requester is already a member of this group");
+        }
+
+        List<String> pending = conversation.getPendingJoinIds();
+        if (pending == null) {
+            pending = new ArrayList<>();
+        }
+        if (!pending.contains(requesterId)) {
+            pending.add(requesterId);
+        }
+        conversation.setPendingJoinIds(pending);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+
+        // Emit realtime notification to owner & admins
+        try {
+            SocketEventDTO event = new SocketEventDTO();
+            event.setType("JOIN_REQUEST_CREATED");
+            event.setUserId(requesterId);
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("conversationId", saved.getId());
+            payload.put("requesterId", requesterId);
+            event.setData(payload);
+            event.setTimestamp(java.time.LocalDateTime.now());
+
+            java.util.Set<String> targets = new java.util.HashSet<>();
+            if (saved.getOwnerId() != null) {
+                targets.add(saved.getOwnerId());
+            }
+            if (saved.getAdminIds() != null) {
+                targets.addAll(saved.getAdminIds());
+            }
+            for (String targetId : targets) {
+                socketEmitterService.emitToUserById(targetId, event);
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to emit JOIN_REQUEST_CREATED event: {}", e.getMessage());
+        }
+
+        return toDTO(saved);
+    }
+
+    public List<String> getPendingJoinRequests(String conversationId, String requesterId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Join requests are only supported for group conversations");
+        }
+        ensureManager(conversation, requesterId);
+        List<String> pending = conversation.getPendingJoinIds();
+        return pending == null ? new ArrayList<>() : new ArrayList<>(pending);
+    }
+
+    public ConversationDTO handleJoinRequest(String conversationId, JoinRequestUpdateRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Join requests are only supported for group conversations");
+        }
+        ensureManager(conversation, request.getApproverId());
+
+        if (request.getRequesterId() == null || request.getRequesterId().isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        List<String> pending = conversation.getPendingJoinIds();
+        if (pending == null || !pending.remove(request.getRequesterId())) {
+            throw new IllegalArgumentException("No pending join request for this user");
+        }
+
+        if (request.isApproved()) {
+            List<String> participants = conversation.getParticipantIds();
+            if (participants == null) {
+                participants = new ArrayList<>();
+            }
+            if (!participants.contains(request.getRequesterId())) {
+                participants.add(request.getRequesterId());
+            }
+            conversation.setParticipantIds(participants);
+        }
+
+        conversation.setPendingJoinIds(pending);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+
+        // Notify requester about decision
+        try {
+            SocketEventDTO event = new SocketEventDTO();
+            event.setType("JOIN_REQUEST_UPDATED");
+            event.setUserId(request.getRequesterId());
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("conversationId", saved.getId());
+            payload.put("approved", request.isApproved());
+            payload.put("approverId", request.getApproverId());
+            event.setData(payload);
+            event.setTimestamp(java.time.LocalDateTime.now());
+
+            socketEmitterService.emitToUserById(request.getRequesterId(), event);
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to emit JOIN_REQUEST_UPDATED event: {}", e.getMessage());
+        }
+
+        return toDTO(saved);
+    }
+
+    public void deleteConversation(String id, String requesterId) {
+        Conversation conversation = conversationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + id));
+
+        // For groups: only owner can delete. requesterId is required.
+        if (conversation.isGroup()) {
+            if (requesterId == null || requesterId.isBlank()) {
+                throw new IllegalArgumentException("requesterId is required to delete a group conversation");
+            }
+            if (conversation.getOwnerId() == null || !conversation.getOwnerId().equals(requesterId)) {
+                throw new IllegalArgumentException("Only the owner can delete a group conversation");
+            }
+            conversationRepository.deleteById(id);
+            return;
+        }
+
+        // For direct chats: if requesterId provided, enforce membership. If not provided, allow (legacy).
+        if (requesterId != null && !requesterId.isBlank()) {
+            if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(requesterId)) {
+                throw new IllegalArgumentException("Requester is not a participant of this conversation");
+            }
+        }
         conversationRepository.deleteById(id);
     }
 
@@ -321,6 +551,8 @@ public class ConversationService {
         dto.setGroupAvatar(conversation.getGroupAvatar());
         dto.setOwnerId(conversation.getOwnerId());
         dto.setAdminIds(conversation.getAdminIds());
+        dto.setApprovalsRequired(conversation.isApprovalsRequired());
+        dto.setPendingJoinIds(conversation.getPendingJoinIds());
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
         dto.setLastMessageAt(conversation.getLastMessageAt());
         dto.setCreatedAt(conversation.getCreatedAt());
@@ -338,6 +570,8 @@ public class ConversationService {
         conversation.setGroupAvatar(dto.getGroupAvatar());
         conversation.setOwnerId(dto.getOwnerId());
         conversation.setAdminIds(dto.getAdminIds());
+        conversation.setApprovalsRequired(dto.isApprovalsRequired());
+        conversation.setPendingJoinIds(dto.getPendingJoinIds());
         return conversation;
     }
 }

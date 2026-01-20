@@ -58,5 +58,20 @@ public class MessageController {
         messageService.deleteMessage(id);
         return ResponseEntity.noContent().build();
     }
+
+@PostMapping("/{id}/pin")
+public ResponseEntity<MessageDTO> togglePin(@PathVariable String id) {
+    return ResponseEntity.ok(messageService.togglePin(id));
+}
+
+@PostMapping("/{id}/star")
+public ResponseEntity<MessageDTO> toggleStar(@PathVariable String id, @RequestParam String userId) {
+    return ResponseEntity.ok(messageService.toggleStar(id, userId));
+}
+
+@PostMapping("/{id}/react")
+public ResponseEntity<MessageDTO> toggleReaction(@PathVariable String id, @RequestParam String emoji) {
+    return ResponseEntity.ok(messageService.toggleReaction(id, emoji));
+}
 }
 

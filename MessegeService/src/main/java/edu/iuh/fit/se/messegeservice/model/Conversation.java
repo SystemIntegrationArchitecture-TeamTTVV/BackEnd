@@ -24,6 +24,8 @@ public class Conversation {
     // Group management
     private String ownerId;
     private List<String> adminIds;
+    private boolean approvalsRequired = false;
+    private List<String> pendingJoinIds;
 
     private boolean isGroup = false;
     private String groupName;
