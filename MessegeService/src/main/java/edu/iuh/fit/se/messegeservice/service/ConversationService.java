@@ -1,6 +1,9 @@
 package edu.iuh.fit.se.messegeservice.service;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
+import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.RemoveMemberRequest;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
@@ -12,7 +15,9 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -67,9 +72,31 @@ public class ConversationService {
     }
 
     public ConversationDTO createConversation(ConversationDTO conversationDTO) {
+        if (conversationDTO.isGroup()) {
+            return createGroupConversation(conversationDTO);
+        }
+
+        // Direct chat validation: exactly 2 unique participants
+        if (conversationDTO.getParticipantIds() == null || conversationDTO.getParticipantIds().size() < 2) {
+            throw new IllegalArgumentException("Direct conversation requires exactly 2 participants");
+        }
+
+        List<String> distinct = conversationDTO.getParticipantIds().stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (distinct.size() != 2) {
+            throw new IllegalArgumentException("Direct conversation must have 2 distinct participants");
+        }
+
+        conversationDTO.setParticipantIds(distinct);
+        conversationDTO.setGroup(false);
+
         Conversation conversation = toEntity(conversationDTO);
         conversation.setCreatedAt(LocalDateTime.now());
         conversation.setUpdatedAt(LocalDateTime.now());
+        conversation.setLastMessageAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
         return toDTO(saved);
     }
@@ -90,6 +117,174 @@ public class ConversationService {
 
     public void deleteConversation(String id) {
         conversationRepository.deleteById(id);
+    }
+
+    public ConversationDTO addMembers(String conversationId, GroupMemberUpdateRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Cannot add members to a direct conversation");
+        }
+        ensureManager(conversation, request.getRequesterId());
+
+        Set<String> newMembers = sanitizeIds(request.getParticipantIds());
+        if (newMembers.isEmpty()) {
+            throw new IllegalArgumentException("participantIds cannot be empty");
+        }
+
+        Set<String> participants = new HashSet<>(conversation.getParticipantIds());
+        participants.addAll(newMembers);
+
+        if (participants.size() < 3) {
+            throw new IllegalStateException("Group must have at least 3 members");
+        }
+
+        conversation.setParticipantIds(new ArrayList<>(participants));
+        conversation.setUpdatedAt(LocalDateTime.now());
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO removeMember(String conversationId, RemoveMemberRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Cannot remove members from a direct conversation");
+        }
+
+        if (request.getParticipantId() == null || request.getParticipantId().isBlank()) {
+            throw new IllegalArgumentException("participantId is required");
+        }
+
+        boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getRequesterId());
+        boolean isAdmin = conversation.getAdminIds() != null && conversation.getAdminIds().contains(request.getRequesterId());
+        boolean selfRemove = request.getRequesterId() != null && request.getRequesterId().equals(request.getParticipantId());
+
+        if (!isOwner && !isAdmin && !selfRemove) {
+            throw new IllegalArgumentException("Requester is not allowed to remove this member");
+        }
+
+        if (conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getParticipantId())) {
+            throw new IllegalArgumentException("Owner cannot be removed. Transfer ownership first.");
+        }
+
+        if (conversation.getAdminIds() != null
+                && conversation.getAdminIds().contains(request.getParticipantId())
+                && !isOwner
+                && !selfRemove) {
+            throw new IllegalArgumentException("Only owner can remove an admin");
+        }
+
+        Set<String> participants = new HashSet<>(conversation.getParticipantIds());
+        if (!participants.remove(request.getParticipantId())) {
+            throw new IllegalArgumentException("Member is not part of the group");
+        }
+
+        // If admin/owner removed themselves, clean from admin list
+        if (conversation.getAdminIds() != null) {
+            conversation.getAdminIds().remove(request.getParticipantId());
+        }
+
+        if (participants.size() < 3) {
+            throw new IllegalStateException("Group must have at least 3 members. Add someone before removing this member.");
+        }
+
+        conversation.setParticipantIds(new ArrayList<>(participants));
+        conversation.setUpdatedAt(LocalDateTime.now());
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO updateGroupRoles(String conversationId, GroupRoleUpdateRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Roles can only be updated for group conversations");
+        }
+
+        if (request.getRequesterId() == null || !request.getRequesterId().equals(conversation.getOwnerId())) {
+            throw new IllegalArgumentException("Only the owner can update roles");
+        }
+
+        if (request.getNewOwnerId() != null && !request.getNewOwnerId().isBlank()) {
+            if (!conversation.getParticipantIds().contains(request.getNewOwnerId())) {
+                throw new IllegalArgumentException("New owner must be a participant");
+            }
+            conversation.setOwnerId(request.getNewOwnerId());
+        }
+
+        if (request.getAdminIds() != null) {
+            Set<String> admins = sanitizeIds(request.getAdminIds());
+            admins.remove(conversation.getOwnerId()); // owner implicitly has all permissions
+
+            for (String adminId : admins) {
+                if (!conversation.getParticipantIds().contains(adminId)) {
+                    throw new IllegalArgumentException("Admin must be a participant: " + adminId);
+                }
+            }
+            conversation.setAdminIds(new ArrayList<>(admins));
+        }
+
+        conversation.setUpdatedAt(LocalDateTime.now());
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    private ConversationDTO createGroupConversation(ConversationDTO conversationDTO) {
+        Set<String> participantIds = sanitizeIds(conversationDTO.getParticipantIds());
+
+        if (conversationDTO.getOwnerId() == null || conversationDTO.getOwnerId().isBlank()) {
+            throw new IllegalArgumentException("ownerId is required for group conversation");
+        }
+
+        participantIds.add(conversationDTO.getOwnerId());
+
+        if (participantIds.size() < 3) {
+            throw new IllegalArgumentException("Group conversation requires at least 3 members (including owner)");
+        }
+
+        conversationDTO.setParticipantIds(new ArrayList<>(participantIds));
+        conversationDTO.setGroup(true);
+
+        // Admins must be subset of participants and cannot include owner
+        Set<String> adminIds = sanitizeIds(conversationDTO.getAdminIds());
+        adminIds.remove(conversationDTO.getOwnerId());
+        for (String adminId : adminIds) {
+            if (!participantIds.contains(adminId)) {
+                throw new IllegalArgumentException("Admin must be a participant: " + adminId);
+            }
+        }
+        conversationDTO.setAdminIds(new ArrayList<>(adminIds));
+
+        if (conversationDTO.getGroupName() == null || conversationDTO.getGroupName().isBlank()) {
+            conversationDTO.setGroupName("New Group Chat");
+        }
+
+        Conversation conversation = toEntity(conversationDTO);
+        conversation.setCreatedAt(LocalDateTime.now());
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversation.setLastMessageAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+        return toDTO(saved);
+    }
+
+    private void ensureManager(Conversation conversation, String requesterId) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+        boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(requesterId);
+        boolean isAdmin = conversation.getAdminIds() != null && conversation.getAdminIds().contains(requesterId);
+        if (!isOwner && !isAdmin) {
+            throw new IllegalArgumentException("Requester does not have permission to manage group members");
+        }
+    }
+
+    private Set<String> sanitizeIds(List<String> ids) {
+        if (ids == null) return new HashSet<>();
+        return ids.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .collect(Collectors.toCollection(HashSet::new));
     }
 
     private ConversationDTO toDTO(Conversation conversation) {
@@ -124,6 +319,8 @@ public class ConversationService {
         dto.setGroup(conversation.isGroup());
         dto.setGroupName(conversation.getGroupName());
         dto.setGroupAvatar(conversation.getGroupAvatar());
+        dto.setOwnerId(conversation.getOwnerId());
+        dto.setAdminIds(conversation.getAdminIds());
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
         dto.setLastMessageAt(conversation.getLastMessageAt());
         dto.setCreatedAt(conversation.getCreatedAt());
@@ -139,6 +336,8 @@ public class ConversationService {
         conversation.setGroup(dto.isGroup());
         conversation.setGroupName(dto.getGroupName());
         conversation.setGroupAvatar(dto.getGroupAvatar());
+        conversation.setOwnerId(dto.getOwnerId());
+        conversation.setAdminIds(dto.getAdminIds());
         return conversation;
     }
 }

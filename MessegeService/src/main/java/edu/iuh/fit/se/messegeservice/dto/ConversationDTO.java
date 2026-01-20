@@ -3,6 +3,7 @@ package edu.iuh.fit.se.messegeservice.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +16,9 @@ public class ConversationDTO {
     private List<String> participantIds;
     private List<String> participantNames;
     private List<String> participantAvatars;
+    private String ownerId;
+    private List<String> adminIds;
+    @JsonProperty("isGroup")
     private boolean group;
     private String groupName;
     private String groupAvatar;

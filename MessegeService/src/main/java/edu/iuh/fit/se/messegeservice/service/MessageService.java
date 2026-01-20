@@ -62,7 +62,18 @@ public class MessageService {
             throw new IllegalArgumentException("senderId is required");
         }
         
-        Message message = toEntity(messageDTO);
+        // Validate membership
+        Conversation conversation = conversationRepository.findById(messageDTO.getConversationId())
+                .orElseThrow(() -> {
+                    log.error("❌ Conversation not found: {}", messageDTO.getConversationId());
+                    return new RuntimeException("Conversation not found: " + messageDTO.getConversationId());
+                });
+
+        if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(messageDTO.getSenderId())) {
+            throw new IllegalArgumentException("Sender is not a participant of this conversation");
+        }
+
+        Message message = toEntity(messageDTO, conversation);
         message.setCreatedAt(LocalDateTime.now());
         message.setUpdatedAt(LocalDateTime.now());
         message.setDeleted(false);
@@ -82,11 +93,6 @@ public class MessageService {
         log.info("✅ Message saved with id: {}", saved.getId());
         
         // Update conversation last message
-        Conversation conversation = conversationRepository.findById(messageDTO.getConversationId())
-                .orElseThrow(() -> {
-                    log.error("❌ Conversation not found: {}", messageDTO.getConversationId());
-                    return new RuntimeException("Conversation not found: " + messageDTO.getConversationId());
-                });
         conversation.setLastMessagePreview(messageDTO.getContent());
         conversation.setLastMessageAt(LocalDateTime.now());
         conversation.setUpdatedAt(LocalDateTime.now());
@@ -172,14 +178,10 @@ public class MessageService {
         return dto;
     }
 
-    private Message toEntity(MessageDTO dto) {
+    private Message toEntity(MessageDTO dto, Conversation conversation) {
         Message message = new Message();
-        if (dto.getConversationId() != null) {
-            Conversation conversation = conversationRepository.findById(dto.getConversationId())
-                    .orElseThrow(() -> new RuntimeException("Conversation not found"));
-            message.setConversation(conversation);
-            message.setConversationId(dto.getConversationId()); // 🔥 Set conversationId explicitly
-        }
+        message.setConversation(conversation);
+        message.setConversationId(conversation.getId()); // 🔥 Set conversationId explicitly
         message.setSenderId(dto.getSenderId());
         message.setSenderName(dto.getSenderName());
         message.setSenderAvatar(dto.getSenderAvatar());

@@ -1,6 +1,9 @@
 package edu.iuh.fit.se.messegeservice.controller;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
+import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.RemoveMemberRequest;
 import edu.iuh.fit.se.messegeservice.service.ConversationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -46,6 +49,33 @@ public class ConversationController {
     @PostMapping
     public ResponseEntity<ConversationDTO> createConversation(@RequestBody ConversationDTO conversationDTO) {
         return ResponseEntity.status(HttpStatus.CREATED).body(conversationService.createConversation(conversationDTO));
+    }
+
+    @PostMapping("/group")
+    public ResponseEntity<ConversationDTO> createGroupConversation(@RequestBody ConversationDTO conversationDTO) {
+        conversationDTO.setGroup(true);
+        return ResponseEntity.status(HttpStatus.CREATED).body(conversationService.createConversation(conversationDTO));
+    }
+
+    @PostMapping("/{id}/members")
+    public ResponseEntity<ConversationDTO> addMembers(@PathVariable String id, @RequestBody GroupMemberUpdateRequest request) {
+        return ResponseEntity.ok(conversationService.addMembers(id, request));
+    }
+
+    @DeleteMapping("/{id}/members")
+    public ResponseEntity<ConversationDTO> removeMember(@PathVariable String id, @RequestBody RemoveMemberRequest request) {
+        return ResponseEntity.ok(conversationService.removeMember(id, request));
+    }
+
+    @PatchMapping("/{id}/roles")
+    public ResponseEntity<ConversationDTO> updateRoles(@PathVariable String id, @RequestBody GroupRoleUpdateRequest request) {
+        return ResponseEntity.ok(conversationService.updateGroupRoles(id, request));
+    }
+
+    // Accept PUT for clients that send full replacements instead of partial updates
+    @PutMapping("/{id}/roles")
+    public ResponseEntity<ConversationDTO> upsertRoles(@PathVariable String id, @RequestBody GroupRoleUpdateRequest request) {
+        return ResponseEntity.ok(conversationService.updateGroupRoles(id, request));
     }
 
     @PutMapping("/{id}")
