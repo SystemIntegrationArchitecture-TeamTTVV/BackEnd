@@ -1,5 +1,11 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Post;
@@ -7,11 +13,6 @@ import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -109,8 +110,8 @@ public class PostService {
         dto.setFeeling(post.getFeeling());
         dto.setActivity(post.getActivity());
         dto.setVisibility(post.getVisibility());
-        dto.setAllowComments(post.isAllowComments());
-        dto.setAllowSharing(post.isAllowSharing());
+        dto.setAllowComments(post.getAllowComments());
+        dto.setAllowSharing(post.getAllowSharing());
         dto.setLikeCount(post.getLikeCount());
         dto.setCommentCount(post.getCommentCount());
         dto.setShareCount(post.getShareCount());
@@ -139,8 +140,8 @@ public class PostService {
         post.setFeeling(dto.getFeeling());
         post.setActivity(dto.getActivity());
         post.setVisibility(dto.getVisibility() != null ? dto.getVisibility() : "PUBLIC");
-        post.setAllowComments(dto.isAllowComments());
-        post.setAllowSharing(dto.isAllowSharing());
+        post.setAllowComments(dto.getAllowComments() != null ? dto.getAllowComments() : true);
+        post.setAllowSharing(dto.getAllowSharing() != null ? dto.getAllowSharing() : true);
         return post;
     }
 }

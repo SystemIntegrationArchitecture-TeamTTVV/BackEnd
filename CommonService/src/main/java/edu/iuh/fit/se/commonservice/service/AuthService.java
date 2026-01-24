@@ -3,8 +3,10 @@ package edu.iuh.fit.se.commonservice.service;
 import edu.iuh.fit.se.commonservice.dto.AuthRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AuthResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.model.PasswordResetToken;
 import edu.iuh.fit.se.commonservice.model.Role;
 import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.repository.PasswordResetTokenRepository;
 import edu.iuh.fit.se.commonservice.repository.RoleRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import edu.iuh.fit.se.commonservice.util.JwtUtil;
@@ -17,8 +19,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
 
     public AuthResponseDTO login(AuthRequestDTO request) {
         try {
@@ -111,5 +117,58 @@ public class AuthService {
                 saved.getAvatar()
         );
     }
-}
 
+    @Transactional
+    public void requestPasswordReset(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User with this email not found"));
+
+        // Delete any existing tokens for this user
+        passwordResetTokenRepository.deleteByUserId(user.getId());
+
+        // Generate new token
+        String token = UUID.randomUUID().toString();
+        
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUserId(user.getId());
+        resetToken.setToken(token);
+        resetToken.setExpiryDate(LocalDateTime.now().plusHours(1)); // Token valid for 1 hour
+        resetToken.setUsed(false);
+        resetToken.setCreatedAt(LocalDateTime.now());
+        
+        passwordResetTokenRepository.save(resetToken);
+
+        // Send email
+        emailService.sendPasswordResetEmail(
+                user.getEmail(),
+                token,
+                user.getFullName() != null ? user.getFullName() : user.getUsername()
+        );
+    }
+
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid or expired reset token"));
+
+        if (resetToken.getUsed()) {
+            throw new RuntimeException("This reset link has already been used");
+        }
+
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("This reset link has expired. Please request a new one");
+        }
+
+        User user = userRepository.findById(resetToken.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // Mark token as used
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+    }
+}

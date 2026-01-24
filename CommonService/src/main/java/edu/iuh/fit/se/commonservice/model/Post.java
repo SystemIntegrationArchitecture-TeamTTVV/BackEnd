@@ -1,14 +1,15 @@
 package edu.iuh.fit.se.commonservice.model;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DBRef;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Document(collection = "posts")
 @Data
@@ -29,13 +30,13 @@ public class Post {
     private String activity; // Hoạt động
     
     private String visibility = "PUBLIC"; // PUBLIC, FRIENDS, ONLY_ME
-    private boolean allowComments = true;
-    private boolean allowSharing = true;
+    private Boolean allowComments = true;
+    private Boolean allowSharing = true;
     
     // Thống kê
-    private int likeCount = 0;
-    private int commentCount = 0;
-    private int shareCount = 0;
+    private Integer likeCount = 0;
+    private Integer commentCount = 0;
+    private Integer shareCount = 0;
     
     // Reference đến Group hoặc Page nếu đăng trong nhóm/trang
     @DBRef
