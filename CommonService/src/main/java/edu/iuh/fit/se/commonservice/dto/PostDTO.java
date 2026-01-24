@@ -22,11 +22,11 @@ public class PostDTO {
     private String feeling;
     private String activity;
     private String visibility;
-    private boolean allowComments;
-    private boolean allowSharing;
-    private int likeCount;
-    private int commentCount;
-    private int shareCount;
+    private Boolean allowComments;
+    private Boolean allowSharing;
+    private Integer likeCount;
+    private Integer commentCount;
+    private Integer shareCount;
     private String groupId;
     private String pageId;
     private LocalDateTime createdAt;

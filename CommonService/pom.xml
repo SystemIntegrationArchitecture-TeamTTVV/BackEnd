@@ -90,6 +90,13 @@
         
         <!-- Method Security - AOP is already included in spring-boot-starter-security -->
         
+        <!-- Resend Email Service -->
+        <dependency>
+            <groupId>com.resend</groupId>
+            <artifactId>resend-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
