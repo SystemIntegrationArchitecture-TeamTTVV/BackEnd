@@ -11,8 +11,8 @@ public class MessageAttachment {
     private String type; // IMAGE, VIDEO, FILE, AUDIO
     private String url;
     private String fileName;
-    private long fileSize; // bytes
-    private int width;
-    private int height;
+    private Long fileSize; // bytes - nullable
+    private Integer width; // nullable
+    private Integer height; // nullable
 }
 

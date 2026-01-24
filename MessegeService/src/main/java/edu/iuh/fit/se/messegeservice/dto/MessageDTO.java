@@ -21,6 +21,8 @@ public class MessageDTO {
     private String content;
     private List<String> emojis;
     private List<MessageAttachment> attachments;
+    private Boolean pinned;
+    private List<String> starredByUserIds;
     
     @JsonProperty(defaultValue = "false")
     private Boolean deleted;
