@@ -1,11 +1,11 @@
 package edu.iuh.fit.se.commonservice.dto;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -19,8 +19,8 @@ public class CommentDTO {
     private String content;
     private List<String> images;
     private String parentCommentId;
-    private int likeCount;
-    private int replyCount;
+    private Integer likeCount;
+    private Integer replyCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

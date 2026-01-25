@@ -1,5 +1,6 @@
 edu\iuh\fit\se\commonservice\controller\NotificationController.class
 edu\iuh\fit\se\commonservice\controller\FriendRequestController.class
+edu\iuh\fit\se\commonservice\repository\PasswordResetTokenRepository.class
 edu\iuh\fit\se\commonservice\repository\UserRepository.class
 edu\iuh\fit\se\commonservice\service\AuthService.class
 edu\iuh\fit\se\commonservice\model\Photo.class
@@ -9,6 +10,7 @@ edu\iuh\fit\se\commonservice\model\User.class
 edu\iuh\fit\se\commonservice\repository\FriendRepository.class
 edu\iuh\fit\se\commonservice\model\Post.class
 edu\iuh\fit\se\commonservice\security\SwaggerBypassFilter.class
+edu\iuh\fit\se\commonservice\dto\ForgotPasswordRequestDTO.class
 edu\iuh\fit\se\commonservice\dto\SocketEventDTO.class
 edu\iuh\fit\se\commonservice\dto\StoryDTO.class
 edu\iuh\fit\se\commonservice\repository\StoryRepository.class
@@ -16,7 +18,9 @@ edu\iuh\fit\se\commonservice\model\Group.class
 edu\iuh\fit\se\commonservice\model\Comment.class
 edu\iuh\fit\se\commonservice\service\ReactionService.class
 edu\iuh\fit\se\commonservice\controller\UserController.class
+edu\iuh\fit\se\commonservice\service\PostService.class
 edu\iuh\fit\se\commonservice\service\RoleService.class
+edu\iuh\fit\se\commonservice\controller\ReactionController.class
 edu\iuh\fit\se\commonservice\dto\ReactionDTO.class
 edu\iuh\fit\se\commonservice\repository\RoleRepository.class
 edu\iuh\fit\se\commonservice\config\PreAuthorizeConfig.class
@@ -31,6 +35,7 @@ edu\iuh\fit\se\commonservice\repository\CommentRepository.class
 edu\iuh\fit\se\commonservice\service\FriendRequestService.class
 edu\iuh\fit\se\commonservice\controller\CommentController.class
 edu\iuh\fit\se\commonservice\security\JwtAuthenticationFilter.class
+edu\iuh\fit\se\commonservice\model\PasswordResetToken.class
 edu\iuh\fit\se\commonservice\service\GroupService.class
 edu\iuh\fit\se\commonservice\config\OpenApiConfig.class
 edu\iuh\fit\se\commonservice\dto\AuthRequestDTO.class
@@ -40,6 +45,7 @@ edu\iuh\fit\se\commonservice\controller\WebSocketController.class
 edu\iuh\fit\se\commonservice\dto\AuthResponseDTO.class
 edu\iuh\fit\se\commonservice\config\MongoConfig$RoleToStringConverter.class
 edu\iuh\fit\se\commonservice\config\WebSocketConfig.class
+edu\iuh\fit\se\commonservice\dto\ResetPasswordRequestDTO.class
 edu\iuh\fit\se\commonservice\config\SecurityConfig.class
 edu\iuh\fit\se\commonservice\repository\ReactionRepository.class
 edu\iuh\fit\se\commonservice\controller\PostController.class
@@ -68,6 +74,7 @@ edu\iuh\fit\se\commonservice\controller\StoryController.class
 edu\iuh\fit\se\commonservice\model\EventParticipant.class
 edu\iuh\fit\se\commonservice\service\SocketService.class
 edu\iuh\fit\se\commonservice\dto\NotificationDTO.class
+edu\iuh\fit\se\commonservice\service\EmailService.class
 edu\iuh\fit\se\commonservice\model\Friend.class
 edu\iuh\fit\se\commonservice\dto\FriendDTO.class
 edu\iuh\fit\se\commonservice\model\Notification.class

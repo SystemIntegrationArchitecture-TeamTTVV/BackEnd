@@ -21,12 +21,14 @@ E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\AuthRequestDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\AuthResponseDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\CommentDTO.java
+E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\ForgotPasswordRequestDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\FriendDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\FriendRequestDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\GroupDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\NotificationDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\PostDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\ReactionDTO.java
+E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\ResetPasswordRequestDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\SocketEventDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\StoryDTO.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\dto\UserDTO.java
@@ -41,6 +43,7 @@ E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\Notification.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\Page.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\PageLike.java
+E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\PasswordResetToken.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\Photo.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\Post.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\model\Product.java
@@ -55,6 +58,7 @@ E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\FriendRequestRepository.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\GroupRepository.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\NotificationRepository.java
+E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\PasswordResetTokenRepository.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\PostRepository.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\ReactionRepository.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\repository\RoleRepository.java
@@ -65,6 +69,7 @@ E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\security\UserDetailsServiceImpl.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\service\AuthService.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\service\CommentService.java
+E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\service\EmailService.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\service\FriendRequestService.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\service\FriendService.java
 E:\GiaoTrinhDH\Nam4_HK2\KienTruc\Duan\DuAn_1\BackEnd\CommonService\src\main\java\edu\iuh\fit\se\commonservice\service\GroupService.java

@@ -1,13 +1,14 @@
 package edu.iuh.fit.se.commonservice.model;
 
+import java.time.LocalDateTime;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DBRef;
-
-import java.time.LocalDateTime;
 
 @Document(collection = "stories")
 @Data
@@ -29,11 +30,11 @@ public class Story {
     
     private String visibility = "PUBLIC"; // PUBLIC, FRIENDS, CUSTOM
     
-    private int viewCount = 0;
-    private int reactionCount = 0;
+    private Integer viewCount = 0;
+    private Integer reactionCount = 0;
     
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt; // Story tự động xóa sau 24h
-    private boolean isActive = true;
+    private Boolean active = true;
 }
 
