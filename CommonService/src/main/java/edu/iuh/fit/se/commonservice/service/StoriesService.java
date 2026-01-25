@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import edu.iuh.fit.se.commonservice.dto.story.CreateStoryRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.story.StoryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.story.UserDTO;
 import edu.iuh.fit.se.commonservice.model.Friend;
@@ -8,6 +9,7 @@ import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.StoriesRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -19,13 +21,13 @@ public class StoriesService {
 
     private final StoriesRepository storiesRepo;
     private final FriendRepository friendRepo;
-
+    private final FileUploadService fileUploadService;
     /**
      * Lấy story feed (bản thân + bạn bè)
      */
     public List<StoryResponseDTO> getStoryFeed(String userId) {
 
-        // ✅ đảm bảo list mutable + không trùng
+        // đảm bảo list mutable + không trùng
         Set<String> userIds = new HashSet<>(getFriendIds(userId));
         userIds.add(userId);
 
@@ -57,10 +59,8 @@ public class StoriesService {
                 .contentType(s.getContentType())
                 .content(s.getContent())
                 .background(s.getBackground())
-                .duration(s.getDuration())
                 .createdAt(s.getCreatedAt().toString())
                 .expiresAt(s.getExpiredAt().toString())
-                .viewCount(s.getViewCount())
                 .isActive(s.getActive())
                 .isViewed(false) // TODO: xử lý sau theo user
                 .build();
@@ -73,6 +73,44 @@ public class StoriesService {
         return friendRepo.findByUserId(userId)
                 .stream()
                 .map(Friend::getFriendId)
-                .collect(Collectors.toList()); // ✅ mutable list
+                .collect(Collectors.toList()); //  mutable list
+    }
+    public StoryResponseDTO createStory(
+            String userId,
+            String userName,
+            String userAvatar,
+            CreateStoryRequestDTO req,
+            MultipartFile file
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        String content;
+
+        // 1️ phân loại story
+        if ("text".equals(req.getContentType())) {
+            content = req.getContent();
+        } else {
+            if (file == null || file.isEmpty()) {
+                throw new RuntimeException("Media file is required");
+            }
+            content = fileUploadService.uploadStoryFile(file);
+        }
+
+        // 2 build entity
+        Stories story = Stories.builder()
+                .userId(userId)
+                .userName(userName)
+                .userAvatar(userAvatar)
+
+                .contentType(req.getContentType())
+                .content(content)
+                .background(req.getBackground())
+
+                .createdAt(now)
+                .expiredAt(now.plusHours(24)) // TTL Mongo
+                .active(true)
+
+                .build();
+
+        return toDTO(storiesRepo.save(story));
     }
 }

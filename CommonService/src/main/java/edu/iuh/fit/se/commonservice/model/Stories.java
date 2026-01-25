@@ -43,5 +43,4 @@ public class Stories {
 
     // ===== Trạng thái =====
     private Boolean active;
-    private Long viewCount;
 }
