@@ -188,7 +188,7 @@ spring:
             maxAge: 3600
 
 server:
-  port: 8088
+  port: 8080
 
 # Actuator endpoints
 management:
