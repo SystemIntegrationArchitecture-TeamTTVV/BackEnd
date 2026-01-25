@@ -27,9 +27,13 @@ public class Message {
     private String senderAvatar;
 
     private String content; // text
-    private List<String> emojis; // quick reactions on message
+    private List<String> emojis; // quick reactions on message (emoji codes)
 
     private List<MessageAttachment> attachments;
+
+    // Message-level flags and metadata
+    private boolean pinned = false;              // pinned for the whole conversation
+    private List<String> starredByUserIds;       // users who starred this message
 
     private boolean isDeleted = false;
     private boolean isEdited = false;

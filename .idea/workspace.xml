@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/WebConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/UploadController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/WebConfig.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/UploadController.class" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/WebConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/FileController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/UploadController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationMetaUpdateRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/GroupMemberUpdateRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/GroupRoleUpdateRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/JoinRequestUpdateRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/LeaveGroupRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/RemoveMemberRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/1502249d-7641-452b-8e08-2d4c256ef66d.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/1803ee35-9660-465b-8444-06409f5c2a14.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/2056d321-d8f5-4999-b856-05d0ba049bc5.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/2d106848-cd6a-48b1-b6fd-ee8ab450c3b9.webm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/384a4abd-f3a0-4cf7-abfc-cd72f41a0a92.webm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/53aa8d87-904e-4a52-8c47-c9760a1b04a6.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/54259bbe-d80a-4ccd-a384-11c0a74b98fd.jpeg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/5a5f10b1-30b8-4ff3-b9a9-5601938b77cf.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/7148834e-115b-4572-9098-ff4489d7ea7c.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/7385e890-145c-4f82-b848-647ee325bf5b.webm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/9d6a0750-46fb-42ab-aa4a-12f31f8757f7.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/a8371928-0c7e-4c0e-a40a-5bfcb5a5c297.gif" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/ca103ceb-fa8c-4b51-bca2-5b5f47d05daa.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/cb76d86e-b312-435c-b108-e2db24cd5b43.jpeg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/e1e64ec9-8f78-4408-a366-0bcbeae77be9.webm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/e2b72d47-d4c4-450f-97aa-401a3fdf5faf.gif" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/e85f32e0-f563-4e7f-9e79-6017ae391190.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/ef514ca5-2ae9-400d-af24-189198321218.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/uploads/f3675995-b1a2-4898-9c5b-c573c4e7faac.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/WebSocketController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/WebSocketController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/CommonServiceApplication.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/CommonServiceApplication.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/DataSeeder.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/DataSeeder.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/MongoConfig$RoleToStringConverter.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/MongoConfig$RoleToStringConverter.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/MongoConfig$StringToRoleConverter.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/MongoConfig$StringToRoleConverter.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/MongoConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/MongoConfig.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/OpenApiConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/OpenApiConfig.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/PreAuthorizeConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/PreAuthorizeConfig.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/SecurityConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/SecurityConfig.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/WebSocketConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/config/WebSocketConfig.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/CommentController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/CommentController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/FriendController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/FriendController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/FriendRequestController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/FriendRequestController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/GroupController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/GroupController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/NotificationController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/NotificationController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/PostController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/PostController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/ReactionController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/ReactionController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/RoleController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/RoleController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/SocketEventController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/SocketEventController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/StoryController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/StoryController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/UserController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/UserController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/WebSocketController.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/controller/WebSocketController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/AuthRequestDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/AuthRequestDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/AuthResponseDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/AuthResponseDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/CommentDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/CommentDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/FriendDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/FriendDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/FriendRequestDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/FriendRequestDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/GroupDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/GroupDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/NotificationDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/NotificationDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/PostDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/PostDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/ReactionDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/ReactionDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/SocketEventDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/SocketEventDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/StoryDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/StoryDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/UserDTO.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/dto/UserDTO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Album.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Album.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Comment.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Comment.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Event.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Event.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/EventParticipant.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/EventParticipant.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Friend.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Friend.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/FriendRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/FriendRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Group.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Group.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/GroupMember.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/GroupMember.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Notification.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Notification.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Page.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Page.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/PageLike.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/PageLike.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Photo.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Photo.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Post.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Post.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Product.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Product.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Reaction.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Reaction.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Report.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Report.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Role.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Role.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/SavedItem.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/SavedItem.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Story.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/Story.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/User.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/model/User.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/CommentRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/CommentRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/FriendRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/FriendRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/FriendRequestRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/FriendRequestRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/GroupRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/GroupRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/NotificationRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/NotificationRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/PasswordResetTokenRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/PasswordResetTokenRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/PostRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/PostRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/ReactionRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/ReactionRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/RoleRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/RoleRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/StoryRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/StoryRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/UserRepository.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/repository/UserRepository.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/security/JwtAuthenticationFilter.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/security/JwtAuthenticationFilter.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/security/SwaggerBypassFilter.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/security/SwaggerBypassFilter.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/security/UserDetailsServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/security/UserDetailsServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/CommentService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/CommentService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/FriendRequestService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/FriendRequestService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/FriendService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/FriendService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/GroupService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/GroupService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/NotificationService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/NotificationService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/PostService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/PostService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/ReactionService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/ReactionService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/RoleService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/RoleService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/SocketService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/SocketService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/StoryService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/StoryService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/UserService.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/service/UserService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/util/JwtUtil.class" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/classes/edu/iuh/fit/se/commonservice/util/JwtUtil.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/DataSeeder.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/DataSeeder.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/ConversationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/ConversationController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/MessageController.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/MessageController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationDTO.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationDTO.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/MessageDTO.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/MessageDTO.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/Conversation.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/Conversation.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/Message.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/Message.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/MessageAttachment.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/MessageAttachment.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/security/JwtAuthenticationFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/security/JwtAuthenticationFilter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/service/ConversationService.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/service/ConversationService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/service/MessageService.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/service/MessageService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/util/JwtUtil.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/util/JwtUtil.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitToolBoxStore">
+    <option name="recentBranches">
+      <RecentBranches>
+        <option name="branchesForRepo">
+          <list>
+            <RecentBranchesForRepo>
+              <option name="branches">
+                <list>
+                  <RecentBranch>
+                    <option name="branchName" value="main" />
+                    <option name="lastUsedInstant" value="1769261285" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="22637901-thach" />
+                    <option name="lastUsedInstant" value="1769261284" />
+                  </RecentBranch>
+                </list>
+              </option>
+              <option name="repositoryRootUrl" value="file://$PROJECT_DIR$" />
+            </RecentBranchesForRepo>
+          </list>
+        </option>
+      </RecentBranches>
+    </option>
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "git-widget-placeholder": "Merging 22637091-tung",
+    "run.configurations.included.in.services": "true"
+  }
+}]]></component>
+  <component name="RunDashboard">
+    <option name="configurationTypes">
+      <set>
+        <option value="KtorApplicationConfigurationType" />
+        <option value="MicronautRunConfigurationType" />
+        <option value="QuarkusRunConfigurationType" />
+        <option value="SpringBootApplicationConfigurationType" />
+      </set>
+    </option>
+  </component>
+  <component name="RunManager" selected="Spring Boot.ApiGatewayApplication">
+    <configuration name="ApiGatewayApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <module name="ApiGateway" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.apigateway.ApiGatewayApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="CommonServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <module name="CommonService" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.commonservice.CommonServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="MessegeServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <module name="MessegeService" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.messegeservice.MessegeServiceApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="TaskManager">
+    <servers />
+  </component>
+</project>
