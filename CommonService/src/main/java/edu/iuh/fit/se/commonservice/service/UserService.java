@@ -1,18 +1,19 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.model.Role;
 import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.RoleRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -172,6 +173,18 @@ public class UserService {
         
         user.setRole(role);
         user.setRoleId(role.getId());
+        user.setUpdatedAt(LocalDateTime.now());
+        User updated = userRepository.save(user);
+        return toDTO(updated);
+    }
+    
+    @PreAuthorize("hasRole('ADMIN')")
+    public UserDTO updateUserStatus(String id, String status) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        
+        boolean isActive = "ACTIVE".equalsIgnoreCase(status);
+        user.setActive(isActive);
         user.setUpdatedAt(LocalDateTime.now());
         User updated = userRepository.save(user);
         return toDTO(updated);
