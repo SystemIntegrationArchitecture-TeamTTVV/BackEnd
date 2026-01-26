@@ -1,6 +1,13 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import edu.iuh.fit.se.commonservice.dto.CommentDTO;
+import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Comment;
 import edu.iuh.fit.se.commonservice.model.Post;
@@ -9,11 +16,6 @@ import edu.iuh.fit.se.commonservice.repository.CommentRepository;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ public class CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final SocketService socketService;
+    private final NotificationService notificationService;
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
@@ -58,6 +61,31 @@ public class CommentService {
         // Update reply count if it's a reply
         if (commentDTO.getParentCommentId() != null) {
             updateReplyCount(commentDTO.getParentCommentId());
+            
+            // Notify parent comment author about the reply
+            Comment parentComment = commentRepository.findById(commentDTO.getParentCommentId()).orElse(null);
+            if (parentComment != null && parentComment.getAuthor() != null) {
+                String parentAuthorId = parentComment.getAuthor().getId();
+                
+                // Only notify if not replying to own comment
+                if (!parentAuthorId.equals(commentDTO.getUserId())) {
+                    User replier = userRepository.findById(commentDTO.getUserId()).orElse(null);
+                    if (replier != null) {
+                        NotificationDTO replyNotification = new NotificationDTO();
+                        replyNotification.setRecipientId(parentAuthorId);
+                        replyNotification.setActorId(commentDTO.getUserId());
+                        replyNotification.setActorName(replier.getFullName());
+                        replyNotification.setActorAvatar(replier.getAvatar());
+                        replyNotification.setType("REPLY_COMMENT");
+                        replyNotification.setTitle("Phản hồi mới");
+                        replyNotification.setContent(replier.getFullName() + " đã phản hồi bình luận của bạn");
+                        replyNotification.setRelatedId(commentDTO.getParentCommentId());
+                        replyNotification.setRelatedType("COMMENT");
+                        
+                        notificationService.createNotification(replyNotification);
+                    }
+                }
+            }
         }
         
         CommentDTO savedDTO = toDTO(saved);
@@ -65,6 +93,23 @@ public class CommentService {
         // Send socket event - notify post author
         String postAuthorId = post.getAuthor() != null ? post.getAuthor().getId() : null;
         if (postAuthorId != null && !postAuthorId.equals(commentDTO.getUserId())) {
+            // Create notification
+            User commenter = userRepository.findById(commentDTO.getUserId()).orElse(null);
+            if (commenter != null) {
+                NotificationDTO notificationDTO = new NotificationDTO();
+                notificationDTO.setRecipientId(postAuthorId);
+                notificationDTO.setActorId(commentDTO.getUserId());
+                notificationDTO.setActorName(commenter.getFullName());
+                notificationDTO.setActorAvatar(commenter.getAvatar());
+                notificationDTO.setType("COMMENT_POST");
+                notificationDTO.setTitle("New Comment");
+                notificationDTO.setContent(commenter.getFullName() + " commented on your post");
+                notificationDTO.setRelatedId(commentDTO.getPostId());
+                notificationDTO.setRelatedType("POST");
+                
+                notificationService.createNotification(notificationDTO);
+            }
+            
             socketService.notifyCommentCreated(
                 postAuthorId,
                 SocketEventDTO.commentCreated(commentDTO.getUserId(), savedDTO)

@@ -1,10 +1,10 @@
 package edu.iuh.fit.se.commonservice.dto;
 
+import java.time.LocalDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -20,10 +20,10 @@ public class StoryDTO {
     private String text;
     private String backgroundColor;
     private String visibility; // PUBLIC, FRIENDS, CUSTOM
-    private int viewCount;
-    private int reactionCount;
+    private Integer viewCount;
+    private Integer reactionCount;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
-    private boolean isActive;
+    private Boolean active;
 }
 

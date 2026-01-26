@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
+import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 public class SocketService {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
 
     /**
      * Send notification to specific user
@@ -57,9 +59,11 @@ public class SocketService {
      * Send comment-related events
      */
     public void notifyCommentCreated(String postAuthorId, SocketEventDTO event) {
-        // Notify post author
+        // Notify post author using username
         if (postAuthorId != null && !postAuthorId.equals(event.getUserId())) {
-            sendNotification(postAuthorId, event);
+            userRepository.findById(postAuthorId).ifPresent(recipient -> {
+                sendNotification(recipient.getUsername(), event);
+            });
         }
         // Also broadcast to all for real-time updates
         sendToAll(event);
@@ -69,9 +73,11 @@ public class SocketService {
      * Send reaction-related events
      */
     public void notifyReactionAdded(String postAuthorId, SocketEventDTO event) {
-        // Notify post author if different user
+        // Notify post author using username if different user
         if (postAuthorId != null && !postAuthorId.equals(event.getUserId())) {
-            sendNotification(postAuthorId, event);
+            userRepository.findById(postAuthorId).ifPresent(recipient -> {
+                sendNotification(recipient.getUsername(), event);
+            });
         }
         // Also broadcast to all for real-time updates
         sendToAll(event);
@@ -81,7 +87,9 @@ public class SocketService {
      * Send message-related events
      */
     public void notifyMessageReceived(String recipientId, SocketEventDTO event) {
-        sendNotification(recipientId, event);
+        userRepository.findById(recipientId).ifPresent(recipient -> {
+            sendNotification(recipient.getUsername(), event);
+        });
     }
 }
 
