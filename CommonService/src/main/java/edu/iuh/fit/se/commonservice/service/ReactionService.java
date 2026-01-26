@@ -1,5 +1,12 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
+import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.ReactionDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Comment;
@@ -11,11 +18,6 @@ import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.ReactionRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,7 @@ public class ReactionService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final SocketService socketService;
+    private final NotificationService notificationService;
 
     public List<ReactionDTO> getReactionsByPostId(String postId) {
         return reactionRepository.findByPostId(postId).stream()
@@ -89,17 +92,62 @@ public class ReactionService {
     }
     
     private void sendReactionEvent(ReactionDTO reactionDTO, ReactionDTO savedDTO) {
-        String postAuthorId = null;
+        String recipientId = null;
+        User actor = null;
+        
+        try {
+            actor = userRepository.findById(reactionDTO.getUserId()).orElse(null);
+        } catch (Exception e) {
+            // Ignore
+        }
+        
         if (reactionDTO.getPostId() != null) {
             Post post = postRepository.findById(reactionDTO.getPostId()).orElse(null);
             if (post != null && post.getAuthor() != null) {
-                postAuthorId = post.getAuthor().getId();
+                recipientId = post.getAuthor().getId();
+                
+                // Create notification for post like (only if not self-like)
+                if (!recipientId.equals(reactionDTO.getUserId()) && actor != null) {
+                    NotificationDTO notificationDTO = new NotificationDTO();
+                    notificationDTO.setRecipientId(recipientId);
+                    notificationDTO.setActorId(reactionDTO.getUserId());
+                    notificationDTO.setActorName(actor.getFullName());
+                    notificationDTO.setActorAvatar(actor.getAvatar());
+                    notificationDTO.setType("LIKE_POST");
+                    notificationDTO.setTitle("New Like");
+                    notificationDTO.setContent(actor.getFullName() + " liked your post");
+                    notificationDTO.setRelatedId(reactionDTO.getPostId());
+                    notificationDTO.setRelatedType("POST");
+                    
+                    notificationService.createNotification(notificationDTO);
+                }
+            }
+        } else if (reactionDTO.getCommentId() != null) {
+            Comment comment = commentRepository.findById(reactionDTO.getCommentId()).orElse(null);
+            if (comment != null && comment.getAuthor() != null) {
+                recipientId = comment.getAuthor().getId();
+                
+                // Create notification for comment like (only if not self-like)
+                if (!recipientId.equals(reactionDTO.getUserId()) && actor != null) {
+                    NotificationDTO notificationDTO = new NotificationDTO();
+                    notificationDTO.setRecipientId(recipientId);
+                    notificationDTO.setActorId(reactionDTO.getUserId());
+                    notificationDTO.setActorName(actor.getFullName());
+                    notificationDTO.setActorAvatar(actor.getAvatar());
+                    notificationDTO.setType("LIKE_COMMENT");
+                    notificationDTO.setTitle("New Like");
+                    notificationDTO.setContent(actor.getFullName() + " liked your comment");
+                    notificationDTO.setRelatedId(reactionDTO.getCommentId());
+                    notificationDTO.setRelatedType("COMMENT");
+                    
+                    notificationService.createNotification(notificationDTO);
+                }
             }
         }
         
-        if (postAuthorId != null && !postAuthorId.equals(reactionDTO.getUserId())) {
+        if (recipientId != null && !recipientId.equals(reactionDTO.getUserId())) {
             socketService.notifyReactionAdded(
-                postAuthorId,
+                recipientId,
                 SocketEventDTO.reactionAdded(reactionDTO.getUserId(), savedDTO)
             );
         }

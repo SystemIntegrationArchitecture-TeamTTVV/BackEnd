@@ -9,9 +9,9 @@ import java.util.List;
 
 @Repository
 public interface StoryRepository extends MongoRepository<Story, String> {
-    List<Story> findByAuthorIdAndIsActiveTrueOrderByCreatedAtDesc(String authorId);
-    List<Story> findByIsActiveTrueAndExpiresAtAfterOrderByCreatedAtDesc(LocalDateTime now);
-    List<Story> findByIsActiveTrueOrderByCreatedAtDesc();
+    List<Story> findByAuthorIdAndActiveTrueOrderByCreatedAtDesc(String authorId);
+    List<Story> findByActiveTrueAndExpiresAtAfterOrderByCreatedAtDesc(LocalDateTime now);
+    List<Story> findByActiveTrueOrderByCreatedAtDesc();
     void deleteByExpiresAtBefore(LocalDateTime now);
 }
 
