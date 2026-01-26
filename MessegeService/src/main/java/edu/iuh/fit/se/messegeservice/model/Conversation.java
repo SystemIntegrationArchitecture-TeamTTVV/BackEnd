@@ -21,6 +21,12 @@ public class Conversation {
     private List<String> participantNames; // để hiển thị nhanh
     private List<String> participantAvatars; // URL avatar
 
+    // Group management
+    private String ownerId;
+    private List<String> adminIds;
+    private boolean approvalsRequired = false;
+    private List<String> pendingJoinIds;
+
     private boolean isGroup = false;
     private String groupName;
     private String groupAvatar;

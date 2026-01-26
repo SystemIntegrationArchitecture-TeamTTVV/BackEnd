@@ -30,6 +30,7 @@ edu\iuh\fit\se\commonservice\config\DataSeeder.class
 edu\iuh\fit\se\commonservice\controller\GroupController.class
 edu\iuh\fit\se\commonservice\service\NotificationService.class
 edu\iuh\fit\se\commonservice\model\Reaction.class
+edu\iuh\fit\se\commonservice\controller\UploadController.class
 edu\iuh\fit\se\commonservice\repository\GroupRepository.class
 edu\iuh\fit\se\commonservice\repository\CommentRepository.class
 edu\iuh\fit\se\commonservice\service\FriendRequestService.class
@@ -66,6 +67,7 @@ edu\iuh\fit\se\commonservice\util\JwtUtil.class
 edu\iuh\fit\se\commonservice\config\MongoConfig.class
 edu\iuh\fit\se\commonservice\controller\SocketEventController.class
 edu\iuh\fit\se\commonservice\config\MongoConfig$StringToRoleConverter.class
+edu\iuh\fit\se\commonservice\config\WebConfig.class
 edu\iuh\fit\se\commonservice\model\Page.class
 edu\iuh\fit\se\commonservice\model\Album.class
 edu\iuh\fit\se\commonservice\CommonServiceApplication.class

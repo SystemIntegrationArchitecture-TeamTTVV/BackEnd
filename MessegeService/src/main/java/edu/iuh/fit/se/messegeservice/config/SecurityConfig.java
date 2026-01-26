@@ -43,6 +43,7 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/api/files/**").permitAll() // Allow public access to uploaded files
                 
                 // All API endpoints require authentication only (no specific role required)
                 .requestMatchers("/conversations/**").authenticated()

@@ -107,6 +107,20 @@ spring:
           filters:
             - RewritePath=/api/common/roles(/.*)?, /api/roles$1
         
+        - id: common-service-files
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/api/files/**
+          filters:
+            - RewritePath=/api/common/api/files(/.*)?, /api/files$1
+        
+        - id: common-service-upload
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/api/upload/**
+          filters:
+            - RewritePath=/api/common/api/upload(/.*)?, /api/upload$1
+        
         - id: common-service-all
           uri: http://localhost:8081
           predicates:
@@ -115,6 +129,20 @@ spring:
             - StripPrefix=2
         
         # MessegeService Routes
+        - id: message-service-upload
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/api/upload/**
+          filters:
+            - RewritePath=/api/message/api/upload(/.*)?, /api/upload$1
+        
+        - id: message-service-files
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/message/api/files/**
+          filters:
+            - RewritePath=/api/message/api/files(/.*)?, /api/files$1
+        
         - id: message-service-conversations
           uri: http://localhost:8082
           predicates:
@@ -160,7 +188,7 @@ spring:
             maxAge: 3600
 
 server:
-  port: 8088
+  port: 8080
 
 # Actuator endpoints
 management:
