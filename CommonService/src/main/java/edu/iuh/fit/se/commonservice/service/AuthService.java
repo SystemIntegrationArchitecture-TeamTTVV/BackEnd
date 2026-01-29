@@ -98,8 +98,8 @@ public class AuthService {
                 });
         user.setRole(defaultRole);
         user.setRoleId(defaultRole.getId());
-        user.setActive(true);
-        user.setVerified(false);
+        user.setIsActive(true);
+        user.setIsVerified(false);
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 

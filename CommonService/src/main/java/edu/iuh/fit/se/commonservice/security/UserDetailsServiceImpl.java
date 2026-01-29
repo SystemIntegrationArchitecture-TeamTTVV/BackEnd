@@ -27,10 +27,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .username(user.getUsername())
                 .password(user.getPassword())
                 .authorities(Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + roleName)))
-                .accountExpired(!user.isActive())
-                .accountLocked(!user.isActive())
+                .accountExpired(!user.getIsActive())
+                .accountLocked(!user.getIsActive())
                 .credentialsExpired(false)
-                .disabled(!user.isActive())
+                .disabled(!user.getIsActive())
                 .build();
     }
 }

@@ -68,17 +68,83 @@ public class UserService {
     public UserDTO updateUser(String id, UserDTO userDTO) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-        
-        user.setFirstName(userDTO.getFirstName());
-        user.setLastName(userDTO.getLastName());
-        user.setFullName(userDTO.getFullName());
-        user.setAvatar(userDTO.getAvatar());
-        user.setCoverPhoto(userDTO.getCoverPhoto());
-        user.setBio(userDTO.getBio());
-        user.setCity(userDTO.getCity());
-        user.setCountry(userDTO.getCountry());
+
+        // Basic info
+        if (userDTO.getFirstName() != null) {
+            user.setFirstName(userDTO.getFirstName());
+        }
+        if (userDTO.getLastName() != null) {
+            user.setLastName(userDTO.getLastName());
+        }
+        if (userDTO.getFullName() != null) {
+            user.setFullName(userDTO.getFullName());
+        }
+
+        // Images
+        if (userDTO.getAvatar() != null) {
+            user.setAvatar(userDTO.getAvatar());
+        }
+        if (userDTO.getCoverPhoto() != null) {
+            user.setCoverPhoto(userDTO.getCoverPhoto());
+        }
+
+        // Profile details
+        if (userDTO.getBio() != null) {
+            user.setBio(userDTO.getBio());
+        }
+        if (userDTO.getCity() != null) {
+            user.setCity(userDTO.getCity());
+        }
+        if (userDTO.getCountry() != null) {
+            user.setCountry(userDTO.getCountry());
+        }
+
+        // Contact info
+        if (userDTO.getPhoneNumber() != null) {
+            user.setPhoneNumber(userDTO.getPhoneNumber());
+        }
+        if (userDTO.getEmail() != null) {
+            user.setEmail(userDTO.getEmail());
+        }
+
+        // Personal info
+        if (userDTO.getDateOfBirth() != null) {
+            user.setDateOfBirth(userDTO.getDateOfBirth());
+        }
+        if (userDTO.getGender() != null) {
+            user.setGender(userDTO.getGender());
+        }
+
+        // Work & Education
+        if (userDTO.getWorkPlace() != null) {
+            user.setWorkPlace(userDTO.getWorkPlace());
+        }
+        if (userDTO.getEducation() != null) {
+            user.setEducation(userDTO.getEducation());
+        }
+        if (userDTO.getRelationshipStatus() != null) {
+            user.setRelationshipStatus(userDTO.getRelationshipStatus());
+        }
+
+        // Interests
+        if (userDTO.getInterests() != null) {
+            user.setInterests(userDTO.getInterests());
+        }
+
+        // Privacy settings
+        if (userDTO.getProfileVisibility() != null) {
+            user.setProfileVisibility(userDTO.getProfileVisibility());
+        }
+        if (userDTO.getPostVisibility() != null) {
+            user.setPostVisibility(userDTO.getPostVisibility());
+        }
+
+        // Boolean fields - cần kiểm tra cẩn thận vì có thể là false
+        user.setShowEmail(userDTO.getShowEmail());
+        user.setShowPhone(userDTO.getShowPhone());
+
         user.setUpdatedAt(LocalDateTime.now());
-        
+
         User updated = userRepository.save(user);
         return toDTO(updated);
     }
@@ -106,16 +172,16 @@ public class UserService {
         dto.setWorkPlace(user.getWorkPlace());
         dto.setEducation(user.getEducation());
         dto.setRelationshipStatus(user.getRelationshipStatus());
-        dto.setActive(user.isActive());
-        dto.setVerified(user.isVerified());
+        dto.setIsActive(user.getIsActive());
+        dto.setIsVerified(user.getIsVerified());
         dto.setRole(user.getRole() != null ? user.getRole().getName() : "USER");
         dto.setInterests(user.getInterests());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setUpdatedAt(user.getUpdatedAt());
         dto.setProfileVisibility(user.getProfileVisibility());
         dto.setPostVisibility(user.getPostVisibility());
-        dto.setShowEmail(user.isShowEmail());
-        dto.setShowPhone(user.isShowPhone());
+        dto.setShowEmail(user.getShowEmail());
+        dto.setShowPhone(user.getShowPhone());
         return dto;
     }
 
@@ -184,7 +250,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
         
         boolean isActive = "ACTIVE".equalsIgnoreCase(status);
-        user.setActive(isActive);
+        user.setIsActive(isActive);
         user.setUpdatedAt(LocalDateTime.now());
         User updated = userRepository.save(user);
         return toDTO(updated);
@@ -194,7 +260,7 @@ public class UserService {
     public void deactivateUser(String id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-        user.setActive(false);
+        user.setIsActive(false);
         userRepository.save(user);
     }
 }
