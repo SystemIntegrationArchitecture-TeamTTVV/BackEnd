@@ -14,6 +14,7 @@ public class CommentDTO {
     private String id;
     private String postId;
     private String userId;
+    private String videoId;
     private String userName;
     private String userAvatar;
     private String content;
@@ -21,6 +22,7 @@ public class CommentDTO {
     private String parentCommentId;
     private Integer likeCount;
     private Integer replyCount;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

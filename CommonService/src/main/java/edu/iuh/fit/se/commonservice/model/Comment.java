@@ -23,6 +23,9 @@ public class Comment {
     
     @DBRef
     private User author;
+
+    @DBRef
+    private Video video;
     
     private String content;
     private List<String> images; // URLs ảnh trong comment

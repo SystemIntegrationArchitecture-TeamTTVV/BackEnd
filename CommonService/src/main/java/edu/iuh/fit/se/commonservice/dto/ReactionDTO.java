@@ -17,6 +17,7 @@ public class ReactionDTO {
     private String type; // LIKE, LOVE, HAHA, WOW, SAD, ANGRY
     private String postId;
     private String commentId;
+    private String videoId;
     private LocalDateTime createdAt;
 }
 

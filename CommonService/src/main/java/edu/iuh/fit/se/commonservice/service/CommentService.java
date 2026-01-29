@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import edu.iuh.fit.se.commonservice.model.Video;
+import edu.iuh.fit.se.commonservice.repository.VideoRepository;
 import org.springframework.stereotype.Service;
 
 import edu.iuh.fit.se.commonservice.dto.CommentDTO;
@@ -26,6 +28,7 @@ public class CommentService {
     private final UserRepository userRepository;
     private final SocketService socketService;
     private final NotificationService notificationService;
+    private final VideoRepository videoRepository;
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
@@ -51,72 +54,52 @@ public class CommentService {
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
         Comment saved = commentRepository.save(comment);
-        
-        // Update comment count in post
-        Post post = postRepository.findById(commentDTO.getPostId())
-                .orElseThrow(() -> new RuntimeException("Post not found"));
-        post.setCommentCount(post.getCommentCount() + 1);
-        postRepository.save(post);
-        
-        // Update reply count if it's a reply
+
+        // Update comment count
+        if (commentDTO.getPostId() != null) {
+            Post post = postRepository.findById(commentDTO.getPostId())
+                    .orElseThrow(() -> new RuntimeException("Post not found"));
+            post.setCommentCount(post.getCommentCount() + 1);
+            postRepository.save(post);
+
+        } else if (commentDTO.getVideoId() != null) {  // ✨ THÊM MỚI
+            Video video = videoRepository.findById(commentDTO.getVideoId())
+                    .orElseThrow(() -> new RuntimeException("Video not found"));
+            video.setCommentCount(video.getCommentCount() + 1);
+            videoRepository.save(video);
+
+            // Notify video author
+            notifyVideoAuthor(commentDTO, video);
+        }
+
+        // Handle reply notification
         if (commentDTO.getParentCommentId() != null) {
             updateReplyCount(commentDTO.getParentCommentId());
-            
-            // Notify parent comment author about the reply
-            Comment parentComment = commentRepository.findById(commentDTO.getParentCommentId()).orElse(null);
-            if (parentComment != null && parentComment.getAuthor() != null) {
-                String parentAuthorId = parentComment.getAuthor().getId();
-                
-                // Only notify if not replying to own comment
-                if (!parentAuthorId.equals(commentDTO.getUserId())) {
-                    User replier = userRepository.findById(commentDTO.getUserId()).orElse(null);
-                    if (replier != null) {
-                        NotificationDTO replyNotification = new NotificationDTO();
-                        replyNotification.setRecipientId(parentAuthorId);
-                        replyNotification.setActorId(commentDTO.getUserId());
-                        replyNotification.setActorName(replier.getFullName());
-                        replyNotification.setActorAvatar(replier.getAvatar());
-                        replyNotification.setType("REPLY_COMMENT");
-                        replyNotification.setTitle("Phản hồi mới");
-                        replyNotification.setContent(replier.getFullName() + " đã phản hồi bình luận của bạn");
-                        replyNotification.setRelatedId(commentDTO.getParentCommentId());
-                        replyNotification.setRelatedType("COMMENT");
-                        
-                        notificationService.createNotification(replyNotification);
-                    }
-                }
-            }
+
         }
-        
-        CommentDTO savedDTO = toDTO(saved);
-        
-        // Send socket event - notify post author
-        String postAuthorId = post.getAuthor() != null ? post.getAuthor().getId() : null;
-        if (postAuthorId != null && !postAuthorId.equals(commentDTO.getUserId())) {
-            // Create notification
+
+        return toDTO(saved);
+    }
+
+    private void notifyVideoAuthor(CommentDTO commentDTO, Video video) {
+        String videoAuthorId = video.getAuthor() != null ? video.getAuthor().getId() : null;
+        if (videoAuthorId != null && !videoAuthorId.equals(commentDTO.getUserId())) {
             User commenter = userRepository.findById(commentDTO.getUserId()).orElse(null);
             if (commenter != null) {
                 NotificationDTO notificationDTO = new NotificationDTO();
-                notificationDTO.setRecipientId(postAuthorId);
+                notificationDTO.setRecipientId(videoAuthorId);
                 notificationDTO.setActorId(commentDTO.getUserId());
                 notificationDTO.setActorName(commenter.getFullName());
                 notificationDTO.setActorAvatar(commenter.getAvatar());
-                notificationDTO.setType("COMMENT_POST");
+                notificationDTO.setType("COMMENT_VIDEO");
                 notificationDTO.setTitle("New Comment");
-                notificationDTO.setContent(commenter.getFullName() + " commented on your post");
-                notificationDTO.setRelatedId(commentDTO.getPostId());
-                notificationDTO.setRelatedType("POST");
-                
+                notificationDTO.setContent(commenter.getFullName() + " commented on your video");
+                notificationDTO.setRelatedId(commentDTO.getVideoId());
+                notificationDTO.setRelatedType("VIDEO");
+
                 notificationService.createNotification(notificationDTO);
             }
-            
-            socketService.notifyCommentCreated(
-                postAuthorId,
-                SocketEventDTO.commentCreated(commentDTO.getUserId(), savedDTO)
-            );
         }
-        
-        return savedDTO;
     }
 
     public CommentDTO updateComment(String id, CommentDTO commentDTO) {
@@ -186,6 +169,11 @@ public class CommentService {
                     .orElseThrow(() -> new RuntimeException("Parent comment not found"));
             comment.setParentComment(parent);
         }
+        if (dto.getVideoId() != null) {  // ✨ THÊM MỚI
+            Video video = videoRepository.findById(dto.getVideoId())
+                    .orElseThrow(() -> new RuntimeException("Video not found"));
+            comment.setVideo(video);
+        }
         comment.setLikeCount(0);
         comment.setReplyCount(0);
         return comment;
@@ -196,6 +184,13 @@ public class CommentService {
                 .orElseThrow(() -> new RuntimeException("Parent comment not found"));
         parent.setReplyCount((int) commentRepository.findByParentCommentIdOrderByCreatedAtAsc(parentCommentId).stream().count());
         commentRepository.save(parent);
+    }
+
+    public List<CommentDTO> getCommentsByVideoId(String videoId) {
+        return commentRepository.findByVideoIdOrderByCreatedAtAsc(videoId).stream()
+                .filter(comment -> comment.getParentComment() == null)
+                .map(this::toDTO)
+                .collect(Collectors.toList());
     }
 }
 

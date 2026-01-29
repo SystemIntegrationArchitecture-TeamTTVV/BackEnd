@@ -11,5 +11,7 @@ public interface CommentRepository extends MongoRepository<Comment, String> {
     List<Comment> findByPostIdOrderByCreatedAtAsc(String postId);
     List<Comment> findByParentCommentIdOrderByCreatedAtAsc(String parentCommentId);
     long countByPostId(String postId);
+    List<Comment> findByVideoIdOrderByCreatedAtAsc(String videoId);
+    long countByVideoId(String videoId);
 }
 

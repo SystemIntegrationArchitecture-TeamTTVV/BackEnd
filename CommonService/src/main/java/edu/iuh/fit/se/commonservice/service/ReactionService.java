@@ -4,19 +4,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import edu.iuh.fit.se.commonservice.model.*;
+import edu.iuh.fit.se.commonservice.repository.*;
 import org.springframework.stereotype.Service;
 
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.ReactionDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
-import edu.iuh.fit.se.commonservice.model.Comment;
-import edu.iuh.fit.se.commonservice.model.Post;
-import edu.iuh.fit.se.commonservice.model.Reaction;
-import edu.iuh.fit.se.commonservice.model.User;
-import edu.iuh.fit.se.commonservice.repository.CommentRepository;
-import edu.iuh.fit.se.commonservice.repository.PostRepository;
-import edu.iuh.fit.se.commonservice.repository.ReactionRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -29,6 +23,7 @@ public class ReactionService {
     private final CommentRepository commentRepository;
     private final SocketService socketService;
     private final NotificationService notificationService;
+    private final VideoRepository videoRepository;
 
     public List<ReactionDTO> getReactionsByPostId(String postId) {
         return reactionRepository.findByPostId(postId).stream()
@@ -63,6 +58,9 @@ public class ReactionService {
         } else if (reactionDTO.getCommentId() != null) {
             existingReaction = reactionRepository.findByUserIdAndCommentId(
                     reactionDTO.getUserId(), reactionDTO.getCommentId()).orElse(null);
+        }else if (reactionDTO.getVideoId() != null) {
+            existingReaction = reactionRepository.findByUserIdAndVideoId(
+                    reactionDTO.getUserId(), reactionDTO.getVideoId()).orElse(null);
         }
 
         if (existingReaction != null) {
@@ -143,6 +141,26 @@ public class ReactionService {
                     notificationService.createNotification(notificationDTO);
                 }
             }
+        }else if (reactionDTO.getVideoId() != null) {  // ✨ THÊM MỚI
+            Video video = videoRepository.findById(reactionDTO.getVideoId()).orElse(null);
+            if (video != null && video.getAuthor() != null) {
+                recipientId = video.getAuthor().getId();
+
+                if (!recipientId.equals(reactionDTO.getUserId()) && actor != null) {
+                    NotificationDTO notificationDTO = new NotificationDTO();
+                    notificationDTO.setRecipientId(recipientId);
+                    notificationDTO.setActorId(reactionDTO.getUserId());
+                    notificationDTO.setActorName(actor.getFullName());
+                    notificationDTO.setActorAvatar(actor.getAvatar());
+                    notificationDTO.setType("LIKE_VIDEO");
+                    notificationDTO.setTitle("New Like");
+                    notificationDTO.setContent(actor.getFullName() + " liked your video");
+                    notificationDTO.setRelatedId(reactionDTO.getVideoId());
+                    notificationDTO.setRelatedType("VIDEO");
+
+                    notificationService.createNotification(notificationDTO);
+                }
+            }
         }
         
         if (recipientId != null && !recipientId.equals(reactionDTO.getUserId())) {
@@ -191,6 +209,11 @@ public class ReactionService {
                     .orElseThrow(() -> new RuntimeException("Comment not found"));
             comment.setLikeCount((int) reactionRepository.countByCommentId(dto.getCommentId()));
             commentRepository.save(comment);
+        }else if (dto.getVideoId() != null) {
+            Video video = videoRepository.findById(dto.getVideoId())
+                    .orElseThrow(() -> new RuntimeException("Video not found"));
+            video.setLikeCount((int) reactionRepository.countByVideoId(dto.getVideoId()));
+            videoRepository.save(video);
         }
     }
 
@@ -205,7 +228,27 @@ public class ReactionService {
                     .orElseThrow(() -> new RuntimeException("Comment not found"));
             comment.setLikeCount(Math.max(0, (int) reactionRepository.countByCommentId(dto.getCommentId())));
             commentRepository.save(comment);
+        }else if (dto.getVideoId() != null) {
+            Video video = videoRepository.findById(dto.getVideoId())
+                    .orElseThrow(() -> new RuntimeException("Video not found"));
+            video.setLikeCount(Math.max(0, (int) reactionRepository.countByVideoId(dto.getVideoId())));
+            videoRepository.save(video);
         }
+    }
+
+    public List<ReactionDTO> getReactionsByVideoId(String videoId) {
+        return reactionRepository.findByVideoId(videoId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public void deleteReactionByVideoIdAndUserId(String videoId, String userId) {
+        reactionRepository.findByUserIdAndVideoId(userId, videoId)
+                .ifPresent(reaction -> {
+                    ReactionDTO dto = toDTO(reaction);
+                    reactionRepository.delete(reaction);
+                    decreaseReactionCounts(dto);
+                });
     }
 
     private ReactionDTO toDTO(Reaction reaction) {
@@ -243,6 +286,12 @@ public class ReactionService {
                     .orElseThrow(() -> new RuntimeException("Comment not found"));
             reaction.setComment(comment);
             reaction.setCommentId(dto.getCommentId());
+        }
+        if (dto.getVideoId() != null) {
+            Video video = videoRepository.findById(dto.getVideoId())
+                    .orElseThrow(() -> new RuntimeException("Video not found"));
+            reaction.setVideo(video);
+            reaction.setVideoId(dto.getVideoId());
         }
         return reaction;
     }

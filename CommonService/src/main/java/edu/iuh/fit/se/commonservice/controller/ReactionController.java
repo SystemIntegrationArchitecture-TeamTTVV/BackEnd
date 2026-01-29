@@ -62,5 +62,18 @@ public class ReactionController {
         reactionService.deleteReactionByCommentIdAndUserId(commentId, userId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/video/{videoId}")
+    public ResponseEntity<List<ReactionDTO>> getReactionsByVideoId(@PathVariable String videoId) {
+        return ResponseEntity.ok(reactionService.getReactionsByVideoId(videoId));
+    }
+
+    @DeleteMapping("/video/{videoId}/user/{userId}")
+    public ResponseEntity<Void> deleteReactionByVideoIdAndUserId(
+            @PathVariable String videoId,
+            @PathVariable String userId) {
+        reactionService.deleteReactionByVideoIdAndUserId(videoId, userId);
+        return ResponseEntity.noContent().build();
+    }
 }
 

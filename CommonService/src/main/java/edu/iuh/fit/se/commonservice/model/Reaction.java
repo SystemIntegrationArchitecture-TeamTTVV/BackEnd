@@ -32,6 +32,10 @@ public class Reaction {
     @DBRef
     private Comment comment;
     private String commentId;
+
+    @DBRef
+    private Video video;
+    private String videoId;
     
     private LocalDateTime createdAt;
 }
