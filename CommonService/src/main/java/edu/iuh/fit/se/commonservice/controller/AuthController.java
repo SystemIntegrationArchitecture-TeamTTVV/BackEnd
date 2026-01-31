@@ -25,8 +25,22 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthRequestDTO request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<?> login(@RequestBody AuthRequestDTO request) {
+        try {
+            return ResponseEntity.ok(authService.login(request));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && (e.getMessage().contains("Invalid username or password") || e.getMessage().contains("User not found"))) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "error", "Invalid username or password",
+                        "message", "The username or password you entered is incorrect"
+                ));
+            }
+            // Other runtime exceptions
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "An error occurred",
+                    "message", e.getMessage() != null ? e.getMessage() : "Unknown error"
+            ));
+        }
     }
 
     @PostMapping("/register")

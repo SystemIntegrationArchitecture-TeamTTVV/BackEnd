@@ -21,51 +21,44 @@ public class RemoveDuplicateCorsFilter implements GlobalFilter {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
+        String origin = request.getHeaders().getFirst(HttpHeaders.ORIGIN);
+        ServerHttpResponse originalResponse = exchange.getResponse();
         
-        // Only process WebSocket related paths
-        if (path.contains("/ws/") || path.contains("/ws?") || path.contains("/api/common/ws")) {
-            String origin = request.getHeaders().getFirst(HttpHeaders.ORIGIN);
-            ServerHttpResponse originalResponse = exchange.getResponse();
-            
-            // Wrap response to handle CORS headers for WebSocket
-            ServerHttpResponseDecorator decoratedResponse = new ServerHttpResponseDecorator(originalResponse) {
-                @Override
-                public Mono<Void> writeWith(org.reactivestreams.Publisher<? extends org.springframework.core.io.buffer.DataBuffer> body) {
-                    // Remove any CORS headers from backend first
-                    HttpHeaders headers = getHeaders();
-                    
-                    // Remove backend CORS headers
-                    headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
-                    headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS);
-                    headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS);
-                    headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS);
-                    headers.remove(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS);
-                    headers.remove(HttpHeaders.ACCESS_CONTROL_MAX_AGE);
-                    
-                    // Set CORS headers from Gateway (always set, not add)
-                    if (origin != null && (origin.contains("localhost") || origin.contains("127.0.0.1") || origin.contains(":"))) {
-                        log.debug("🔧 Setting CORS headers for WebSocket path: {} with origin: {}", path, origin);
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin);
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
-                        headers.set(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "*");
-                        headers.set(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
-                    } else {
-                        // Fallback: allow all origins if no origin header
-                        log.debug("🔧 Setting CORS headers with wildcard for WebSocket path: {}", path);
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-                        headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
-                    }
-                    
-                    return super.writeWith(body);
+        // Wrap response to ensure CORS headers are always set, even for error responses
+        ServerHttpResponseDecorator decoratedResponse = new ServerHttpResponseDecorator(originalResponse) {
+            @Override
+            public Mono<Void> writeWith(org.reactivestreams.Publisher<? extends org.springframework.core.io.buffer.DataBuffer> body) {
+                HttpHeaders headers = getHeaders();
+                
+                // Remove backend CORS headers to prevent duplicate values
+                headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
+                headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS);
+                headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS);
+                headers.remove(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS);
+                headers.remove(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS);
+                headers.remove(HttpHeaders.ACCESS_CONTROL_MAX_AGE);
+                
+                // Always set CORS headers explicitly to ensure they're present even for error responses
+                if (origin != null) {
+                    // Set the origin from the request
+                    headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+                    headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+                } else {
+                    // Fallback: allow all origins if no origin header
+                    headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
                 }
-            };
-            
-            return chain.filter(exchange.mutate().response(decoratedResponse).build());
-        }
+                
+                headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+                headers.set(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
+                headers.set(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "*");
+                headers.set(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
+                
+                log.debug("🔧 Set CORS headers for path: {} with origin: {}", path, origin);
+                
+                return super.writeWith(body);
+            }
+        };
         
-        return chain.filter(exchange);
+        return chain.filter(exchange.mutate().response(decoratedResponse).build());
     }
 }
