@@ -99,8 +99,7 @@ public class IndexFixer implements CommandLineRunner {
                 logger.debug("Index {} already exists with correct configuration", indexName);
             }
         } catch (Exception e) {
-            // Nếu index đã tồn tại với config khác, MongoDB sẽ throw exception
-            // Spring Data MongoDB sẽ tự động tạo lại từ annotation
+           
             logger.debug("Index {} might already exist or will be created by Spring Data MongoDB: {}", 
                     indexName, e.getMessage());
         }
