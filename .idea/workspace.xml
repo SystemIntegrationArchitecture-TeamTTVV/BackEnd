@@ -5,11 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/StoriesController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/StoriesController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/repository/StoriesRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/repository/StoriesRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/security/JwtAuthenticationFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/security/JwtAuthenticationFilter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/StoriesService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/StoriesService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/security/JwtAuthenticationFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/security/JwtAuthenticationFilter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ApiGateway/src/main/java/edu/iuh/fit/se/apigateway/config/RemoveDuplicateCorsFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/ApiGateway/src/main/java/edu/iuh/fit/se/apigateway/config/RemoveDuplicateCorsFilter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/DataSeeder.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/DataSeeder.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/IndexFixer.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/IndexFixer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AuthController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AuthController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/DataSeeder.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/DataSeeder.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -80,6 +84,7 @@
     "RequestMappingsPanelWidth0": "75",
     "RequestMappingsPanelWidth1": "75",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "Spring Boot.ApiGatewayApplication.executor": "Run",
     "Spring Boot.CommonServiceApplication.executor": "Run",
@@ -159,7 +164,7 @@
       <option name="presentableId" value="Default" />
       <updated>1769415600793</updated>
       <workItem from="1769415601975" duration="6025000" />
-      <workItem from="1769865484732" duration="502000" />
+      <workItem from="1769865484732" duration="3075000" />
     </task>
     <servers />
   </component>

@@ -169,4 +169,3 @@ public class DataSeeder implements CommandLineRunner {
         return call;
     }
 }
-

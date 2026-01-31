@@ -57,6 +57,16 @@ public class IndexFixer implements CommandLineRunner {
             for (org.springframework.data.mongodb.core.index.IndexInfo indexInfo : existingIndexes) {
                 String indexName = indexInfo.getName();
                 
+                // Drop user_comment_idx nếu nó có unique constraint (vì sparse + unique với null values gây lỗi)
+                if ("user_comment_idx".equals(indexName) && indexInfo.isUnique()) {
+                    try {
+                        indexOps.dropIndex(indexName);
+                        logger.info("✅ Dropped old {} (has unique constraint which causes issues with null values)", indexName);
+                    } catch (Exception e) {
+                        logger.debug("Could not drop {}: {}", indexName, e.getMessage());
+                    }
+                }
+                
                 // Kiểm tra nếu là index cần fix và không có sparse option
                 if (("user_post_idx".equals(indexName) || "user_comment_idx".equals(indexName)) 
                     && !indexInfo.isSparse()) {
@@ -87,12 +97,20 @@ public class IndexFixer implements CommandLineRunner {
                     .anyMatch(idx -> indexName.equals(idx.getName()) && idx.isSparse());
             
             if (!exists) {
+                // Only make user_post_idx unique (one reaction per user per post)
+                // user_comment_idx should not be unique because multiple users can react to the same comment
+                // and sparse index with null values can cause issues
                 Index index = new Index()
                         .on(field1, org.springframework.data.domain.Sort.Direction.ASC)
                         .on(field2, org.springframework.data.domain.Sort.Direction.ASC)
-                        .unique()
                         .sparse()
                         .named(indexName);
+                
+                // Only add unique constraint for user_post_idx
+                if ("user_post_idx".equals(indexName)) {
+                    index = index.unique();
+                }
+                
                 String createdIndexName = indexOps.createIndex(index);
                 logger.info("✅ Created {} with sparse option: {}", indexName, createdIndexName);
             } else {

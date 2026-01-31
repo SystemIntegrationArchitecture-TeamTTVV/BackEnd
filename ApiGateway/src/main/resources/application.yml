@@ -100,6 +100,13 @@ spring:
           filters:
             - RewritePath=/api/common/stories(/.*)?, /api/stories$1
         
+        - id: common-service-ai
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/ai/**
+          filters:
+            - RewritePath=/api/common/ai(/.*)?, /api/ai$1
+        
         - id: common-service-roles
           uri: http://localhost:8081
           predicates:
