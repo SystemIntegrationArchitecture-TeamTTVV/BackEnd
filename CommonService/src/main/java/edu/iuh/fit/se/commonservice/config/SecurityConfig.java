@@ -66,6 +66,9 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/ws").permitAll()
                 
+                // Admin-only endpoints - require ADMIN role
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                
                 // All API endpoints require authentication (but SwaggerBypassFilter will handle Swagger requests)
                 .requestMatchers("/api/groups/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
                 .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "MODERATOR", "USER")
