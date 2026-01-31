@@ -58,8 +58,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     logger.warn("JWT Filter: Token validation failed for username=" + username);
                 }
             }
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // Token expired - this is normal, just log as debug/warn, not error
+            logger.debug("JWT Filter: Token expired for request: " + request.getRequestURI());
+        } catch (io.jsonwebtoken.JwtException e) {
+            // Other JWT exceptions (malformed, invalid signature, etc.)
+            logger.warn("JWT Filter: Invalid JWT token: " + e.getMessage());
         } catch (Exception e) {
-            logger.error("Cannot set user authentication: " + e.getMessage(), e);
+            // Other unexpected errors
+            logger.error("JWT Filter: Unexpected error during authentication: " + e.getMessage(), e);
         }
 
         chain.doFilter(request, response);

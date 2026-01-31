@@ -13,5 +13,8 @@ public interface StoriesRepository extends MongoRepository<Stories, String> {
             List<String> userIds,
             LocalDateTime now
     );
+
+    // Lấy tất cả active stories chưa hết hạn
+    List<Stories> findByActiveTrueAndExpiredAtAfterOrderByCreatedAtDesc(LocalDateTime now);
 }
 
