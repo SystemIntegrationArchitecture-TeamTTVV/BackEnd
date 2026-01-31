@@ -21,6 +21,15 @@ public class StoriesController {
     private final StoriesService storiesService;
 
     /**
+     * Lấy tất cả active stories chưa hết hạn
+     * FE gọi: GET /api/stories
+     */
+    @GetMapping
+    public List<StoryResponseDTO> getAllActiveStories() {
+        return storiesService.getAllActiveStories();
+    }
+
+    /**
      * FE gọi:
      * GET /api/stories/feed/{userId}
      */

@@ -23,6 +23,19 @@ public class StoriesService {
     private final FriendRepository friendRepo;
     private final FileUploadService fileUploadService;
     /**
+     * Lấy tất cả active stories chưa hết hạn
+     */
+    public List<StoryResponseDTO> getAllActiveStories() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Stories> stories = storiesRepo
+                .findByActiveTrueAndExpiredAtAfterOrderByCreatedAtDesc(now);
+        
+        return stories.stream()
+                .map(this::toDTO)
+                .toList();
+    }
+
+    /**
      * Lấy story feed (bản thân + bạn bè)
      */
     public List<StoryResponseDTO> getStoryFeed(String userId) {
