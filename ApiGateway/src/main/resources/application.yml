@@ -11,14 +11,14 @@ spring:
             - Path=/api/common/v3/api-docs
           filters:
             - RewritePath=/api/common/v3/api-docs, /api-docs
-        
+
         - id: message-service-api-docs
           uri: http://localhost:8082
           predicates:
             - Path=/api/message/v3/api-docs
           filters:
             - RewritePath=/api/message/v3/api-docs, /api-docs
-        
+
         # CommonService Auth Routes
         - id: common-service-auth
           uri: http://localhost:8081
@@ -26,7 +26,7 @@ spring:
             - Path=/api/common/auth/**
           filters:
             - RewritePath=/api/common/auth(/.*)?, /api/auth$1
-        
+
         # CommonService WebSocket Route - Must be before common-service-all
         # WebSocket routes need to be explicitly configured
         - id: common-service-websocket
@@ -35,7 +35,7 @@ spring:
             - Path=/api/common/ws/**
           filters:
             - RewritePath=/api/common/ws(/.*)?, /ws$1
-        
+
         # CommonService Routes
         - id: common-service-users
           uri: http://localhost:8081
@@ -43,98 +43,112 @@ spring:
             - Path=/api/common/users/**
           filters:
             - RewritePath=/api/common/users(/.*)?, /api/users$1
-        
+
         - id: common-service-posts
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/posts/**
           filters:
             - RewritePath=/api/common/posts(/.*)?, /api/posts$1
-        
+
         - id: common-service-comments
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/comments/**
           filters:
             - RewritePath=/api/common/comments(/.*)?, /api/comments$1
-        
+
         - id: common-service-groups
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/groups/**
           filters:
             - RewritePath=/api/common/groups(/.*)?, /api/groups$1
-        
+
         - id: common-service-friends
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/friends/**
           filters:
             - RewritePath=/api/common/friends(/.*)?, /api/friends$1
-        
+
         - id: common-service-reactions
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/reactions/**
           filters:
             - RewritePath=/api/common/reactions(/.*)?, /api/reactions$1
-        
+
         - id: common-service-friend-requests
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/friend-requests/**
           filters:
             - RewritePath=/api/common/friend-requests(/.*)?, /api/friend-requests$1
-        
+
         - id: common-service-notifications
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/notifications/**
           filters:
             - RewritePath=/api/common/notifications(/.*)?, /api/notifications$1
-        
+
         - id: common-service-stories
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/stories/**
           filters:
             - RewritePath=/api/common/stories(/.*)?, /api/stories$1
-        
+
         - id: common-service-ai
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/ai/**
           filters:
             - RewritePath=/api/common/ai(/.*)?, /api/ai$1
-        
+
         - id: common-service-roles
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/roles/**
           filters:
             - RewritePath=/api/common/roles(/.*)?, /api/roles$1
-        
+
         - id: common-service-files
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/api/files/**
           filters:
             - RewritePath=/api/common/api/files(/.*)?, /api/files$1
-        
+
         - id: common-service-upload
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/api/upload/**
           filters:
             - RewritePath=/api/common/api/upload(/.*)?, /api/upload$1
-        
+
+        - id: common-service-reports
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/reports/**
+          filters:
+            - RewritePath=/api/reports(/.*)?, /api/reports$1
+
+        - id: common-service-stats
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/stats/**
+          filters:
+            - RewritePath=/api/stats(/.*)?, /api/stats$1
+
         - id: common-service-all
           uri: http://localhost:8081
           predicates:
             - Path=/api/common/**
           filters:
             - StripPrefix=2
-        
+
         # MessegeService Routes
         - id: message-service-upload
           uri: http://localhost:8082
@@ -142,47 +156,47 @@ spring:
             - Path=/api/message/api/upload/**
           filters:
             - RewritePath=/api/message/api/upload(/.*)?, /api/upload$1
-        
+
         - id: message-service-files
           uri: http://localhost:8082
           predicates:
             - Path=/api/message/api/files/**
           filters:
             - RewritePath=/api/message/api/files(/.*)?, /api/files$1
-        
+
         - id: message-service-conversations
           uri: http://localhost:8082
           predicates:
             - Path=/api/message/conversations/**
           filters:
             - StripPrefix=2
-        
+
         - id: message-service-messages
           uri: http://localhost:8082
           predicates:
             - Path=/api/message/messages/**
           filters:
             - StripPrefix=2
-        
+
         - id: message-service-calls
           uri: http://localhost:8082
           predicates:
             - Path=/api/message/calls/**
           filters:
             - StripPrefix=2
-        
+
         - id: message-service-all
           uri: http://localhost:8082
           predicates:
             - Path=/api/message/**
           filters:
             - StripPrefix=2
-      
+
       # Global CORS Configuration
       globalcors:
         cors-configurations:
-          '[/**]':
-            allowedOriginPatterns: "*"  # Changed from allowedOrigins to allowedOriginPatterns
+          "[/**]":
+            allowedOriginPatterns: "*" # Changed from allowedOrigins to allowedOriginPatterns
             allowedMethods:
               - GET
               - POST

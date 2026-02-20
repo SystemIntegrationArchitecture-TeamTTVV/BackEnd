@@ -6,14 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ApiGateway/src/main/java/edu/iuh/fit/se/apigateway/config/RemoveDuplicateCorsFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/ApiGateway/src/main/java/edu/iuh/fit/se/apigateway/config/RemoveDuplicateCorsFilter.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/DataSeeder.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/DataSeeder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/IndexFixer.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/IndexFixer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AuthController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AuthController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/DataSeeder.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/config/DataSeeder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/model/Report.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/model/Report.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,21 +77,26 @@
     "RequestMappingsPanelOrder1": "1",
     "RequestMappingsPanelWidth0": "75",
     "RequestMappingsPanelWidth1": "75",
+    "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "Spring Boot.ApiGatewayApplication.executor": "Run",
     "Spring Boot.CommonServiceApplication.executor": "Run",
     "Spring Boot.MessegeServiceApplication.executor": "Run",
-    "git-widget-placeholder": "22637901-thach",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "22638111-viet",
     "ignore.virus.scanning.warn.message": "true",
+    "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "E:/GiaoTrinhDH/Nam4_HK2/KienTruc/Duan/DuAn_2/BackEnd",
+    "last_opened_file_path": "D:/DaiHoc/MonHocNam4_2/Kientruc/BaiTapNhom/BackEnd",
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "run.configurations.included.in.services": "true",
+    "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -124,7 +123,7 @@
       </map>
     </option>
   </component>
-  <component name="RunManager" selected="Spring Boot.CommonServiceApplication">
+  <component name="RunManager" selected="Spring Boot.ApiGatewayApplication">
     <configuration name="ApiGatewayApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <module name="ApiGateway" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.apigateway.ApiGatewayApplication" />
@@ -150,8 +149,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.23892.409" />
-        <option value="bundled-js-predefined-d6986cc7102b-e03c56caf84a-JavaScript-IU-252.23892.409" />
+        <option value="bundled-jdk-30f59d01ecdd-26cb7f24e5b0-intellij.indexing.shared.core-IU-253.29346.240" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.29346.240" />
       </set>
     </attachedChunks>
   </component>
@@ -165,6 +164,7 @@
       <updated>1769415600793</updated>
       <workItem from="1769415601975" duration="6025000" />
       <workItem from="1769865484732" duration="3075000" />
+      <workItem from="1771553532876" duration="5146000" />
     </task>
     <servers />
   </component>
