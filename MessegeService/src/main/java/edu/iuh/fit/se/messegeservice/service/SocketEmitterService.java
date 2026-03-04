@@ -3,12 +3,7 @@ package edu.iuh.fit.se.messegeservice.service;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 /**
  * Service to emit socket events via CommonService
@@ -18,15 +13,10 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class SocketEmitterService {
 
-    private final RestTemplate restTemplate;
-    private final String commonServiceUrl;
+    private final CommonServiceClientFacade commonServiceClientFacade;
 
-    public SocketEmitterService(
-            RestTemplate restTemplate,
-            @Value("${common.service.url:http://localhost:8081}") String commonServiceUrl
-    ) {
-        this.restTemplate = restTemplate;
-        this.commonServiceUrl = commonServiceUrl;
+    public SocketEmitterService(CommonServiceClientFacade commonServiceClientFacade) {
+        this.commonServiceClientFacade = commonServiceClientFacade;
     }
 
     /**
@@ -36,8 +26,7 @@ public class SocketEmitterService {
      */
     private String getUsernameFromUserId(String userId) {
         try {
-            String url = commonServiceUrl + "/api/users/" + userId;
-            UserDTO user = restTemplate.getForObject(url, UserDTO.class);
+            UserDTO user = commonServiceClientFacade.getUserById(userId);
             return user != null && user.getUsername() != null ? user.getUsername() : userId;
         } catch (Exception e) {
             log.warn("⚠️ Failed to fetch username for userId {}, using userId as fallback: {}", userId, e.getMessage());
@@ -64,14 +53,8 @@ public class SocketEmitterService {
      */
     public void emitToUser(String username, SocketEventDTO event) {
         try {
-            String url = commonServiceUrl + "/api/socket/emit/user/" + username;
-            log.info("🚀 Emitting {} event to user {} via {}", event.getType(), username, url);
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<SocketEventDTO> request = new HttpEntity<>(event, headers);
-            
-            restTemplate.postForEntity(url, request, Void.class);
+            log.info("🚀 Emitting {} event to user {}", event.getType(), username);
+            commonServiceClientFacade.emitToUser(username, event);
             log.info("✅ Socket event emitted successfully to user {}", username);
         } catch (Exception e) {
             log.error("❌ Failed to emit socket event to user {}: {}", username, e.getMessage());
@@ -85,14 +68,8 @@ public class SocketEmitterService {
      */
     public void emitToAll(SocketEventDTO event) {
         try {
-            String url = commonServiceUrl + "/api/socket/emit/all";
-            log.info("🚀 Emitting {} event to all users via {}", event.getType(), url);
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<SocketEventDTO> request = new HttpEntity<>(event, headers);
-            
-            restTemplate.postForEntity(url, request, Void.class);
+            log.info("🚀 Emitting {} event to all users", event.getType());
+            commonServiceClientFacade.emitToAll(event);
             log.info("✅ Socket event emitted successfully to all users");
         } catch (Exception e) {
             log.error("❌ Failed to emit socket event to all users: {}", e.getMessage());
@@ -106,14 +83,8 @@ public class SocketEmitterService {
      */
     public void emitToTopic(String topic, SocketEventDTO event) {
         try {
-            String url = commonServiceUrl + "/api/socket/emit/topic/" + topic;
-            log.info("🚀 Emitting {} event to topic {} via {}", event.getType(), topic, url);
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<SocketEventDTO> request = new HttpEntity<>(event, headers);
-            
-            restTemplate.postForEntity(url, request, Void.class);
+            log.info("🚀 Emitting {} event to topic {}", event.getType(), topic);
+            commonServiceClientFacade.emitToTopic(topic, event);
             log.info("✅ Socket event emitted successfully to topic {}", topic);
         } catch (Exception e) {
             log.error("❌ Failed to emit socket event to topic {}: {}", topic, e.getMessage());

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import edu.iuh.fit.se.commonservice.dto.AIChatRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatResponseDTO;
 
@@ -29,6 +30,7 @@ public class AIChatService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
+    @CircuitBreaker(name = "aiService", fallbackMethod = "chatFallback")
     public AIChatResponseDTO chat(AIChatRequestDTO request) {
         try {
             log.info("🤖 [AIChat] Processing chat request from user: {}", request.getUserId());
@@ -85,6 +87,17 @@ public class AIChatService {
             log.error("❌ [AIChat] Error calling Gemini API: {}", e.getMessage(), e);
             throw new RuntimeException("Error communicating with AI service: " + e.getMessage(), e);
         }
+    }
+
+    @SuppressWarnings("unused")
+    private AIChatResponseDTO chatFallback(AIChatRequestDTO request, Throwable throwable) {
+        log.warn("⚠️ [AIChat] Falling back for chat due to: {}", throwable.getMessage());
+        String fallbackMessage = "Xin lỗi, dịch vụ AI hiện đang bận hoặc tạm thời không khả dụng. "
+                + "Bạn vui lòng thử lại sau nhé.";
+        String conversationId = request.getConversationId() != null
+                ? request.getConversationId()
+                : generateConversationId(request.getUserId());
+        return new AIChatResponseDTO(fallbackMessage, conversationId);
     }
 
     private String extractTextFromResponse(JsonNode jsonResponse) {
