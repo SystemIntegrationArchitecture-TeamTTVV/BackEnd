@@ -46,5 +46,11 @@ public class CommentController {
         commentService.deleteComment(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/video/{videoId}")
+    public ResponseEntity<List<CommentDTO>> getCommentsByVideoId(@PathVariable String videoId) {
+        return ResponseEntity.ok(commentService.getCommentsByVideoId(videoId));
+    }
+
 }
 

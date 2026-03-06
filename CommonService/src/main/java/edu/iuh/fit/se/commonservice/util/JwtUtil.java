@@ -19,8 +19,17 @@ public class JwtUtil {
     @Value("${jwt.secret:mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}")
     private String secret;
 
-    @Value("${jwt.expiration:86400000}") // 24 hours
-    private Long expiration;
+    /**
+     * Access token expiration in milliseconds (default 30 minutes).
+     */
+    @Value("${jwt.access-token-expiration:1800000}")
+    private Long accessTokenExpiration;
+
+    /**
+     * Refresh token expiration in milliseconds (default 7 days).
+     */
+    @Value("${jwt.refresh-token-expiration:604800000}")
+    private Long refreshTokenExpiration;
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
@@ -56,19 +65,36 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
+    /**
+     * Backwards compatible method used in existing code – generates an access token.
+     */
     public String generateToken(String username, String role, String userId) {
+        return generateAccessToken(username, role, userId);
+    }
+
+    public String generateAccessToken(String username, String role, String userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
         claims.put("userId", userId);
-        return createToken(claims, username);
+        claims.put("tokenType", "ACCESS");
+        return createToken(claims, username, accessTokenExpiration);
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    public String generateRefreshToken(String username, String role, String userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role);
+        claims.put("userId", userId);
+        claims.put("tokenType", "REFRESH");
+        return createToken(claims, username, refreshTokenExpiration);
+    }
+
+    private String createToken(Map<String, Object> claims, String subject, Long expirationMillis) {
+        long exp = expirationMillis != null && expirationMillis > 0 ? expirationMillis : accessTokenExpiration;
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .expiration(new Date(System.currentTimeMillis() + exp))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -76,6 +102,14 @@ public class JwtUtil {
     public Boolean validateToken(String token, String username) {
         final String extractedUsername = extractUsername(token);
         return (extractedUsername.equals(username) && !isTokenExpired(token));
+    }
+
+    public long getAccessTokenExpiration() {
+        return accessTokenExpiration != null ? accessTokenExpiration : 0L;
+    }
+
+    public long getRefreshTokenExpiration() {
+        return refreshTokenExpiration != null ? refreshTokenExpiration : 0L;
     }
 }
 

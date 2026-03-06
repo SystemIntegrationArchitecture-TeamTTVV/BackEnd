@@ -1,17 +1,15 @@
 package edu.iuh.fit.se.commonservice.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.service.MessageServiceClientFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -24,11 +22,7 @@ public class WebSocketController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    
-    @Value("${message.service.url:http://localhost:8082}")
-    private String messageServiceUrl;
+    private final MessageServiceClientFacade messageServiceClientFacade;
 
     /**
      * Handle client connection and subscribe to user-specific channel
@@ -102,24 +96,8 @@ public class WebSocketController {
     private void broadcastGroupCallOffer(SocketEventDTO event, String conversationId) {
         try {
             log.info("📞 Broadcasting group call offer to conversation: {}", conversationId);
-            
-            // Get conversation details from MessageService
-            // MessageService has @RequestMapping("/conversations") so path is /conversations/{id}
-            String url = messageServiceUrl + "/conversations/" + conversationId;
-            log.info("📞 Fetching conversation from: {}", url);
-            
-            Map<String, Object> conversation = null;
-            try {
-                conversation = restTemplate.getForObject(url, Map.class);
-            } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
-                log.error("❌ 404 - Conversation not found at URL: {} - Message: {}", url, e.getMessage());
-                // The URL might be wrong, check if MessageService is accessible
-                log.error("❌ Make sure MessageService is running at: {}", messageServiceUrl);
-                return;
-            } catch (Exception e) {
-                log.error("❌ Error fetching conversation from {}: {}", url, e.getMessage());
-                return;
-            }
+
+            Map<String, Object> conversation = messageServiceClientFacade.getConversationById(conversationId);
             
             if (conversation == null) {
                 log.error("❌ Conversation not found: {}", conversationId);

@@ -209,8 +209,8 @@ public class DataSeeder implements CommandLineRunner {
         u.setGender("Khác");
         u.setRole(role);
         u.setRoleId(role != null ? role.getId() : null);
-        u.setActive(true);
-        u.setVerified(role != null && (role.getName().equals("ADMIN") || role.getName().equals("MODERATOR")));
+        u.setIsActive(true);
+        u.setIsVerified(role != null && (role.getName().equals("ADMIN") || role.getName().equals("MODERATOR")));
         u.setInterests(List.of("du lịch", "ẩm thực", "công nghệ"));
         u.setCreatedAt(LocalDateTime.now().minusDays(random.nextInt(30)));
         u.setUpdatedAt(LocalDateTime.now());
@@ -413,29 +413,29 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedCommentsAndReactions(List<Post> posts, List<User> users) {
         List<Comment> comments = new ArrayList<>();
-        Comment c1 = new Comment(null, posts.get(0), users.get(1),
+        Comment c1 = new Comment(null, posts.get(0), users.get(1), null,
                 "Cho xin lịch trình với bạn ơi!", List.of(), null,
                 3, 1, LocalDateTime.now().minusHours(5), LocalDateTime.now(), null, false);
         // Tránh tham chiếu tới comment khác chưa có id (gây lỗi NULL id DBRef)
-        Comment c2 = new Comment(null, posts.get(0), users.get(2),
+        Comment c2 = new Comment(null, posts.get(0), users.get(2), null,
                 "Đi Đà Lạt nhớ mang áo ấm nha 🧥", List.of(), null,
                 1, 0, LocalDateTime.now().minusHours(3), LocalDateTime.now(), null, false);
         comments.add(c1);
         comments.add(c2);
         // Comments cho post 2
-        comments.add(new Comment(null, posts.get(2), users.get(0),
+        comments.add(new Comment(null, posts.get(2), users.get(0), null,
                 "Nhìn ngon quá, tối nay phải thử!", List.of(), null,
                 2, 0, LocalDateTime.now().minusHours(4), LocalDateTime.now(), null, false));
-        comments.add(new Comment(null, posts.get(2), users.get(3),
+        comments.add(new Comment(null, posts.get(2), users.get(3), null,
                 "Quán này ở đâu vậy bạn?", List.of(), null,
                 1, 0, LocalDateTime.now().minusHours(2), LocalDateTime.now(), null, false));
         // Comments cho post 3
-        comments.add(new Comment(null, posts.get(3), users.get(1),
+        comments.add(new Comment(null, posts.get(3), users.get(1), null,
                 "Checklist này hay đấy, mình sẽ áp dụng!", List.of(), null,
                 0, 0, LocalDateTime.now().minusHours(1), LocalDateTime.now(), null, false));
         // Comments cho post 5
         if (posts.size() > 5) {
-            comments.add(new Comment(null, posts.get(5), users.get(0),
+            comments.add(new Comment(null, posts.get(5), users.get(0), null,
                     "Chạy bộ buổi sáng là cách tốt nhất để bắt đầu ngày mới! 💪", List.of(), null,
                     0, 0, LocalDateTime.now().minusMinutes(30), LocalDateTime.now(), null, false));
         }
@@ -750,4 +750,3 @@ public class DataSeeder implements CommandLineRunner {
         return r;
     }
 }
-

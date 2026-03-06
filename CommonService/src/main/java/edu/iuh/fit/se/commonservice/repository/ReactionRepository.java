@@ -18,5 +18,9 @@ public interface ReactionRepository extends MongoRepository<Reaction, String> {
     long countByCommentId(String commentId);
     void deleteByPostId(String postId);
     void deleteByCommentId(String commentId);
+    List<Reaction> findByVideoId(String videoId);
+    Optional<Reaction> findByUserIdAndVideoId(String userId, String videoId);
+    long countByVideoId(String videoId);
+    void deleteByVideoId(String videoId);
 }
 

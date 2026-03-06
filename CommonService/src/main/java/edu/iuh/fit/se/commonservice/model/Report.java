@@ -27,7 +27,7 @@ public class Report {
     private String reason;     // Lý do report
     private String detail;     // Mô tả chi tiết
 
-    private String status = "OPEN"; // OPEN, REVIEWING, RESOLVED, REJECTED
+    private String status = "pending"; // pending, reviewing, resolved, rejected
     private String actionTaken;     // Ghi chú xử lý
 
     private LocalDateTime createdAt;

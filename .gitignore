@@ -1,0 +1,11 @@
+##############################
+# Global Git Ignore for BE
+##############################
+
+# Build outputs
+**/target/
+
+# IDE configuration (IntelliJ, etc.)
+.idea/
+
+

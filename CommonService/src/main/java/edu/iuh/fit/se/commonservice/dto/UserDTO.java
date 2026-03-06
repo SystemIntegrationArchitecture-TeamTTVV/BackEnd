@@ -29,15 +29,15 @@ public class UserDTO {
     private String workPlace;
     private String education;
     private String relationshipStatus;
-    private boolean isActive;
-    private boolean isVerified;
+    private Boolean isActive;
+    private Boolean isVerified;
     private String role;
     private List<String> interests;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String profileVisibility;
     private String postVisibility;
-    private boolean showEmail;
-    private boolean showPhone;
+    private Boolean showEmail;
+    private Boolean showPhone;
 }
 

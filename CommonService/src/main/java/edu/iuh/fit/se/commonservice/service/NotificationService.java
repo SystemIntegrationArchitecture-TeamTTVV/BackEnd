@@ -50,12 +50,15 @@ public class NotificationService {
         Notification saved = notificationRepository.save(notification);
         NotificationDTO savedDTO = toDTO(saved);
         
-        // Send socket event to recipient
+        // Send socket event to recipient using username, not userId
         if (savedDTO.getRecipientId() != null) {
-            socketService.sendNotification(
-                savedDTO.getRecipientId(),
-                SocketEventDTO.notification(savedDTO.getRecipientId(), savedDTO)
-            );
+            // Fetch recipient user to get username
+            userRepository.findById(savedDTO.getRecipientId()).ifPresent(recipient -> {
+                socketService.sendNotification(
+                    recipient.getUsername(), // Use username, not userId
+                    SocketEventDTO.notification(savedDTO.getRecipientId(), savedDTO)
+                );
+            });
         }
         
         return savedDTO;

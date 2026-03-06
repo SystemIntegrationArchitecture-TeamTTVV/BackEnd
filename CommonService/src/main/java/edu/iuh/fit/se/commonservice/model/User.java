@@ -41,8 +41,8 @@ public class User {
     private String education; // Học vấn
     private String relationshipStatus; // Độc thân, Đã kết hôn, v.v.
     
-    private boolean isActive = true;
-    private boolean isVerified = false;
+    private Boolean isActive = true;
+    private Boolean isVerified = false;
     
     @DBRef
     private Role role; // Reference to Role entity
@@ -55,7 +55,7 @@ public class User {
     // Privacy settings
     private String profileVisibility = "PUBLIC"; // PUBLIC, FRIENDS, PRIVATE
     private String postVisibility = "PUBLIC"; // PUBLIC, FRIENDS, PRIVATE
-    private boolean showEmail = false;
-    private boolean showPhone = false;
+    private Boolean showEmail = false;
+    private Boolean showPhone = false;
 }
 

@@ -1,22 +1,19 @@
 package edu.iuh.fit.se.commonservice.model;
 
+import java.time.LocalDateTime;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DBRef;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-
-import java.time.LocalDateTime;
 
 @Document(collection = "reactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@CompoundIndex(name = "user_post_idx", def = "{'userId': 1, 'postId': 1}", unique = true)
-// Note: user_comment_idx removed to avoid conflict with post reactions (commentId = null)
-// If needed, create partial index manually: db.reactions.createIndex({userId: 1, commentId: 1}, {unique: true, partialFilterExpression: {commentId: {$ne: null}}})
 public class Reaction {
     @Id
     private String id;
@@ -35,6 +32,10 @@ public class Reaction {
     @DBRef
     private Comment comment;
     private String commentId;
+
+    @DBRef
+    private Video video;
+    private String videoId;
     
     private LocalDateTime createdAt;
 }

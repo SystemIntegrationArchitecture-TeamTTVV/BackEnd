@@ -36,6 +36,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final TokenStoreService tokenStoreService;
 
     public AuthResponseDTO login(AuthRequestDTO request) {
         try {
@@ -47,10 +48,15 @@ public class AuthService {
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
             String roleName = user.getRole() != null ? user.getRole().getName() : "USER";
-            String token = jwtUtil.generateToken(user.getUsername(), roleName, user.getId());
+            String accessToken = jwtUtil.generateAccessToken(user.getUsername(), roleName, user.getId());
+            // We keep refresh token as a separate opaque value stored in Redis
+            String refreshToken = UUID.randomUUID().toString();
+
+            tokenStoreService.storeTokens(accessToken, refreshToken, user.getId());
 
             return new AuthResponseDTO(
-                    token,
+                    accessToken,
+                    refreshToken,
                     user.getUsername(),
                     roleName,
                     user.getId(),
@@ -98,18 +104,22 @@ public class AuthService {
                 });
         user.setRole(defaultRole);
         user.setRoleId(defaultRole.getId());
-        user.setActive(true);
-        user.setVerified(false);
+        user.setIsActive(true);
+        user.setIsVerified(false);
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
         User saved = userRepository.save(user);
 
         String roleName = saved.getRole() != null ? saved.getRole().getName() : "USER";
-        String token = jwtUtil.generateToken(saved.getUsername(), roleName, saved.getId());
+        String accessToken = jwtUtil.generateAccessToken(saved.getUsername(), roleName, saved.getId());
+        String refreshToken = UUID.randomUUID().toString();
+
+        tokenStoreService.storeTokens(accessToken, refreshToken, saved.getId());
 
         return new AuthResponseDTO(
-                token,
+                accessToken,
+                refreshToken,
                 saved.getUsername(),
                 roleName,
                 saved.getId(),
@@ -170,5 +180,37 @@ public class AuthService {
         // Mark token as used
         resetToken.setUsed(true);
         passwordResetTokenRepository.save(resetToken);
+    }
+
+    public AuthResponseDTO refreshAccessToken(String refreshToken) {
+        String userId = tokenStoreService.getUserIdForRefreshToken(refreshToken);
+        if (userId == null) {
+            throw new RuntimeException("Invalid or expired refresh token");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String roleName = user.getRole() != null ? user.getRole().getName() : "USER";
+
+        String newAccessToken = jwtUtil.generateAccessToken(user.getUsername(), roleName, user.getId());
+        String newRefreshToken = UUID.randomUUID().toString();
+
+        tokenStoreService.storeTokens(newAccessToken, newRefreshToken, user.getId());
+        tokenStoreService.deleteRefreshToken(refreshToken);
+
+        return new AuthResponseDTO(
+                newAccessToken,
+                newRefreshToken,
+                user.getUsername(),
+                roleName,
+                user.getId(),
+                user.getFullName(),
+                user.getAvatar()
+        );
+    }
+
+    public void logout(String refreshToken) {
+        tokenStoreService.deleteRefreshToken(refreshToken);
     }
 }
