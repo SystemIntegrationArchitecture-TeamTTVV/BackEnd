@@ -32,6 +32,7 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final RestTemplate restTemplate;
     private final SocketEmitterService socketEmitterService;
+    private final CommonServiceClientFacade commonServiceClientFacade;
     
     @Value("${common.service.url:http://localhost:8081}")
     private String commonServiceUrl;
@@ -528,8 +529,7 @@ public class ConversationService {
         
         for (String participantId : conversation.getParticipantIds()) {
             try {
-                String url = commonServiceUrl + "/api/users/" + participantId;
-                UserDTO user = restTemplate.getForObject(url, UserDTO.class);
+                UserDTO user = commonServiceClientFacade.getUserById(participantId);
                 if (user != null) {
                     participantNames.add(user.getFullName() != null ? user.getFullName() : user.getUsername());
                     participantAvatars.add(user.getAvatar());
