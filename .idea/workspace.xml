@@ -5,7 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/dto/FriendInviteDTO.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/repository/GroupMemberRepository.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/GroupController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/GroupController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/GroupService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/GroupService.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -15,6 +19,7 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
+        <option value="Interface" />
         <option value="Class" />
       </list>
     </option>
@@ -47,13 +52,13 @@
       </RecentBranches>
     </option>
   </component>
-  <component name="KubernetesApiPersistence"><![CDATA[{}]]></component>
-  <component name="KubernetesApiProvider"><![CDATA[{
-  "isMigrated": true
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 2
-}]]></component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
   <component name="ProjectId" id="3AYznIcd2rwRKeOcbDEdeD3VOOx" />
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
@@ -68,6 +73,7 @@
     "RequestMappingsPanelOrder1": "1",
     "RequestMappingsPanelWidth0": "75",
     "RequestMappingsPanelWidth1": "75",
+    "RunOnceActivity.git.unshallow": "true",
     "Spring Boot.ApiGatewayApplication.executor": "Run",
     "Spring Boot.CommonServiceApplication.executor": "Run",
     "Spring Boot.MessegeServiceApplication.executor": "Run",
@@ -75,7 +81,9 @@
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
-    "run.configurations.included.in.services": "true"
+    "nodejs_package_manager_path": "npm",
+    "run.configurations.included.in.services": "true",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="RunDashboard">
@@ -88,7 +96,7 @@
       </set>
     </option>
   </component>
-  <component name="RunManager" selected="Spring Boot.MessegeServiceApplication">
+  <component name="RunManager" selected="Spring Boot.CommonServiceApplication">
     <configuration name="ApiGatewayApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <module name="ApiGateway" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.apigateway.ApiGatewayApplication" />
@@ -120,6 +128,14 @@
     </attachedChunks>
   </component>
   <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="" />
+      <created>1773335780566</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1773335780566</updated>
+      <workItem from="1773335783581" duration="11237000" />
+    </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
