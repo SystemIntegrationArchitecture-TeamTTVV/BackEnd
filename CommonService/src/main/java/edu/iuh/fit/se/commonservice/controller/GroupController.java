@@ -1,6 +1,8 @@
 package edu.iuh.fit.se.commonservice.controller;
 
+import edu.iuh.fit.se.commonservice.dto.FriendInviteDTO;
 import edu.iuh.fit.se.commonservice.dto.GroupDTO;
+import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.service.GroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -50,6 +52,75 @@ public class GroupController {
     public ResponseEntity<Void> deleteGroup(@PathVariable String id) {
         groupService.deleteGroup(id);
         return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/{groupId}/members")
+    public void addMembers(
+            @PathVariable String groupId,
+            @RequestBody List<String> userIds
+    ) {
+        groupService.addMembers(groupId, userIds);
+    }
+    @GetMapping("/{groupId}/members")
+    public List<User> getMembers(@PathVariable String groupId) {
+        return groupService.getGroupMembers(groupId);
+    }
+    @DeleteMapping("/{groupId}/members/{userId}")
+    public void removeMember(
+            @PathVariable String groupId,
+            @PathVariable String userId
+    ) {
+        groupService.removeMember(groupId, userId);
+    }
+    @GetMapping("/{groupId}/is-member/{userId}")
+    public boolean isUserMember(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        return groupService.isUserMember(groupId, userId);
+
+    }
+    @PostMapping("/{groupId}/join/{userId}")
+    public ResponseEntity<Void> joinGroup(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        groupService.joinGroup(groupId, userId);
+
+        return ResponseEntity.ok().build();
+    }
+    @GetMapping("/{groupId}/role/{userId}")
+    public ResponseEntity<String> getUserRole(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        String role = groupService.getUserRole(groupId, userId);
+
+        return ResponseEntity.ok(role);
+    }
+    @DeleteMapping("/{groupId}/leave/{userId}")
+    public ResponseEntity<Void> leaveGroup(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        groupService.leaveGroup(groupId, userId);
+
+        return ResponseEntity.ok().build();
+    }
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<GroupDTO>> getGroupsByUserId(
+            @PathVariable String userId) {
+
+        return ResponseEntity.ok(groupService.getGroupsByUserId(userId));
+    }
+
+    @GetMapping("/{groupId}/invitable-friends/{userId}")
+    public ResponseEntity<List<FriendInviteDTO>> getInvitableFriends(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        return ResponseEntity.ok(
+                groupService.getInvitableFriends(groupId, userId)
+        );
     }
 }
 
