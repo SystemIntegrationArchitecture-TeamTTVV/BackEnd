@@ -3,7 +3,10 @@ package edu.iuh.fit.se.messegeservice.service;
 import edu.iuh.fit.se.messegeservice.client.CommonServiceClient;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,9 @@ public class CommonServiceClientFacade {
 
     private final CommonServiceClient commonServiceClient;
 
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "getUserByIdFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "getUserByIdFallback")
+    @Retry(name = "commonService", fallbackMethod = "getUserByIdFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "getUserByIdFallback")
     public UserDTO getUserById(String id) {
         return commonServiceClient.getUserById(id);
@@ -35,6 +41,9 @@ public class CommonServiceClientFacade {
         return fallback;
     }
 
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToUserFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "emitToUserFallback")
+    @Retry(name = "commonService", fallbackMethod = "emitToUserFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToUserFallback")
     public void emitToUser(String username, SocketEventDTO event) {
         commonServiceClient.emitToUser(username, event);
@@ -46,6 +55,9 @@ public class CommonServiceClientFacade {
                 username, throwable.getMessage(), event != null ? event.getType() : "null");
     }
 
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToAllFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "emitToAllFallback")
+    @Retry(name = "commonService", fallbackMethod = "emitToAllFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToAllFallback")
     public void emitToAll(SocketEventDTO event) {
         commonServiceClient.emitToAll(event);
@@ -57,6 +69,9 @@ public class CommonServiceClientFacade {
                 throwable.getMessage(), event != null ? event.getType() : "null");
     }
 
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToTopicFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "emitToTopicFallback")
+    @Retry(name = "commonService", fallbackMethod = "emitToTopicFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToTopicFallback")
     public void emitToTopic(String topic, SocketEventDTO event) {
         commonServiceClient.emitToTopic(topic, event);
