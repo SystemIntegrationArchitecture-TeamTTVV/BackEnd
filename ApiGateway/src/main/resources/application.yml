@@ -7,24 +7,24 @@ spring:
         locator:
           enabled: true
       routes:
-        # Swagger API Docs Routes
+        # ─── Swagger ───────────────────────────────────────────────────────────
         - id: common-service-api-docs
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/v3/api-docs
           filters:
             - RewritePath=/api/common/v3/api-docs, /api-docs
 
         - id: message-service-api-docs
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/v3/api-docs
           filters:
             - RewritePath=/api/message/v3/api-docs, /api-docs
 
-        # CommonService Auth Routes
+        # ─── CommonService ─────────────────────────────────────────────────────
         - id: common-service-auth
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/auth/**
           filters:
@@ -34,18 +34,15 @@ spring:
                 name: commonService
                 fallbackUri: forward:/fallback/common
 
-        # CommonService WebSocket Route - Must be before common-service-all
-        # WebSocket routes need to be explicitly configured
         - id: common-service-websocket
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/ws/**
           filters:
             - RewritePath=/api/common/ws(/.*)?, /ws$1
 
-        # CommonService Routes
         - id: common-service-users
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/users/**
           filters:
@@ -56,7 +53,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-posts
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/posts/**
           filters:
@@ -67,7 +64,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-comments
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/comments/**
           filters:
@@ -78,7 +75,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-groups
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/groups/**
           filters:
@@ -89,7 +86,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-friends
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/friends/**
           filters:
@@ -100,7 +97,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-reactions
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/reactions/**
           filters:
@@ -111,7 +108,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-friend-requests
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/friend-requests/**
           filters:
@@ -122,7 +119,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-notifications
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/notifications/**
           filters:
@@ -133,7 +130,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-stories
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/stories/**
           filters:
@@ -144,7 +141,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-ai
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/ai/**
           filters:
@@ -155,7 +152,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-roles
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/roles/**
           filters:
@@ -166,7 +163,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-files
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/api/files/**
           filters:
@@ -177,7 +174,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-upload
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/api/upload/**
           filters:
@@ -188,7 +185,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-reports
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/reports/**
           filters:
@@ -199,7 +196,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-stats
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/stats/**
           filters:
@@ -210,7 +207,7 @@ spring:
                 fallbackUri: forward:/fallback/common
 
         - id: common-service-all
-          uri: lb://CommonService
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/**
           filters:
@@ -220,9 +217,9 @@ spring:
                 name: commonService
                 fallbackUri: forward:/fallback/common
 
-        # MessegeService Routes
+        # ─── MessegeService ────────────────────────────────────────────────────
         - id: message-service-upload
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/api/upload/**
           filters:
@@ -233,7 +230,7 @@ spring:
                 fallbackUri: forward:/fallback/message
 
         - id: message-service-files
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/api/files/**
           filters:
@@ -244,7 +241,7 @@ spring:
                 fallbackUri: forward:/fallback/message
 
         - id: message-service-conversations
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/conversations/**
           filters:
@@ -255,7 +252,7 @@ spring:
                 fallbackUri: forward:/fallback/message
 
         - id: message-service-messages
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/messages/**
           filters:
@@ -266,7 +263,7 @@ spring:
                 fallbackUri: forward:/fallback/message
 
         - id: message-service-calls
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/calls/**
           filters:
@@ -277,7 +274,7 @@ spring:
                 fallbackUri: forward:/fallback/message
 
         - id: message-service-all
-          uri: lb://MessegeService
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/**
           filters:
@@ -287,11 +284,15 @@ spring:
                 name: messageService
                 fallbackUri: forward:/fallback/message
 
-      # Global CORS Configuration
+      httpclient:
+        connect-timeout: 10000
+        response-timeout: 30s
+
+      # ─── Global CORS ───────────────────────────────────────────────────────
       globalcors:
         cors-configurations:
           "[/**]":
-            allowedOriginPatterns: "*" # Changed from allowedOrigins to allowedOriginPatterns
+            allowedOriginPatterns: "*"
             allowedMethods:
               - GET
               - POST
@@ -311,7 +312,6 @@ app:
     enabled: false
 
 jwt:
-  # Must match CommonService jwt.secret to validate tokens at the edge
   secret: mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong
 
 eureka:
@@ -322,24 +322,34 @@ eureka:
     prefer-ip-address: true
 
 resilience4j:
+  timelimiter:
+    instances:
+      commonService:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
+      messageService:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
   circuitbreaker:
     instances:
       commonService:
         slidingWindowType: COUNT_BASED
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        failureRateThreshold: 50
-        waitDurationInOpenState: 30s
-        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 80
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
       messageService:
         slidingWindowType: COUNT_BASED
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        failureRateThreshold: 50
-        waitDurationInOpenState: 30s
-        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 80
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
 
-# Actuator endpoints
+# Actuator
 management:
   endpoints:
     web:
@@ -355,7 +365,7 @@ logging:
     org.springframework.cloud.gateway: DEBUG
     org.springframework.web: INFO
 
-# Swagger/OpenAPI Configuration
+# Swagger
 springdoc:
   api-docs:
     enabled: true
