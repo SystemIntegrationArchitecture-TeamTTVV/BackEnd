@@ -28,7 +28,7 @@ public class GroupMember {
     private String groupId;
     
     private String role = "MEMBER"; // MEMBER, ADMIN, MODERATOR
-    private String status = "ACTIVE"; // ACTIVE, PENDING, BANNED
+    private String status = "ACTIVE"; // ACTIVE, PENDING, BANNED, REJECT
     
     private LocalDateTime joinedAt;
     private LocalDateTime updatedAt;

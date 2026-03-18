@@ -65,6 +65,14 @@ spring:
           filters:
             - RewritePath=/api/common/groups(/.*)?, /api/groups$1
 
+        - id: common-service-group-posts
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/group-posts/**
+          filters:
+            - RewritePath=/api/common/group-posts(/.*)?, /api/group-posts$1
+
+
         - id: common-service-friends
           uri: http://localhost:8081
           predicates:

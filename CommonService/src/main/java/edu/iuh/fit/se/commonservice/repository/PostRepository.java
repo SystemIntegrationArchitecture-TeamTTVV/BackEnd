@@ -2,6 +2,7 @@ package edu.iuh.fit.se.commonservice.repository;
 
 import edu.iuh.fit.se.commonservice.model.Post;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,6 +12,11 @@ public interface PostRepository extends MongoRepository<Post, String> {
     List<Post> findByAuthorIdOrderByCreatedAtDesc(String authorId);
     List<Post> findByGroupIdOrderByCreatedAtDesc(String groupId);
     List<Post> findByPageIdOrderByCreatedAtDesc(String pageId);
-    List<Post> findByIsDeletedFalseOrderByCreatedAtDesc();
+    List<Post> findByIsDeletedFalseAndGroupIdIsNullOrderByCreatedAtDesc();
+    @Query("{ 'groupId': ?0, 'isDeleted': false }")
+    List<Post> findByGroupIdAndNotDeleted(String groupId);
+
+
+
 }
 

@@ -226,17 +226,20 @@ public class GroupService {
         Optional<GroupMember> existing =
                 groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
 
-        if (existing.isPresent()) {
+        String newStatus = "ACTIVE"; // default
+        if ("PRIVATE".equals(group.getPrivacy())) {
+            newStatus = "PENDING";
+        }
 
+        if (existing.isPresent()) {
             GroupMember member = existing.get();
 
-            // nếu đang ACTIVE thì thôi
-            if ("ACTIVE".equals(member.getStatus())) {
+            // nếu đang ACTIVE hoặc PENDING thì thôi
+            if (newStatus.equals(member.getStatus())) {
                 return;
             }
 
-            // nếu REMOVED thì kích hoạt lại
-            member.setStatus("ACTIVE");
+            member.setStatus(newStatus);
             member.setUpdatedAt(LocalDateTime.now());
 
             groupMemberRepository.save(member);
@@ -252,7 +255,7 @@ public class GroupService {
             member.setUserId(userId);
 
             member.setRole("MEMBER");
-            member.setStatus("ACTIVE");
+            member.setStatus(newStatus);
 
             member.setJoinedAt(LocalDateTime.now());
             member.setUpdatedAt(LocalDateTime.now());
@@ -260,8 +263,8 @@ public class GroupService {
             groupMemberRepository.save(member);
         }
 
+        // Chỉ đếm những ACTIVE thôi
         long count = groupMemberRepository.countByGroupIdAndStatus(groupId, "ACTIVE");
-
         group.setMemberCount((int) count);
 
         groupRepository.save(group);
@@ -305,6 +308,7 @@ public class GroupService {
                 .findByUserIdAndStatus(userId, "ACTIVE")
                 .stream()
                 .map(GroupMember::getGroup)
+                .filter(Group::isActive)
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -335,6 +339,90 @@ public class GroupService {
                     return dto;
                 })
                 .toList();
+    }
+
+    public String getUserStatus(String groupId, String userId) {
+        return groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .map(GroupMember::getStatus)
+                .orElse(null);
+    }
+    public List<GroupMember> getPendingMembers(String groupId) {
+        return groupMemberRepository
+                .findByGroupIdAndStatus(groupId, "PENDING");
+    }
+    public GroupDTO toggleGroupPrivacy(String groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found with id: " + groupId));
+
+        // Kiểm tra trạng thái hiện tại
+        String currentPrivacy = group.getPrivacy();
+
+        if ("PUBLIC".equals(currentPrivacy)) {
+            // từ PUBLIC -> PRIVATE
+            group.setPrivacy("PRIVATE");
+        } else if ("PRIVATE".equals(currentPrivacy)) {
+            // từ PRIVATE -> PUBLIC
+            group.setPrivacy("PUBLIC");
+
+            // Chuyển tất cả PENDING member sang ACTIVE
+            List<GroupMember> pendingMembers = groupMemberRepository.findByGroupIdAndStatus(groupId, "PENDING");
+            for (GroupMember member : pendingMembers) {
+                member.setStatus("ACTIVE");
+                member.setUpdatedAt(LocalDateTime.now());
+            }
+            groupMemberRepository.saveAll(pendingMembers);
+        } else {
+            throw new RuntimeException("Cannot toggle privacy for group with privacy: " + currentPrivacy);
+        }
+
+        group.setUpdatedAt(LocalDateTime.now());
+
+        // cập nhật lại memberCount chỉ tính ACTIVE
+        long activeCount = groupMemberRepository.countByGroupIdAndStatus(groupId, "ACTIVE");
+        group.setMemberCount((int) activeCount);
+
+        Group updated = groupRepository.save(group);
+        return toDTO(updated);
+    }
+    public void approveMember(String groupId, String userId) {
+
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new RuntimeException("Member not found"));
+
+        if (!"PENDING".equals(member.getStatus())) {
+            throw new RuntimeException("Member is not in PENDING status");
+        }
+
+        member.setStatus("ACTIVE");
+        member.setJoinedAt(LocalDateTime.now());
+        member.setUpdatedAt(LocalDateTime.now());
+        groupMemberRepository.save(member);
+
+        // Cập nhật lại memberCount
+        long count = groupMemberRepository.countByGroupIdAndStatus(groupId, "ACTIVE");
+
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        group.setMemberCount((int) count);
+        groupRepository.save(group);
+    }
+
+    public void rejectMember(String groupId, String userId) {
+
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new RuntimeException("Member not found"));
+
+        if (!"PENDING".equals(member.getStatus())) {
+            throw new RuntimeException("Member is not in PENDING status");
+        }
+
+        member.setStatus("REJECTED");
+        member.setUpdatedAt(LocalDateTime.now());
+        groupMemberRepository.save(member);
     }
 }
 
