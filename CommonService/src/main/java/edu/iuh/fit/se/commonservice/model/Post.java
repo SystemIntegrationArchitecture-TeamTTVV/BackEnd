@@ -41,6 +41,7 @@ public class Post {
     // Reference đến Group hoặc Page nếu đăng trong nhóm/trang
     @DBRef
     private Group group; // null nếu không đăng trong nhóm
+    private String groupId;
     @DBRef
     private Page page; // null nếu không đăng trong trang
     
@@ -48,5 +49,6 @@ public class Post {
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt; // Soft delete
     private boolean isDeleted = false;
+
 }
 

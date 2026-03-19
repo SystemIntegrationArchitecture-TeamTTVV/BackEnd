@@ -122,5 +122,56 @@ public class GroupController {
                 groupService.getInvitableFriends(groupId, userId)
         );
     }
+
+    @GetMapping("/{groupId}/status/{userId}")
+    public ResponseEntity<String> getUserStatus(
+            @PathVariable String groupId,
+            @PathVariable String userId
+    ) {
+        String status = groupService.getUserStatus(groupId, userId);
+        return ResponseEntity.ok(status);
+    }
+    public record PendingMemberDTO(String userId, String fullName, String avatar, String status) {}
+    @GetMapping("/{groupId}/pending-members")
+    public ResponseEntity<List<PendingMemberDTO>> getPendingMembers(@PathVariable String groupId) {
+        List<PendingMemberDTO> pending = groupService.getPendingMembers(groupId)
+                .stream()
+                .map(m -> new PendingMemberDTO(
+                        m.getUserId(),
+                        m.getUser().getFullName(),
+                        m.getUser().getAvatar(),
+                        m.getStatus()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(pending);
+    }
+    /**
+     * Toggle trạng thái privacy của group:
+     * PUBLIC <-> PRIVATE
+     * Nếu chuyển PRIVATE -> PUBLIC, các member PENDING sẽ thành ACTIVE
+     */
+    @PostMapping("/{groupId}/toggle-privacy")
+    public ResponseEntity<GroupDTO> toggleGroupPrivacy(@PathVariable String groupId) {
+        GroupDTO updatedGroup = groupService.toggleGroupPrivacy(groupId);
+        return ResponseEntity.ok(updatedGroup);
+    }
+    @PostMapping("/{groupId}/members/{userId}/approve")
+    public ResponseEntity<Void> approveMember(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        groupService.approveMember(groupId, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{groupId}/members/{userId}/reject")
+    public ResponseEntity<Void> rejectMember(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        groupService.rejectMember(groupId, userId);
+        return ResponseEntity.ok().build();
+    }
 }
 

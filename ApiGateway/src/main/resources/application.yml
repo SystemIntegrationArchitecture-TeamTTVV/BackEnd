@@ -85,6 +85,14 @@ spring:
                 name: commonService
                 fallbackUri: forward:/fallback/common
 
+        - id: common-service-group-posts
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/common/group-posts/**
+          filters:
+            - RewritePath=/api/common/group-posts(/.*)?, /api/group-posts$1
+
+
         - id: common-service-friends
           uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:

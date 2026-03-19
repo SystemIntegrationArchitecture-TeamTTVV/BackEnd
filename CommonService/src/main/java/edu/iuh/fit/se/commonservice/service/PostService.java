@@ -26,7 +26,7 @@ public class PostService {
     private final FriendService friendService;
 
     public List<PostDTO> getAllPosts() {
-        return postRepository.findByIsDeletedFalseOrderByCreatedAtDesc().stream()
+        return postRepository.findByIsDeletedFalseAndGroupIdIsNullOrderByCreatedAtDesc().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
