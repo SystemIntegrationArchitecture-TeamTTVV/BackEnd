@@ -10,8 +10,7 @@ import java.util.Map;
  * OpenFeign client for calling MessegeService from CommonService.
  */
 @FeignClient(
-        name = "message-service",
-        url = "${message.service.url:http://localhost:8082}"
+        name = "MessegeService"
 )
 public interface MessageServiceClient {
 

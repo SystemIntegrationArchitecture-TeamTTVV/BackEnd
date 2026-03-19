@@ -3,67 +3,87 @@ spring:
     name: ApiGateway
   cloud:
     gateway:
+      discovery:
+        locator:
+          enabled: true
       routes:
-        # Swagger API Docs Routes
+        # ─── Swagger ───────────────────────────────────────────────────────────
         - id: common-service-api-docs
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/v3/api-docs
           filters:
             - RewritePath=/api/common/v3/api-docs, /api-docs
 
         - id: message-service-api-docs
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/v3/api-docs
           filters:
             - RewritePath=/api/message/v3/api-docs, /api-docs
 
-        # CommonService Auth Routes
+        # ─── CommonService ─────────────────────────────────────────────────────
         - id: common-service-auth
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/auth/**
           filters:
             - RewritePath=/api/common/auth(/.*)?, /api/auth$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
-        # CommonService WebSocket Route - Must be before common-service-all
-        # WebSocket routes need to be explicitly configured
         - id: common-service-websocket
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/ws/**
           filters:
             - RewritePath=/api/common/ws(/.*)?, /ws$1
 
-        # CommonService Routes
         - id: common-service-users
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/users/**
           filters:
             - RewritePath=/api/common/users(/.*)?, /api/users$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-posts
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/posts/**
           filters:
             - RewritePath=/api/common/posts(/.*)?, /api/posts$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-comments
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/comments/**
           filters:
             - RewritePath=/api/common/comments(/.*)?, /api/comments$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-groups
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/groups/**
           filters:
             - RewritePath=/api/common/groups(/.*)?, /api/groups$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-group-posts
           uri: http://localhost:8081
@@ -74,137 +94,213 @@ spring:
 
 
         - id: common-service-friends
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/friends/**
           filters:
             - RewritePath=/api/common/friends(/.*)?, /api/friends$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-reactions
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/reactions/**
           filters:
             - RewritePath=/api/common/reactions(/.*)?, /api/reactions$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-friend-requests
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/friend-requests/**
           filters:
             - RewritePath=/api/common/friend-requests(/.*)?, /api/friend-requests$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-notifications
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/notifications/**
           filters:
             - RewritePath=/api/common/notifications(/.*)?, /api/notifications$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-stories
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/stories/**
           filters:
             - RewritePath=/api/common/stories(/.*)?, /api/stories$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-ai
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/ai/**
           filters:
             - RewritePath=/api/common/ai(/.*)?, /api/ai$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-roles
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/roles/**
           filters:
             - RewritePath=/api/common/roles(/.*)?, /api/roles$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-files
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/api/files/**
           filters:
             - RewritePath=/api/common/api/files(/.*)?, /api/files$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-upload
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/api/upload/**
           filters:
             - RewritePath=/api/common/api/upload(/.*)?, /api/upload$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-reports
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/reports/**
           filters:
             - RewritePath=/api/reports(/.*)?, /api/reports$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-stats
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/stats/**
           filters:
             - RewritePath=/api/stats(/.*)?, /api/stats$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
         - id: common-service-all
-          uri: http://localhost:8081
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/common/**
           filters:
             - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
 
-        # MessegeService Routes
+        # ─── MessegeService ────────────────────────────────────────────────────
         - id: message-service-upload
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/api/upload/**
           filters:
             - RewritePath=/api/message/api/upload(/.*)?, /api/upload$1
+            - name: CircuitBreaker
+              args:
+                name: messageService
+                fallbackUri: forward:/fallback/message
 
         - id: message-service-files
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/api/files/**
           filters:
             - RewritePath=/api/message/api/files(/.*)?, /api/files$1
+            - name: CircuitBreaker
+              args:
+                name: messageService
+                fallbackUri: forward:/fallback/message
 
         - id: message-service-conversations
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/conversations/**
           filters:
             - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: messageService
+                fallbackUri: forward:/fallback/message
 
         - id: message-service-messages
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/messages/**
           filters:
             - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: messageService
+                fallbackUri: forward:/fallback/message
 
         - id: message-service-calls
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/calls/**
           filters:
             - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: messageService
+                fallbackUri: forward:/fallback/message
 
         - id: message-service-all
-          uri: http://localhost:8082
+          uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/message/**
           filters:
             - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: messageService
+                fallbackUri: forward:/fallback/message
 
-      # Global CORS Configuration
+      httpclient:
+        connect-timeout: 10000
+        response-timeout: 30s
+
+      # ─── Global CORS ───────────────────────────────────────────────────────
       globalcors:
         cors-configurations:
           "[/**]":
-            allowedOriginPatterns: "*" # Changed from allowedOrigins to allowedOriginPatterns
+            allowedOriginPatterns: "*"
             allowedMethods:
               - GET
               - POST
@@ -219,12 +315,54 @@ spring:
 server:
   port: 8088
 
-# Actuator endpoints
+app:
+  security:
+    enabled: false
+
+jwt:
+  secret: mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  timelimiter:
+    instances:
+      commonService:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
+      messageService:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
+  circuitbreaker:
+    instances:
+      commonService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 80
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      messageService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 80
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+# Actuator
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health,info,gateway,prometheus
   endpoint:
     health:
       show-details: always
@@ -235,7 +373,7 @@ logging:
     org.springframework.cloud.gateway: DEBUG
     org.springframework.web: INFO
 
-# Swagger/OpenAPI Configuration
+# Swagger
 springdoc:
   api-docs:
     enabled: true

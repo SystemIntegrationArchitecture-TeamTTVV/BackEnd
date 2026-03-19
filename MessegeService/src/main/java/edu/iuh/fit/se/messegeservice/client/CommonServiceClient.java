@@ -12,8 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * OpenFeign client for calling CommonService from MessegeService.
  */
 @FeignClient(
-        name = "common-service",
-        url = "${common.service.url:http://localhost:8081}"
+        name = "CommonService"
 )
 public interface CommonServiceClient {
 

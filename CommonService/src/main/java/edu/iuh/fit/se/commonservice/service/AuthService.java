@@ -11,17 +11,18 @@ import edu.iuh.fit.se.commonservice.repository.RoleRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import edu.iuh.fit.se.commonservice.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.kafka.core.KafkaTemplate;
 
+import edu.iuh.fit.se.commonservice.event.UserRegisteredEvent;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -32,11 +33,14 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
-    private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
     private final TokenStoreService tokenStoreService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    @Value("${app.kafka.enabled:false}")
+    private boolean kafkaEnabled;
 
     public AuthResponseDTO login(AuthRequestDTO request) {
         try {
@@ -110,6 +114,15 @@ public class AuthService {
         user.setUpdatedAt(LocalDateTime.now());
 
         User saved = userRepository.save(user);
+
+        // Saga / Choreography: publish "user registered" event for downstream services (e.g. MessegeService onboarding)
+        if (kafkaEnabled) {
+            kafkaTemplate.send("ttvv.user.registered", saved.getId(), new UserRegisteredEvent(
+                    saved.getId(),
+                    saved.getUsername(),
+                    Instant.now()
+            ));
+        }
 
         String roleName = saved.getRole() != null ? saved.getRole().getName() : "USER";
         String accessToken = jwtUtil.generateAccessToken(saved.getUsername(), roleName, saved.getId());

@@ -63,10 +63,14 @@
   <component name="KubernetesApiProvider">{
   &quot;isMigrated&quot;: true
 }</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
   <component name="ProjectColorInfo">{
-  &quot;associatedIndex&quot;: 2
+  &quot;associatedIndex&quot;: 7
 }</component>
-  <component name="ProjectId" id="3AYznIcd2rwRKeOcbDEdeD3VOOx" />
+  <component name="ProjectId" id="38mrUC2pfDnsaJnd7FI0MgpoyWu" />
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
   </component>
@@ -76,6 +80,8 @@
   </component>
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
+    &quot;Maven.CommonService [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CommonService [compile].executor&quot;: &quot;Run&quot;,
     &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
     &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
     &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
@@ -102,8 +108,22 @@
         <option value="SpringBootApplicationConfigurationType" />
       </set>
     </option>
+    <option name="configurationStatuses">
+      <map>
+        <entry key="SpringBootApplicationConfigurationType">
+          <value>
+            <map>
+              <entry key="ApiGatewayApplication" value="STOPPED" />
+              <entry key="CommonServiceApplication" value="STOPPED" />
+              <entry key="EurekaServerApplication" value="STOPPED" />
+              <entry key="MessegeServiceApplication" value="STOPPED" />
+            </map>
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
-  <component name="RunManager" selected="Spring Boot.CommonServiceApplication">
+  <component name="RunManager" selected="Spring Boot.ApiGatewayApplication">
     <configuration name="ApiGatewayApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <module name="ApiGateway" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.apigateway.ApiGatewayApplication" />
@@ -118,6 +138,13 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="EurekaServerApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <module name="EurekaServer" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.eurekaserver.EurekaServerApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="MessegeServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <module name="MessegeService" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="edu.iuh.fit.se.messegeservice.MessegeServiceApplication" />
@@ -125,19 +152,25 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <list>
+      <item itemvalue="Spring Boot.ApiGatewayApplication" />
+      <item itemvalue="Spring Boot.CommonServiceApplication" />
+      <item itemvalue="Spring Boot.EurekaServerApplication" />
+      <item itemvalue="Spring Boot.MessegeServiceApplication" />
+    </list>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.29188.11" />
-        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-IU-251.29188.11" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.23892.409" />
       </set>
     </attachedChunks>
   </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="" />
-      <created>1773335780566</created>
+      <created>1769415600793</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1773335780566</updated>

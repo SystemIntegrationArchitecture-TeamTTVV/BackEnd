@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,11 @@ public class UserService {
         return userRepository.findById(id)
                 .map(this::toDTO)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+    }
+
+    @Cacheable(cacheNames = "usersById", key = "#id")
+    public UserDTO getUserByIdCached(String id) {
+        return getUserById(id);
     }
 
     public UserDTO getUserByUsername(String username) {

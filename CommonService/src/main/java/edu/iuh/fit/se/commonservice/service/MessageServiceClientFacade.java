@@ -1,7 +1,10 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.client.MessageServiceClient;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,9 @@ public class MessageServiceClientFacade {
 
     private final MessageServiceClient messageServiceClient;
 
+    @Bulkhead(name = "messageService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "getConversationByIdFallback")
+    @RateLimiter(name = "messageService", fallbackMethod = "getConversationByIdFallback")
+    @Retry(name = "messageService", fallbackMethod = "getConversationByIdFallback")
     @CircuitBreaker(name = "messageService", fallbackMethod = "getConversationByIdFallback")
     public Map<String, Object> getConversationById(String id) {
         return messageServiceClient.getConversationById(id);
