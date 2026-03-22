@@ -72,6 +72,7 @@ public class StoriesService {
                 .contentType(s.getContentType())
                 .content(s.getContent())
                 .background(s.getBackground())
+                .caption(s.getCaption())
                 .createdAt(s.getCreatedAt().toString())
                 .expiresAt(s.getExpiredAt().toString())
                 .isActive(s.getActive())
@@ -109,6 +110,12 @@ public class StoriesService {
         }
 
         // 2 build entity
+        String captionMedia = req.getCaption();
+        if (captionMedia != null) {
+            captionMedia = captionMedia.trim();
+            if (captionMedia.isEmpty()) captionMedia = null;
+        }
+
         Stories story = Stories.builder()
                 .userId(userId)
                 .userName(userName)
@@ -117,6 +124,7 @@ public class StoriesService {
                 .contentType(req.getContentType())
                 .content(content)
                 .background(req.getBackground())
+                .caption("text".equals(req.getContentType()) ? null : captionMedia)
 
                 .createdAt(now)
                 .expiredAt(now.plusHours(24)) // TTL Mongo
