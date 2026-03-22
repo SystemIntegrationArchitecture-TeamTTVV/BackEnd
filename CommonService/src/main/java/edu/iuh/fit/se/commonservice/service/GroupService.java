@@ -1,7 +1,16 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import edu.iuh.fit.se.commonservice.dto.FriendInviteDTO;
 import edu.iuh.fit.se.commonservice.dto.GroupDTO;
+import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.Group;
 import edu.iuh.fit.se.commonservice.model.GroupMember;
@@ -11,14 +20,6 @@ import edu.iuh.fit.se.commonservice.repository.GroupMemberRepository;
 import edu.iuh.fit.se.commonservice.repository.GroupRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final FriendRepository friendRepository;
+    private final NotificationService notificationService;
     public List<GroupDTO> getAllGroups() {
         return groupRepository.findByIsActiveTrueOrderByCreatedAtDesc().stream()
                 .map(this::toDTO)
@@ -149,12 +151,25 @@ public class GroupService {
 
         for (String userId : userIds) {
 
-            if (groupMemberRepository.existsByUserIdAndGroupId(userId, groupId)) {
-                continue;
-            }
-
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Optional<GroupMember> existing = groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
+
+            if (existing.isPresent()) {
+                GroupMember member = existing.get();
+
+                if ("ACTIVE".equals(member.getStatus()) || "INVITED".equals(member.getStatus())) {
+                    continue;
+                }
+
+                member.setRole("MEMBER");
+                member.setStatus("INVITED");
+                member.setUpdatedAt(LocalDateTime.now());
+                groupMemberRepository.save(member);
+                createGroupInviteNotification(group, userId);
+                continue;
+            }
 
             GroupMember member = new GroupMember();
             member.setGroup(group);
@@ -163,12 +178,12 @@ public class GroupService {
             member.setUserId(userId);
 
             member.setRole("MEMBER");
-            member.setStatus("ACTIVE");
+            member.setStatus("INVITED");
 
-            member.setJoinedAt(LocalDateTime.now());
             member.setUpdatedAt(LocalDateTime.now());
 
             groupMemberRepository.save(member);
+            createGroupInviteNotification(group, userId);
         }
 
         // 🔥 tính lại memberCount từ database
@@ -176,6 +191,27 @@ public class GroupService {
 
         group.setMemberCount((int) count);
         groupRepository.save(group);
+    }
+
+    private void createGroupInviteNotification(Group group, String recipientId) {
+        NotificationDTO notification = new NotificationDTO();
+        notification.setRecipientId(recipientId);
+
+        if (group.getAdmin() != null) {
+            notification.setActorId(group.getAdmin().getId());
+            notification.setActorName(group.getAdmin().getFullName());
+            notification.setActorAvatar(group.getAdmin().getAvatar());
+        }
+
+        notification.setType("GROUP_INVITE");
+        notification.setTitle("Lời mời vào nhóm");
+        notification.setContent("đã mời bạn vào nhóm " + group.getName());
+        notification.setRelatedId(group.getId());
+        notification.setRelatedType("GROUP");
+        notification.setRead(false);
+        notification.setCreatedAt(LocalDateTime.now());
+
+        notificationService.createNotification(notification);
     }
     public long getMemberCount(String groupId) {
         return groupMemberRepository.countByGroupIdAndStatus(groupId, "ACTIVE");
@@ -234,12 +270,19 @@ public class GroupService {
         if (existing.isPresent()) {
             GroupMember member = existing.get();
 
+            if ("INVITED".equals(member.getStatus())) {
+                newStatus = "ACTIVE";
+            }
+
             // nếu đang ACTIVE hoặc PENDING thì thôi
             if (newStatus.equals(member.getStatus())) {
                 return;
             }
 
             member.setStatus(newStatus);
+            if ("ACTIVE".equals(newStatus)) {
+                member.setJoinedAt(LocalDateTime.now());
+            }
             member.setUpdatedAt(LocalDateTime.now());
 
             groupMemberRepository.save(member);
@@ -322,8 +365,9 @@ public class GroupService {
 
         // 2. Lấy member ACTIVE của group
         Set<String> memberIds = groupMemberRepository
-                .findByGroupIdAndStatus(groupId, "ACTIVE")
+            .findByGroupId(groupId)
                 .stream()
+            .filter(member -> !"REMOVED".equals(member.getStatus()) && !"REJECTED".equals(member.getStatus()))
                 .map(GroupMember::getUserId)
                 .collect(Collectors.toSet());
 
@@ -418,6 +462,21 @@ public class GroupService {
 
         if (!"PENDING".equals(member.getStatus())) {
             throw new RuntimeException("Member is not in PENDING status");
+        }
+
+        member.setStatus("REJECTED");
+        member.setUpdatedAt(LocalDateTime.now());
+        groupMemberRepository.save(member);
+    }
+
+    public void rejectGroupInvite(String groupId, String userId) {
+
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new RuntimeException("Invite not found"));
+
+        if (!"INVITED".equals(member.getStatus())) {
+            throw new RuntimeException("User is not in INVITED status");
         }
 
         member.setStatus("REJECTED");

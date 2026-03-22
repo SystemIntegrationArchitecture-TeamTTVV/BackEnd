@@ -26,7 +26,12 @@ public class PostService {
     private final FriendService friendService;
 
     public List<PostDTO> getAllPosts() {
+        return getAllPosts(null);
+    }
+
+    public List<PostDTO> getAllPosts(String viewerId) {
         return postRepository.findByIsDeletedFalseAndGroupIdIsNullOrderByCreatedAtDesc().stream()
+                .filter(post -> isPostVisibleToViewer(post, viewerId))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -38,7 +43,12 @@ public class PostService {
     }
 
     public List<PostDTO> getPostsByUserId(String userId) {
+        return getPostsByUserId(userId, null);
+    }
+
+    public List<PostDTO> getPostsByUserId(String userId, String viewerId) {
         return postRepository.findByAuthorIdOrderByCreatedAtDesc(userId).stream()
+                .filter(post -> isPostVisibleToViewer(post, viewerId))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -79,6 +89,11 @@ public class PostService {
     
     private void notifyFriendsAboutPost(PostDTO post) {
         try {
+            String visibility = normalizeVisibility(post.getVisibility());
+            if ("PRIVATE".equals(visibility)) {
+                return;
+            }
+
             // Get author info
             User author = userRepository.findById(post.getAuthorId()).orElse(null);
             if (author == null) return;
@@ -121,6 +136,9 @@ public class PostService {
         post.setLocation(postDTO.getLocation());
         post.setFeeling(postDTO.getFeeling());
         post.setActivity(postDTO.getActivity());
+        if (postDTO.getVisibility() != null) {
+            post.setVisibility(normalizeVisibility(postDTO.getVisibility()));
+        }
         post.setUpdatedAt(LocalDateTime.now());
         
         Post updated = postRepository.save(post);
@@ -166,9 +184,9 @@ public class PostService {
         sharePost.setVideos(originalPost.getVideos());
         
         // Set share settings
-        sharePost.setVisibility(shareDTO.getVisibility() != null ? shareDTO.getVisibility() : "PUBLIC");
-        sharePost.setAllowComments(shareDTO.getAllowComments() != null ? shareDTO.getAllowComments() : true);
-        sharePost.setAllowSharing(shareDTO.getAllowSharing() != null ? shareDTO.getAllowSharing() : true);
+        sharePost.setVisibility(normalizeVisibility(shareDTO.getVisibility()));
+        sharePost.setAllowComments(shareDTO.getAllowComments() == null ? Boolean.TRUE : shareDTO.getAllowComments());
+        sharePost.setAllowSharing(shareDTO.getAllowSharing() == null ? Boolean.TRUE : shareDTO.getAllowSharing());
         
         // Set timestamps
         sharePost.setCreatedAt(LocalDateTime.now());
@@ -225,7 +243,7 @@ public class PostService {
         dto.setLocation(post.getLocation());
         dto.setFeeling(post.getFeeling());
         dto.setActivity(post.getActivity());
-        dto.setVisibility(post.getVisibility());
+        dto.setVisibility(normalizeVisibility(post.getVisibility()));
         dto.setAllowComments(post.getAllowComments());
         dto.setAllowSharing(post.getAllowSharing());
         dto.setLikeCount(post.getLikeCount());
@@ -255,10 +273,51 @@ public class PostService {
         post.setLocation(dto.getLocation());
         post.setFeeling(dto.getFeeling());
         post.setActivity(dto.getActivity());
-        post.setVisibility(dto.getVisibility() != null ? dto.getVisibility() : "PUBLIC");
-        post.setAllowComments(dto.getAllowComments() != null ? dto.getAllowComments() : true);
-        post.setAllowSharing(dto.getAllowSharing() != null ? dto.getAllowSharing() : true);
+        post.setVisibility(normalizeVisibility(dto.getVisibility()));
+        post.setAllowComments(dto.getAllowComments() == null ? Boolean.TRUE : dto.getAllowComments());
+        post.setAllowSharing(dto.getAllowSharing() == null ? Boolean.TRUE : dto.getAllowSharing());
         return post;
+    }
+
+    private boolean isPostVisibleToViewer(Post post, String viewerId) {
+        if (post == null || post.getAuthor() == null || post.getAuthor().getId() == null) {
+            return false;
+        }
+
+        String authorId = post.getAuthor().getId();
+        String normalizedVisibility = normalizeVisibility(post.getVisibility());
+
+        if ("PUBLIC".equals(normalizedVisibility)) {
+            return true;
+        }
+
+        if (viewerId == null || viewerId.isBlank()) {
+            return false;
+        }
+
+        if (authorId.equals(viewerId)) {
+            return true;
+        }
+
+        if ("FRIENDS".equals(normalizedVisibility)) {
+            return friendService.checkIfFriends(authorId, viewerId);
+        }
+
+        return false;
+    }
+
+    private String normalizeVisibility(String visibility) {
+        if (visibility == null || visibility.isBlank()) {
+            return "PUBLIC";
+        }
+
+        String normalized = visibility.trim().toUpperCase();
+        return switch (normalized) {
+            case "FRIEND", "FRIENDS" -> "FRIENDS";
+            case "ONLY_ME", "PRIVATE" -> "PRIVATE";
+            case "PUBLIC" -> "PUBLIC";
+            default -> "PUBLIC";
+        };
     }
 }
 

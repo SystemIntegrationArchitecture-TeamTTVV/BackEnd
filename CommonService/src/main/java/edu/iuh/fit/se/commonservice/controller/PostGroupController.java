@@ -22,17 +22,19 @@ public class PostGroupController {
     //  Lấy tất cả bài trong group
     @GetMapping("/group/{groupId}")
     public ResponseEntity<List<PostDTO>> getPostsByGroup(
-            @PathVariable String groupId
+            @PathVariable String groupId,
+            @RequestParam(required = false) String viewerId
     ) {
-        return ResponseEntity.ok(postService.getPostsByGroupId(groupId));
+        return ResponseEntity.ok(postService.getPostsByGroupId(groupId, viewerId));
     }
 
     //  Lấy chi tiết bài viết
     @GetMapping("/{postId}")
     public ResponseEntity<PostDTO> getPostById(
-            @PathVariable String postId
+            @PathVariable String postId,
+            @RequestParam(required = false) String viewerId
     ) {
-        return ResponseEntity.ok(postService.getPostById(postId));
+        return ResponseEntity.ok(postService.getPostById(postId, viewerId));
     }
 
     // ================= CREATE =================
