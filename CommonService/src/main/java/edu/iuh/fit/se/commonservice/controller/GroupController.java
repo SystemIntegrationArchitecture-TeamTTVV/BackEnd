@@ -173,5 +173,14 @@ public class GroupController {
         groupService.rejectMember(groupId, userId);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/{groupId}/invite/{userId}/reject")
+    public ResponseEntity<Void> rejectGroupInvite(
+            @PathVariable String groupId,
+            @PathVariable String userId) {
+
+        groupService.rejectGroupInvite(groupId, userId);
+        return ResponseEntity.ok().build();
+    }
 }
 

@@ -32,17 +32,25 @@ public class PostGroupService {
     // ================= GET =================
 
     public List<PostDTO> getPostsByGroupId(String groupId) {
+        return getPostsByGroupId(groupId, null);
+    }
+
+    public List<PostDTO> getPostsByGroupId(String groupId, String viewerId) {
         return postRepository
                 .findByGroupIdAndNotDeleted(groupId)
                 .stream()
                 .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // newest first
-                .map(this::toDTO)
+                .map(post -> toDTOForViewer(post, viewerId))
                 .collect(Collectors.toList());
     }
 
     public PostDTO getPostById(String id) {
+        return getPostById(id, null);
+    }
+
+    public PostDTO getPostById(String id, String viewerId) {
         return postRepository.findById(id)
-                .map(this::toDTO)
+                .map(post -> toDTOForViewer(post, viewerId))
                 .orElseThrow(() -> new RuntimeException("Post not found"));
     }
 
@@ -134,6 +142,9 @@ public class PostGroupService {
         post.setLocation(dto.getLocation());
         post.setFeeling(dto.getFeeling());
         post.setActivity(dto.getActivity());
+        if (dto.getVisibility() != null) {
+            post.setVisibility(normalizeVisibility(dto.getVisibility()));
+        }
 
         post.setUpdatedAt(LocalDateTime.now());
 
@@ -174,7 +185,7 @@ public class PostGroupService {
         dto.setFeeling(post.getFeeling());
         dto.setActivity(post.getActivity());
 
-        dto.setVisibility(post.getVisibility());
+        dto.setVisibility(normalizeVisibility(post.getVisibility()));
         dto.setAllowComments(post.getAllowComments());
         dto.setAllowSharing(post.getAllowSharing());
 
@@ -186,6 +197,22 @@ public class PostGroupService {
 
         dto.setCreatedAt(post.getCreatedAt());
         dto.setUpdatedAt(post.getUpdatedAt());
+
+        return dto;
+    }
+
+    private PostDTO toDTOForViewer(Post post, String viewerId) {
+        PostDTO dto = toDTO(post);
+
+        boolean isPrivate = "PRIVATE".equals(normalizeVisibility(post.getVisibility()));
+        String authorId = dto.getAuthorId();
+        boolean isOwner = authorId != null && viewerId != null && authorId.equals(viewerId);
+
+        if (isPrivate && !isOwner) {
+            dto.setAuthorId(null);
+            dto.setAuthorName("Ẩn danh");
+            dto.setAuthorAvatar(null);
+        }
 
         return dto;
     }
@@ -217,10 +244,22 @@ public class PostGroupService {
         post.setFeeling(dto.getFeeling());
         post.setActivity(dto.getActivity());
 
-        post.setVisibility(dto.getVisibility() != null ? dto.getVisibility() : "PUBLIC");
+        post.setVisibility(normalizeVisibility(dto.getVisibility()));
         post.setAllowComments(dto.getAllowComments() != null ? dto.getAllowComments() : true);
         post.setAllowSharing(dto.getAllowSharing() != null ? dto.getAllowSharing() : true);
 
         return post;
+    }
+
+    private String normalizeVisibility(String visibility) {
+        if (visibility == null || visibility.isBlank()) {
+            return "PUBLIC";
+        }
+
+        String normalized = visibility.trim().toUpperCase();
+        return switch (normalized) {
+            case "PRIVATE", "ONLY_ME" -> "PRIVATE";
+            default -> "PUBLIC";
+        };
     }
 }
