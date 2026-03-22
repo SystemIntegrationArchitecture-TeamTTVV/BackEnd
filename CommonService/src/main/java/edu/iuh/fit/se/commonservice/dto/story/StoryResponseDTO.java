@@ -14,6 +14,8 @@ public class StoryResponseDTO {
     private String contentType;
     private String content;
     private String background;
+    /** Chú thích ảnh/video */
+    private String caption;
 
     private String createdAt;
     private String expiresAt;

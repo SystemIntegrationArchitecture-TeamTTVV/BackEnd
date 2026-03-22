@@ -4,7 +4,7 @@ import edu.iuh.fit.se.messegeservice.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.LocalDateTime;
@@ -12,7 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-@Configuration
+/**
+ * Seed dữ liệu mẫu khi app khởi động (bật bằng app.data.seed.enabled=true).
+ * Dùng Component thay vì Configuration để tránh lỗi CGLIB với record phụ (SeedUserRef).
+ */
+@Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
@@ -45,9 +49,9 @@ public class DataSeeder implements CommandLineRunner {
 
         // Conversation 1: Lan - Minh
         Conversation c1 = new Conversation();
-        c1.setParticipantIds(List.of(lan.id, minh.id));
-        c1.setParticipantNames(List.of(lan.name, minh.name));
-        c1.setParticipantAvatars(List.of(lan.avatar, minh.avatar));
+        c1.setParticipantIds(List.of(lan.id(), minh.id()));
+        c1.setParticipantNames(List.of(lan.name(), minh.name()));
+        c1.setParticipantAvatars(List.of(lan.avatar(), minh.avatar()));
         c1.setGroup(false);
         c1.setLastMessagePreview("Đi biển nhé! Bạn nghĩ sao? 🌊");
         c1.setLastMessageAt(LocalDateTime.now().minusMinutes(5));
@@ -56,9 +60,9 @@ public class DataSeeder implements CommandLineRunner {
 
         // Conversation 2: Nhóm 3 người
         Conversation c2 = new Conversation();
-        c2.setParticipantIds(List.of(lan.id, minh.id, hong.id));
-        c2.setParticipantNames(List.of(lan.name, minh.name, hong.name));
-        c2.setParticipantAvatars(List.of(lan.avatar, minh.avatar, hong.avatar));
+        c2.setParticipantIds(List.of(lan.id(), minh.id(), hong.id()));
+        c2.setParticipantNames(List.of(lan.name(), minh.name(), hong.name()));
+        c2.setParticipantAvatars(List.of(lan.avatar(), minh.avatar(), hong.avatar()));
         c2.setGroup(true);
         c2.setGroupName("Nhóm bạn thân 🎉");
         c2.setGroupAvatar("https://picsum.photos/400/400?random=73");
@@ -115,29 +119,27 @@ public class DataSeeder implements CommandLineRunner {
 
         // Calls
         List<Call> calls = new ArrayList<>();
-        calls.add(buildCall(c1, lan, List.of(minh.id), "VOICE", "COMPLETED", 420));
-        calls.add(buildCall(c1, minh, List.of(lan.id), "VIDEO", "COMPLETED", 1200));
-        calls.add(buildCall(c2, minh, List.of(lan.id, hong.id), "VIDEO", "MISSED", 0));
-        calls.add(buildCall(c2, hong, List.of(lan.id, minh.id), "VOICE", "COMPLETED", 600));
+        calls.add(buildCall(c1, lan, List.of(minh.id()), "VOICE", "COMPLETED", 420));
+        calls.add(buildCall(c1, minh, List.of(lan.id()), "VIDEO", "COMPLETED", 1200));
+        calls.add(buildCall(c2, minh, List.of(lan.id(), hong.id()), "VIDEO", "MISSED", 0));
+        calls.add(buildCall(c2, hong, List.of(lan.id(), minh.id()), "VOICE", "COMPLETED", 600));
         mongoTemplate.insert(calls, Call.class);
 
         System.out.println("✅ Data seeding completed successfully!");
         System.out.println("💡 To disable seeding on next run, set 'app.data.seed.enabled=false' in application.properties");
     }
 
-    private record UserLite(String id, String name, String avatar) {}
-
-    private UserLite user(String id, String name, String avatar) {
-        return new UserLite(id, name, avatar);
+    private SeedUserRef user(String id, String name, String avatar) {
+        return new SeedUserRef(id, name, avatar);
     }
 
-    private Message buildMessage(Conversation c, UserLite sender, String content, List<MessageAttachment> attachments) {
+    private Message buildMessage(Conversation c, SeedUserRef sender, String content, List<MessageAttachment> attachments) {
         Message m = new Message();
         m.setConversation(c);
         m.setConversationId(c.getId());
-        m.setSenderId(sender.id);
-        m.setSenderName(sender.name);
-        m.setSenderAvatar(sender.avatar);
+        m.setSenderId(sender.id());
+        m.setSenderName(sender.name());
+        m.setSenderAvatar(sender.avatar());
         m.setContent(content);
         m.setAttachments(attachments);
         m.setEmojis(List.of());
@@ -146,20 +148,20 @@ public class DataSeeder implements CommandLineRunner {
         return m;
     }
 
-    private MessageReaction buildReaction(Message msg, UserLite user, String emoji) {
+    private MessageReaction buildReaction(Message msg, SeedUserRef user, String emoji) {
         MessageReaction r = new MessageReaction();
         r.setMessageId(msg.getId());
         r.setConversationId(msg.getConversationId());
-        r.setUserId(user.id);
+        r.setUserId(user.id());
         r.setEmoji(emoji);
         r.setCreatedAt(LocalDateTime.now().minusMinutes(10));
         return r;
     }
 
-    private Call buildCall(Conversation c, UserLite caller, List<String> callees, String type, String status, int duration) {
+    private Call buildCall(Conversation c, SeedUserRef caller, List<String> callees, String type, String status, int duration) {
         Call call = new Call();
         call.setConversationId(c.getId());
-        call.setCallerId(caller.id);
+        call.setCallerId(caller.id());
         call.setCalleeIds(callees);
         call.setType(type);
         call.setStatus(status);

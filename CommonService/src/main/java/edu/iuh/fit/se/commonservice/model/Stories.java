@@ -30,7 +30,10 @@ public class Stories {
 
     private String content;       // image/video URL hoặc text
 
-    private String background;    // chỉ dùng cho text story
+    private String background;    // chỉ dùng cho text story (class Tailwind)
+
+    /** Chú thích hiển thị trên ảnh/video (tuỳ chọn) */
+    private String caption;
 
     private Integer duration;
     // ===== Thời gian =====

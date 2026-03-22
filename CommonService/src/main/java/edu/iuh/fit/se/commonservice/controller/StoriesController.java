@@ -45,6 +45,7 @@ public class StoriesController {
             @RequestParam("contentType") String contentType,
             @RequestParam(value = "content", required = false) String content,
             @RequestParam(value = "background", required = false) String background,
+            @RequestParam(value = "caption", required = false) String caption,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) {
         // Tạo DTO từ params
@@ -53,6 +54,7 @@ public class StoriesController {
 
                 .content(content)
                 .background(background)
+                .caption(caption)
                 .build();
 
         return storiesService.createStory(userId, userName, userAvatar, data, file);
