@@ -28,6 +28,7 @@ public class PostGroupService {
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final GroupMemberService groupMemberService;
+    private final AIViolationCheckService aiViolationCheckService;
 
     // ================= GET =================
 
@@ -67,6 +68,8 @@ public class PostGroupService {
         if (!isMember) {
             throw new RuntimeException("User is not in group");
         }
+
+        aiViolationCheckService.checkOrThrow(dto.getContent(), "POST");
 
         Post post = toEntity(dto); // <- đổi từ PostGroup
 
@@ -135,6 +138,8 @@ public class PostGroupService {
 
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        aiViolationCheckService.checkOrThrow(dto.getContent(), "POST");
 
         post.setContent(dto.getContent());
         post.setImages(dto.getImages());

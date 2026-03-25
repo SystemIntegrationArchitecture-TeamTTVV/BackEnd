@@ -29,6 +29,7 @@ public class CommentService {
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final VideoRepository videoRepository;
+    private final AIViolationCheckService aiViolationCheckService;
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
@@ -50,6 +51,8 @@ public class CommentService {
     }
 
     public CommentDTO createComment(CommentDTO commentDTO) {
+        aiViolationCheckService.checkOrThrow(commentDTO.getContent(), "COMMENT");
+
         Comment comment = toEntity(commentDTO);
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
@@ -106,6 +109,8 @@ public class CommentService {
         Comment comment = commentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Comment not found with id: " + id));
         
+        aiViolationCheckService.checkOrThrow(commentDTO.getContent(), "COMMENT");
+
         comment.setContent(commentDTO.getContent());
         comment.setImages(commentDTO.getImages());
         comment.setUpdatedAt(LocalDateTime.now());
