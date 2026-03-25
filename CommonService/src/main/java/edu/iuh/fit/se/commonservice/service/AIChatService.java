@@ -1,31 +1,38 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+
+import edu.iuh.fit.se.commonservice.dto.AIChatRequestDTO;
+import edu.iuh.fit.se.commonservice.dto.AIChatResponseDTO;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
-import edu.iuh.fit.se.commonservice.dto.AIChatRequestDTO;
-import edu.iuh.fit.se.commonservice.dto.AIChatResponseDTO;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.HashMap;
-import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AIChatService {
 
-    @Value("${ai.gemini.api-key:AIzaSyBkpBpE22FyiNaMwwVJ_8UYmAiWlj-xGQw}")
+    @Value("${ai.gemini.api-key:}")
     private String geminiApiKey;
 
     // Sử dụng gemini-2.5-flash-lite như user yêu cầu (model nhẹ)
@@ -47,6 +54,21 @@ public class AIChatService {
         }
     }
 
+    public String generatePostContent(String idea, String userId) {
+        if (idea == null || idea.isBlank()) {
+            throw new RuntimeException("Prompt cannot be empty");
+        }
+
+        String prompt = "Bạn là trợ lý viết bài mạng xã hội. "
+                + "Hãy viết 1 bài đăng tiếng Việt ngắn gọn, tự nhiên, có cảm xúc tích cực và dễ đọc. "
+                + "Không thêm lời dẫn kiểu AI, không markdown, không tiêu đề phụ. "
+                + "Giữ dưới 180 từ. Ý tưởng người dùng: " + idea;
+
+        AIChatRequestDTO request = new AIChatRequestDTO(prompt, userId, null);
+        AIChatResponseDTO response = chat(request);
+        return response.getResponse();
+    }
+
     @TimeLimiter(name = "aiService", fallbackMethod = "chatFallbackAsync")
     @Bulkhead(name = "aiService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "chatFallbackAsync")
     @RateLimiter(name = "aiService", fallbackMethod = "chatFallbackAsync")
@@ -56,6 +78,10 @@ public class AIChatService {
         return CompletableFuture.supplyAsync(() -> {
         try {
             log.info("🤖 [AIChat] Processing chat request from user: {}", request.getUserId());
+
+            if (geminiApiKey == null || geminiApiKey.isBlank()) {
+                throw new RuntimeException("Thiếu cấu hình ai.gemini.api-key. Vui lòng cấu hình API key mới.");
+            }
 
             // Build request body for Gemini API
             Map<String, Object> requestBody = new HashMap<>();
@@ -105,6 +131,14 @@ public class AIChatService {
                 throw new RuntimeException("Failed to get response from AI: " + response.getStatusCode());
             }
             
+        } catch (HttpClientErrorException.Forbidden e) {
+            String responseBody = e.getResponseBodyAsString();
+            log.error("❌ [AIChat] Gemini 403 Forbidden: {}", responseBody);
+
+            if (responseBody != null && responseBody.toLowerCase().contains("reported as leaked")) {
+                throw new RuntimeException("API key Gemini đã bị Google khóa vì lộ. Vui lòng tạo key mới và cập nhật ai.gemini.api-key.");
+            }
+            throw new RuntimeException("Gemini từ chối truy cập (403). Vui lòng kiểm tra API key và quyền truy cập model.");
         } catch (Exception e) {
             log.error("❌ [AIChat] Error calling Gemini API: {}", e.getMessage(), e);
             throw new RuntimeException("Error communicating with AI service: " + e.getMessage(), e);
