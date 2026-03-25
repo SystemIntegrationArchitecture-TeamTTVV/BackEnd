@@ -24,6 +24,7 @@ public class PostService {
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final FriendService friendService;
+    private final AIViolationCheckService aiViolationCheckService;
 
     public List<PostDTO> getAllPosts() {
         return getAllPosts(null);
@@ -66,6 +67,8 @@ public class PostService {
     }
 
     public PostDTO createPost(PostDTO postDTO) {
+        aiViolationCheckService.checkOrThrow(postDTO.getContent(), "POST");
+
         Post post = toEntity(postDTO);
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
@@ -129,6 +132,8 @@ public class PostService {
     public PostDTO updatePost(String id, PostDTO postDTO) {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
+
+        aiViolationCheckService.checkOrThrow(postDTO.getContent(), "POST");
         
         post.setContent(postDTO.getContent());
         post.setImages(postDTO.getImages());
@@ -157,11 +162,7 @@ public class PostService {
         // Get the original post to share
         Post originalPost = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
-        
-        // Increment share count on original post
-        originalPost.setShareCount(originalPost.getShareCount() + 1);
-        postRepository.save(originalPost);
-        
+
         // Create new post as a share
         Post sharePost = new Post();
         if (shareDTO.getAuthorId() != null) {
@@ -179,6 +180,14 @@ public class PostService {
         String sharedContent = shareDTO.getContent() != null && !shareDTO.getContent().isEmpty() 
             ? shareDTO.getContent() + "\n\n--- Shared Post ---\n" + originalPost.getContent()
             : "--- Shared Post ---\n" + originalPost.getContent();
+
+        // Chặn share nếu nội dung bị vi phạm (để không tăng shareCount sai).
+        aiViolationCheckService.checkOrThrow(sharedContent, "POST");
+
+        // Increment share count on original post
+        originalPost.setShareCount(originalPost.getShareCount() + 1);
+        postRepository.save(originalPost);
+
         sharePost.setContent(sharedContent);
         sharePost.setImages(originalPost.getImages());
         sharePost.setVideos(originalPost.getVideos());
