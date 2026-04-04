@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import edu.iuh.fit.se.commonservice.dto.AIAutoPostRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIAutoPostResponseDTO;
+import edu.iuh.fit.se.commonservice.dto.AIDailySummaryRequestDTO;
+import edu.iuh.fit.se.commonservice.dto.AIDailySummaryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
@@ -91,6 +93,25 @@ public class AIChatController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Tạo bản nháp thất bại."));
+        }
+    }
+
+    @PostMapping("/daily-summary")
+    public ResponseEntity<?> dailySummary(@RequestBody AIDailySummaryRequestDTO request) {
+        try {
+            if (request.getUserId() == null || request.getUserId().isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "Thiếu userId để tóm tắt hoạt động hôm nay."));
+            }
+
+            AIDailySummaryResponseDTO response = aiChatService.summarizeDailyActivity(
+                    request.getUserId(),
+                    request.getLimit()
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", e.getMessage() != null ? e.getMessage() : "Không thể tóm tắt hoạt động hôm nay."));
         }
     }
 }
