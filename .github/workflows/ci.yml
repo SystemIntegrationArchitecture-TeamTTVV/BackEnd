@@ -1,5 +1,8 @@
-# Chạy khi push/PR vào repo GitHub của BE (thư mục BE = root repo).
-# Build từng service song song: compile + package (verify).
+# CI — repo BE (root GitHub = thư mục BE).
+# • Mỗi push/PR: build 4 module Maven (matrix).
+# • CD (DigitalOcean, SSH, …): xem deploy.yml (workflow_dispatch hoặc nối sau job CI).
+#
+# Compose Kafka/Redis/Grafana nằm ở monorepo KIenTruc/ops/ (không nằm trong repo BE).
 
 name: Backend CI
 
