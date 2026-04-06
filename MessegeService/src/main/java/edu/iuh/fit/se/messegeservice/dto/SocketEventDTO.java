@@ -63,4 +63,16 @@ public class SocketEventDTO {
         event.setTimestamp(LocalDateTime.now());
         return event;
     }
+
+    /**
+     * Payload is typically a map with {@code conversationId} and {@code messageId}.
+     */
+    public static SocketEventDTO messageDeleted(String recipientUserId, Object data) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType("MESSAGE_DELETED");
+        event.setUserId(recipientUserId);
+        event.setData(data);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
 }

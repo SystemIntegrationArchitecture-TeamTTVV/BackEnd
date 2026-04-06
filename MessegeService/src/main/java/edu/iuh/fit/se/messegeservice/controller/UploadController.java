@@ -1,13 +1,5 @@
 package edu.iuh.fit.se.messegeservice.controller;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,11 +9,26 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import edu.iuh.fit.se.messegeservice.service.CloudinaryStorageService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/upload")
 @RequiredArgsConstructor
 public class UploadController {
+
+    private final CloudinaryStorageService cloudinaryStorageService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -29,20 +36,29 @@ public class UploadController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
-            // Validate file
             if (file.isEmpty()) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("error", "File is empty");
                 return ResponseEntity.badRequest().body(error);
             }
 
-            // Create upload directory if it doesn't exist
+            if (cloudinaryStorageService.isEnabled()) {
+                String secureUrl = cloudinaryStorageService.upload(file, "ttvv/message-uploads");
+                Map<String, Object> response = new HashMap<>();
+                response.put("url", secureUrl);
+                response.put("fileName", file.getOriginalFilename());
+                response.put("fileSize", file.getSize());
+                response.put("fileType", file.getContentType());
+                response.put("path", secureUrl);
+                log.info("File uploaded to Cloudinary: {}", file.getOriginalFilename());
+                return ResponseEntity.ok(response);
+            }
+
             Path uploadPath = Paths.get(uploadDir);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            // Generate unique filename
             String originalFilename = file.getOriginalFilename();
             String extension = "";
             if (originalFilename != null && originalFilename.contains(".")) {
@@ -50,15 +66,11 @@ public class UploadController {
             }
             String uniqueFilename = UUID.randomUUID().toString() + extension;
 
-            // Save file
             Path filePath = uploadPath.resolve(uniqueFilename);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // Build file URL (accessible through API Gateway)
-            // The gateway route /api/message/api/files/** maps to /api/files/**
             String fileUrl = "/api/message/api/files/" + uniqueFilename;
 
-            // Return response
             Map<String, Object> response = new HashMap<>();
             response.put("url", fileUrl);
             response.put("fileName", originalFilename);
@@ -66,7 +78,7 @@ public class UploadController {
             response.put("fileType", file.getContentType());
             response.put("path", fileUrl);
 
-            log.info("File uploaded successfully: {} -> {}", originalFilename, uniqueFilename);
+            log.info("File uploaded locally: {} -> {}", originalFilename, uniqueFilename);
             return ResponseEntity.ok(response);
 
         } catch (IOException e) {
