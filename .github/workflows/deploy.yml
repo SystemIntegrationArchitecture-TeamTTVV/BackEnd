@@ -1,0 +1,29 @@
+# CD (DigitalOcean / VPS): bổ sung khi đã có Droplet + secrets.
+# - CI (build) nằm ở ci.yml — chạy mỗi push/PR.
+# - File này: deploy thủ công hoặc sau khi CI xanh (workflow_run).
+#
+# Gợi ý triển khai:
+#   • SSH: appleboy/ssh-action — trên server: git pull + docker compose up -d
+#   • Hoặc: build JAR/Docker image → push DO Container Registry → server pull
+#
+# Compose hạ tầng (Kafka, Redis, Grafana) nằm ở monorepo KIenTruc/ops/ nếu bạn clone cả workspace;
+# repo chỉ có BE thì copy ops/ lên server hoặc dùng image có sẵn.
+
+name: Deploy (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Môi trường (ví dụ staging / production)"
+        required: false
+        default: "staging"
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chưa cấu hình deploy
+        run: |
+          echo "Thêm bước SSH hoặc registry deploy tại đây."
+          echo "Environment: ${{ github.event.inputs.environment }}"

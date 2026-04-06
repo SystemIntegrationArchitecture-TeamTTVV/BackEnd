@@ -8,8 +8,10 @@ import edu.iuh.fit.se.commonservice.model.Stories;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.StoriesRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -18,6 +20,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class StoriesService {
+
+    /** Same cap as UI — story media should stay small for feed performance. */
+    private static final long MAX_STORY_MEDIA_BYTES = 10L * 1024 * 1024;
 
     private final StoriesRepository storiesRepo;
     private final FriendRepository friendRepo;
@@ -105,6 +110,11 @@ public class StoriesService {
         } else {
             if (file == null || file.isEmpty()) {
                 throw new RuntimeException("Media file is required");
+            }
+            if (file.getSize() > MAX_STORY_MEDIA_BYTES) {
+                throw new ResponseStatusException(
+                        HttpStatus.PAYLOAD_TOO_LARGE,
+                        "Story media must not exceed 10 MB");
             }
             content = fileUploadService.uploadStoryFile(file);
         }

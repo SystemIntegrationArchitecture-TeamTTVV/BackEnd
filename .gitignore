@@ -8,4 +8,6 @@
 # IDE configuration (IntelliJ, etc.)
 .idea/
 
+# Cloudinary / secrets (copy from .env.example)
+**/.env
 

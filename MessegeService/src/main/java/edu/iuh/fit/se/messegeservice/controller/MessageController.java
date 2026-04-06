@@ -54,8 +54,10 @@ public class MessageController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMessage(@PathVariable String id) {
-        messageService.deleteMessage(id);
+    public ResponseEntity<Void> deleteMessage(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        messageService.deleteMessage(id, userId);
         return ResponseEntity.noContent().build();
     }
 

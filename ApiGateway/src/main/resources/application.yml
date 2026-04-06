@@ -1,6 +1,9 @@
 spring:
   application:
     name: ApiGateway
+  # Gateway buffer body in memory; default ~256KB causes 413 on multipart story/post uploads
+  codec:
+    max-in-memory-size: 52MB
   cloud:
     gateway:
       discovery:

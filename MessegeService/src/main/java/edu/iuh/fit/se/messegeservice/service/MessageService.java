@@ -8,10 +8,14 @@ import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -74,6 +78,7 @@ public class MessageService {
         }
 
         Message message = toEntity(messageDTO, conversation);
+        applyReplySnapshotIfPresent(messageDTO, conversation, message);
         message.setCreatedAt(LocalDateTime.now());
         message.setUpdatedAt(LocalDateTime.now());
         message.setDeleted(false);
@@ -93,7 +98,7 @@ public class MessageService {
         log.info("✅ Message saved with id: {}", saved.getId());
         
         // Update conversation last message
-        conversation.setLastMessagePreview(messageDTO.getContent());
+        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
         conversation.setLastMessageAt(LocalDateTime.now());
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -227,11 +232,77 @@ public class MessageService {
         return toDTO(messageRepository.save(message));
     }
 
-    public void deleteMessage(String id) {
+    public void deleteMessage(String id, String requesterId) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
         Message message = messageRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+        if (!message.getSenderId().equals(requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the sender can delete this message");
+        }
         message.setDeleted(true);
         messageRepository.save(message);
+
+        Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
+        if (conversation != null && conversation.getParticipantIds() != null) {
+            Map<String, String> payload = new HashMap<>();
+            payload.put("conversationId", message.getConversationId());
+            payload.put("messageId", id);
+            for (String participantId : conversation.getParticipantIds()) {
+                try {
+                    socketEmitterService.emitToUserById(
+                            participantId,
+                            SocketEventDTO.messageDeleted(participantId, payload));
+                } catch (Exception e) {
+                    log.warn("Failed to emit MESSAGE_DELETED to {}: {}", participantId, e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void applyReplySnapshotIfPresent(MessageDTO messageDTO, Conversation conversation, Message message) {
+        String replyId = messageDTO.getReplyToMessageId();
+        if (replyId == null || replyId.isBlank()) {
+            return;
+        }
+        Message replied = messageRepository.findById(replyId)
+                .orElseThrow(() -> new IllegalArgumentException("Reply target not found"));
+        if (!conversation.getId().equals(replied.getConversationId())) {
+            throw new IllegalArgumentException("Reply target must be in the same conversation");
+        }
+        if (replied.isDeleted()) {
+            throw new IllegalArgumentException("Cannot reply to a deleted message");
+        }
+        message.setReplyToMessageId(replied.getId());
+        message.setReplyToSenderName(replied.getSenderName());
+        message.setReplyToContentPreview(buildReplyContentPreview(replied));
+    }
+
+    private static String buildReplyContentPreview(Message replied) {
+        String c = replied.getContent();
+        if (c != null && !c.trim().isEmpty()) {
+            return c.length() > 200 ? c.substring(0, 200) : c;
+        }
+        if (replied.getAttachments() != null && !replied.getAttachments().isEmpty()) {
+            return "[📎]";
+        }
+        return "";
+    }
+
+    private static String buildLastMessagePreview(Message saved) {
+        String content = saved.getContent();
+        if (content != null && !content.trim().isEmpty()) {
+            return content.length() > 80 ? content.substring(0, 80) + "…" : content;
+        }
+        if (saved.getAttachments() != null && !saved.getAttachments().isEmpty()) {
+            return "📎";
+        }
+        if (saved.getReplyToMessageId() != null) {
+            String p = saved.getReplyToContentPreview();
+            return "↩ " + (p != null ? p : "");
+        }
+        return "";
     }
 
     private MessageDTO toDTO(Message message) {
@@ -257,6 +328,12 @@ public class MessageService {
         dto.setEdited(message.isEdited());
         dto.setCreatedAt(message.getCreatedAt());
         dto.setUpdatedAt(message.getUpdatedAt());
+        if (message.getReplyToMessageId() != null) {
+            dto.setReplyTo(new MessageDTO.ReplyToPreview(
+                    message.getReplyToMessageId(),
+                    message.getReplyToSenderName(),
+                    message.getReplyToContentPreview()));
+        }
         return dto;
     }
 

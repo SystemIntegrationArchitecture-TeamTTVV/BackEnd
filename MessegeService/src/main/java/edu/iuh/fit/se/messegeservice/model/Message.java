@@ -38,6 +38,11 @@ public class Message {
     private boolean isDeleted = false;
     private boolean isEdited = false;
 
+    /** Snapshot of the message this one replies to (same conversation only). */
+    private String replyToMessageId;
+    private String replyToSenderName;
+    private String replyToContentPreview;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

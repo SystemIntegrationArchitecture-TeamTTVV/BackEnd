@@ -32,5 +32,20 @@ public class MessageDTO {
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    /** Client may send this when creating a message; server fills {@link #replyTo}. */
+    private String replyToMessageId;
+
+    /** Populated on read / after create — quoted preview for UI. */
+    private ReplyToPreview replyTo;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReplyToPreview {
+        private String messageId;
+        private String senderName;
+        private String contentPreview;
+    }
 }
 
