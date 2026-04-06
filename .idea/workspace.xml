@@ -5,6 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/client/MessageServiceClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/client/MessageServiceClient.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AIChatController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AIChatController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/AIChatService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/AIChatService.java" afterDir="false" />
@@ -70,31 +71,31 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Maven.CommonService [clean].executor": "Run",
-    "Maven.CommonService [compile].executor": "Run",
-    "RequestMappingsPanelOrder0": "0",
-    "RequestMappingsPanelOrder1": "1",
-    "RequestMappingsPanelWidth0": "75",
-    "RequestMappingsPanelWidth1": "75",
-    "RunOnceActivity.git.unshallow": "true",
-    "Spring Boot.ApiGatewayApplication.executor": "Run",
-    "Spring Boot.CommonServiceApplication.executor": "Run",
-    "Spring Boot.EurekaServerApplication.executor": "Run",
-    "Spring Boot.MessegeServiceApplication.executor": "Run",
-    "git-widget-placeholder": "dev/main",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "E:/GiaoTrinhDH/Nam4_HK2/KienTruc/Duan/DuAn_5/BackEnd",
-    "node.js.detected.package.eslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "run.configurations.included.in.services": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Maven.CommonService [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CommonService [compile].executor&quot;: &quot;Run&quot;,
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;Spring Boot.ApiGatewayApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Spring Boot.CommonServiceApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Spring Boot.EurekaServerApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Spring Boot.MessegeServiceApplication.executor&quot;: &quot;Run&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;22637091-tung&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/GiaoTrinhDH/Nam4_HK2/KienTruc/Duan/DuAn_5/BackEnd&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.configurations.included.in.services&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunDashboard">
     <option name="configurationTypes">
       <set>
@@ -161,7 +162,8 @@
       <workItem from="1773858237441" duration="17122000" />
       <workItem from="1774075114220" duration="5742000" />
       <workItem from="1774441499749" duration="2156000" />
-      <workItem from="1775300296617" duration="836000" />
+      <workItem from="1775300296617" duration="1468000" />
+      <workItem from="1775439644498" duration="156000" />
     </task>
     <servers />
   </component>

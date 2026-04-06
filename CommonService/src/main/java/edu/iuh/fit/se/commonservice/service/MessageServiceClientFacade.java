@@ -1,5 +1,11 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Service;
+
 import edu.iuh.fit.se.commonservice.client.MessageServiceClient;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -7,11 +13,6 @@ import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Wrapper around {@link MessageServiceClient} that adds Resilience4j circuit breaker
