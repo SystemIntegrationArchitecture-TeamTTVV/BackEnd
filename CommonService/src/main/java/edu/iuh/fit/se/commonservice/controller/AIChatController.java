@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import edu.iuh.fit.se.commonservice.dto.AIAutoPostRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIAutoPostResponseDTO;
-import edu.iuh.fit.se.commonservice.dto.AIDailySummaryRequestDTO;
-import edu.iuh.fit.se.commonservice.dto.AIDailySummaryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatResponseDTO;
+import edu.iuh.fit.se.commonservice.dto.AIDailySummaryRequestDTO;
+import edu.iuh.fit.se.commonservice.dto.AIDailySummaryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.service.AIChatService;
 import edu.iuh.fit.se.commonservice.service.PostService;

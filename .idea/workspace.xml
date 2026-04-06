@@ -5,6 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/client/MessageServiceClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/client/MessageServiceClient.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AIChatController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/AIChatController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/AIChatService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/AIChatService.java" afterDir="false" />
@@ -161,7 +162,8 @@
       <workItem from="1773858237441" duration="17122000" />
       <workItem from="1774075114220" duration="5742000" />
       <workItem from="1774441499749" duration="2156000" />
-      <workItem from="1775300296617" duration="836000" />
+      <workItem from="1775300296617" duration="1468000" />
+      <workItem from="1775439644498" duration="156000" />
     </task>
     <servers />
   </component>

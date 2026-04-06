@@ -22,13 +22,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
-import edu.iuh.fit.se.commonservice.dto.AIDailySummaryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIChatResponseDTO;
+import edu.iuh.fit.se.commonservice.dto.AIDailySummaryResponseDTO;
 import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.Notification;
 import edu.iuh.fit.se.commonservice.model.Post;
