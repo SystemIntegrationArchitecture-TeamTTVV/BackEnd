@@ -66,6 +66,17 @@ spring:
                 name: commonService
                 fallbackUri: forward:/fallback/common
 
+        - id: common-service-products
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/common/products/**
+          filters:
+            - RewritePath=/api/common/products(/.*)?, /api/products$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
+
         - id: common-service-comments
           uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
