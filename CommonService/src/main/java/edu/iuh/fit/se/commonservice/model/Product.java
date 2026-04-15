@@ -24,6 +24,7 @@ public class Product {
 
     @DBRef
     private User seller;
+    private String sellerId;
 
     private BigDecimal price;
     private String currency = "USD";
@@ -36,10 +37,17 @@ public class Product {
     private List<String> tags;
     private String category; // Electronics, Vehicles, Property...
 
-    private boolean isSold = false;
-    private boolean isActive = true;
+    // Use wrapper Boolean to keep consistency with other models (User)
+    private Boolean isSold = Boolean.FALSE;
+    private Boolean isActive = Boolean.TRUE;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-}
 
+    // Explicit getters/setters for boolean fields to avoid Lombok naming ambiguity
+    public Boolean getIsSold() { return this.isSold; }
+    public void setIsSold(Boolean isSold) { this.isSold = isSold; }
+
+    public Boolean getIsActive() { return this.isActive; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+}
