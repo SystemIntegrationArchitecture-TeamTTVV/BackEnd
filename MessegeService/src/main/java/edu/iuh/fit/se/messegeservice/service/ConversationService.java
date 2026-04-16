@@ -41,6 +41,7 @@ public class ConversationService {
     private final RestTemplate restTemplate;
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
+    private final MessageService messageService;
     
     @Value("${common.service.url:http://localhost:8081}")
     private String commonServiceUrl;
@@ -229,6 +230,11 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
 
+        String oldGroupName = conversation.getGroupName();
+        boolean oldApprovalsRequired = conversation.isApprovalsRequired();
+        boolean oldOnlyAdminsCanSend = conversation.isOnlyAdminsCanSend();
+        boolean oldOnlyAdminsCanAddMembers = conversation.isOnlyAdminsCanAddMembers();
+
         if (request.getRequesterId() == null || request.getRequesterId().isBlank()) {
             throw new IllegalArgumentException("requesterId is required");
         }
@@ -263,7 +269,40 @@ public class ConversationService {
         }
 
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        if (conversation.isGroup()) {
+            String actor = getParticipantDisplayName(conversation, request.getRequesterId());
+                if (request.getGroupName() != null
+                    && saved.getGroupName() != null
+                    && !saved.getGroupName().equals(oldGroupName)) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "GROUP_RENAMED",
+                        actor + " da doi ten nhom thanh \"" + saved.getGroupName() + "\"");
+            }
+
+            if (oldApprovalsRequired != saved.isApprovalsRequired()) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "JOIN_APPROVALS_UPDATED",
+                        actor + (saved.isApprovalsRequired()
+                                ? " da bat duyet thanh vien moi"
+                                : " da tat duyet thanh vien moi"));
+            }
+
+            if (oldOnlyAdminsCanSend != saved.isOnlyAdminsCanSend()) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "SEND_PERMISSION_UPDATED",
+                        actor + (saved.isOnlyAdminsCanSend()
+                                ? " da bat che do chi admin duoc gui tin"
+                                : " da tat che do chi admin duoc gui tin"));
+            }
+
+            if (oldOnlyAdminsCanAddMembers != saved.isOnlyAdminsCanAddMembers()) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "ADD_MEMBER_PERMISSION_UPDATED",
+                        actor + (saved.isOnlyAdminsCanAddMembers()
+                                ? " da bat che do chi admin duoc them thanh vien"
+                                : " da tat che do chi admin duoc them thanh vien"));
+            }
+        }
+
+        return toDTO(saved);
     }
 
     public ConversationDTO leaveGroup(String conversationId, LeaveGroupRequest request) {
@@ -283,6 +322,7 @@ public class ConversationService {
         }
 
         boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getRequesterId());
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
         if (isOwner) {
             String newOwnerId = request.getNewOwnerId();
             if (newOwnerId == null || newOwnerId.isBlank()) {
@@ -300,6 +340,10 @@ public class ConversationService {
             if (conversation.getAdminIds() != null) {
                 conversation.getAdminIds().remove(newOwnerId);
             }
+
+            String newOwnerName = resolveUserDisplayName(newOwnerId);
+            emitGroupSystemEvent(conversation, request.getRequesterId(), "OWNER_TRANSFERRED",
+                    actorName + " da chuyen quyen chu nhom cho " + newOwnerName);
         }
 
         Set<String> participants = new HashSet<>(conversation.getParticipantIds());
@@ -314,7 +358,11 @@ public class ConversationService {
             conversation.getAdminIds().remove(request.getRequesterId());
         }
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBER_LEFT", actorName + " da roi nhom");
+
+        return toDTO(saved);
     }
 
     public ConversationDTO requestToJoin(String conversationId, String requesterId) {
@@ -418,6 +466,11 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
 
+        if (request.isApproved()) {
+            String joinerName = resolveUserDisplayName(request.getRequesterId());
+            emitGroupSystemEvent(saved, request.getApproverId(), "JOIN_REQUEST_APPROVED", joinerName + " da tham gia nhom");
+        }
+
         // Notify requester about decision
         try {
             SocketEventDTO event = new SocketEventDTO();
@@ -490,7 +543,14 @@ public class ConversationService {
 
         conversation.setParticipantIds(new ArrayList<>(participants));
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
+        List<String> addedNames = newMembers.stream().map(this::resolveUserDisplayName).toList();
+        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBERS_ADDED",
+            actorName + " da them " + String.join(", ", addedNames) + " vao nhom");
+
+        return toDTO(saved);
     }
 
     public ConversationDTO removeMember(String conversationId, RemoveMemberRequest request) {
@@ -540,12 +600,22 @@ public class ConversationService {
 
         conversation.setParticipantIds(new ArrayList<>(participants));
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
+        String removedName = resolveUserDisplayName(request.getParticipantId());
+        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBER_REMOVED",
+            actorName + " da xoa " + removedName + " khoi nhom");
+
+        return toDTO(saved);
     }
 
     public ConversationDTO updateGroupRoles(String conversationId, GroupRoleUpdateRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        String oldOwnerId = conversation.getOwnerId();
+        Set<String> oldAdmins = sanitizeIds(conversation.getAdminIds());
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Roles can only be updated for group conversations");
@@ -575,7 +645,30 @@ public class ConversationService {
         }
 
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
+        if (oldOwnerId != null && !oldOwnerId.equals(saved.getOwnerId())) {
+            emitGroupSystemEvent(saved, request.getRequesterId(), "OWNER_TRANSFERRED",
+                    actorName + " da chuyen quyen chu nhom cho " + resolveUserDisplayName(saved.getOwnerId()));
+        }
+
+        Set<String> newAdmins = sanitizeIds(saved.getAdminIds());
+        Set<String> promoted = new HashSet<>(newAdmins);
+        promoted.removeAll(oldAdmins);
+        if (!promoted.isEmpty()) {
+            emitGroupSystemEvent(saved, request.getRequesterId(), "ADMINS_UPDATED",
+                    actorName + " da bo nhiem admin: " + promoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
+        }
+
+        Set<String> demoted = new HashSet<>(oldAdmins);
+        demoted.removeAll(newAdmins);
+        if (!demoted.isEmpty()) {
+            emitGroupSystemEvent(saved, request.getRequesterId(), "ADMINS_UPDATED",
+                    actorName + " da go admin: " + demoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
+        }
+
+        return toDTO(saved);
     }
 
     private ConversationDTO createGroupConversation(ConversationDTO conversationDTO) {
@@ -642,6 +735,54 @@ public class ConversationService {
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private void emitGroupSystemEvent(Conversation conversation, String actorUserId, String action, String content) {
+        if (conversation == null || !conversation.isGroup()) {
+            return;
+        }
+        try {
+            messageService.createSystemMessage(conversation.getId(), actorUserId, action, content);
+        } catch (Exception e) {
+            log.warn("Failed to create system message {} in conversation {}: {}", action, conversation.getId(), e.getMessage());
+        }
+    }
+
+    private String getParticipantDisplayName(Conversation conversation, String userId) {
+        if (conversation != null
+                && conversation.getParticipantIds() != null
+                && conversation.getParticipantNames() != null
+                && userId != null) {
+            int index = conversation.getParticipantIds().indexOf(userId);
+            if (index >= 0 && index < conversation.getParticipantNames().size()) {
+                String name = conversation.getParticipantNames().get(index);
+                if (name != null && !name.isBlank()) {
+                    return name;
+                }
+            }
+        }
+        return resolveUserDisplayName(userId);
+    }
+
+    private String resolveUserDisplayName(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return "Unknown";
+        }
+        try {
+            UserDTO user = commonServiceClientFacade.getUserById(userId);
+            if (user == null) {
+                return userId;
+            }
+            if (user.getFullName() != null && !user.getFullName().isBlank()) {
+                return user.getFullName();
+            }
+            if (user.getUsername() != null && !user.getUsername().isBlank()) {
+                return user.getUsername();
+            }
+            return userId;
+        } catch (Exception ex) {
+            return userId;
+        }
     }
 
     private ConversationDTO toDTO(Conversation conversation) {

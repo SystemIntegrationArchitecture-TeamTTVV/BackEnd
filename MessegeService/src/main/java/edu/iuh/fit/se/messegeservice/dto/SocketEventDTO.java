@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * DTO for socket events
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SocketEventDTO {
+    private String eventId;
     private String type; // EVENT TYPE: MESSAGE_RECEIVED, MESSAGE_SENT, etc.
     private String userId; // Target user ID
     private Object data; // Event payload (MessageDTO)
@@ -27,6 +29,7 @@ public class SocketEventDTO {
      */
     public static SocketEventDTO messageReceived(String userId, Object messageData) {
         SocketEventDTO event = new SocketEventDTO();
+        event.setEventId(UUID.randomUUID().toString());
         event.setType("MESSAGE_RECEIVED");
         event.setUserId(userId);
         event.setData(messageData);
@@ -42,6 +45,7 @@ public class SocketEventDTO {
      */
     public static SocketEventDTO messageSent(String userId, Object messageData) {
         SocketEventDTO event = new SocketEventDTO();
+        event.setEventId(UUID.randomUUID().toString());
         event.setType("MESSAGE_SENT");
         event.setUserId(userId);
         event.setData(messageData);
@@ -57,6 +61,7 @@ public class SocketEventDTO {
      */
     public static SocketEventDTO typing(String userId, String conversationId) {
         SocketEventDTO event = new SocketEventDTO();
+        event.setEventId(UUID.randomUUID().toString());
         event.setType("TYPING");
         event.setUserId(userId);
         event.setData(conversationId);
@@ -69,6 +74,7 @@ public class SocketEventDTO {
      */
     public static SocketEventDTO messageDeleted(String recipientUserId, Object data) {
         SocketEventDTO event = new SocketEventDTO();
+        event.setEventId(UUID.randomUUID().toString());
         event.setType("MESSAGE_DELETED");
         event.setUserId(recipientUserId);
         event.setData(data);
@@ -78,6 +84,7 @@ public class SocketEventDTO {
 
     public static SocketEventDTO of(String type, String recipientUserId, Object data) {
         SocketEventDTO event = new SocketEventDTO();
+        event.setEventId(UUID.randomUUID().toString());
         event.setType(type);
         event.setUserId(recipientUserId);
         event.setData(data);

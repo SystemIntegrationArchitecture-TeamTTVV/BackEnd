@@ -571,6 +571,21 @@ public class MessageService {
         }
     }
 
+    public MessageDTO createSystemMessage(String conversationId, String actorUserId, String action, String content) {
+        if (conversationId == null || conversationId.isBlank()) {
+            throw new IllegalArgumentException("conversationId is required");
+        }
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("content is required");
+        }
+
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+
+        Message saved = createAndEmitSystemMessage(conversation, actorUserId, action, content);
+        return toDTO(saved);
+    }
+
     private void applyReplySnapshotIfPresent(MessageDTO messageDTO, Conversation conversation, Message message) {
         String replyId = messageDTO.getReplyToMessageId();
         if (replyId == null || replyId.isBlank()) {
@@ -746,7 +761,7 @@ public class MessageService {
         }
     }
 
-    private void createAndEmitSystemMessage(Conversation conversation, String actorUserId, String action, String content) {
+    private Message createAndEmitSystemMessage(Conversation conversation, String actorUserId, String action, String content) {
         Message systemMessage = new Message();
         systemMessage.setConversation(conversation);
         systemMessage.setConversationId(conversation.getId());
@@ -769,6 +784,8 @@ public class MessageService {
         conversationRepository.save(conversation);
 
         emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage), null);
+
+        return savedSystemMessage;
     }
 
     private List<String> resolveMentionUserIds(MessageDTO dto, Conversation conversation) {
