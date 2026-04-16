@@ -7,7 +7,10 @@ public class ConversationMetaUpdateRequest {
     private String requesterId;
     private String groupName;
     private String groupAvatar;
+    private String description;
     private Boolean approvalsRequired;
+    private Boolean onlyAdminsCanSend;
+    private Boolean onlyAdminsCanAddMembers;
 }
 
 

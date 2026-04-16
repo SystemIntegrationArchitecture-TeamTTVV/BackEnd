@@ -45,6 +45,15 @@ public class SocketService {
     }
 
     /**
+     * Send event to a conversation room channel.
+     * Room destination format: /topic/rooms.{conversationId}
+     */
+    public void sendToRoom(String roomId, SocketEventDTO event) {
+        log.debug("Sending event to room {}: {}", roomId, event.getType());
+        messagingTemplate.convertAndSend("/topic/rooms." + roomId, event);
+    }
+
+    /**
      * Send post-related events
      */
     public void notifyPostCreated(String authorId, SocketEventDTO event) {

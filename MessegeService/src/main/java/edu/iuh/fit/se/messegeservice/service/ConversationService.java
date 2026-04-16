@@ -2,6 +2,7 @@ package edu.iuh.fit.se.messegeservice.service;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
 import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.ConversationPinRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.JoinRequestUpdateRequest;
@@ -10,10 +11,14 @@ import edu.iuh.fit.se.messegeservice.dto.RemoveMemberRequest;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
+import edu.iuh.fit.se.messegeservice.model.HiddenConversation;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
+import edu.iuh.fit.se.messegeservice.repository.HiddenConversationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -29,18 +34,218 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ConversationService {
 
+    private static final PasswordEncoder PIN_ENCODER = new BCryptPasswordEncoder();
+
     private final ConversationRepository conversationRepository;
+    private final HiddenConversationRepository hiddenConversationRepository;
     private final RestTemplate restTemplate;
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
+    private final MessageService messageService;
     
     @Value("${common.service.url:http://localhost:8081}")
     private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
+        Set<String> hiddenConversationIds = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId).stream()
+                .map(HiddenConversation::getConversationId)
+                .collect(Collectors.toSet());
+
         return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
-                .map(this::toDTO)
+                .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
+                .map(conversation -> {
+                    ConversationDTO dto = toDTO(conversation);
+                    dto.setHiddenForCurrentUser(false);
+                    return dto;
+                })
                 .collect(Collectors.toList());
+    }
+
+    public List<ConversationDTO> searchGroupConversations(String userId, String keyword) {
+        String normalized = keyword == null ? "" : keyword.trim();
+        if (normalized.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        List<HiddenConversation> hiddenRows = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId);
+        Set<String> hiddenConversationIds = hiddenRows.stream()
+            .map(HiddenConversation::getConversationId)
+            .collect(Collectors.toSet());
+        java.util.Map<String, HiddenConversation> hiddenByConversationId = hiddenRows.stream()
+            .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
+
+        return conversationRepository
+                .findByParticipantIdsContainingAndIsGroupTrueAndGroupNameContainingIgnoreCaseOrderByLastMessageAtDesc(
+                        userId,
+                        normalized
+                )
+                .stream()
+                .map(conversation -> {
+                    ConversationDTO dto = toDTO(conversation);
+                    HiddenConversation visibility = hiddenByConversationId.get(conversation.getId());
+                    if (visibility != null) {
+                        dto.setHiddenForCurrentUser(true);
+                        dto.setHiddenRequiresPin(visibility.isRequirePinUnlock());
+                        dto.setClearBeforeAt(visibility.getClearBeforeAt());
+                    } else {
+                        dto.setHiddenForCurrentUser(hiddenConversationIds.contains(conversation.getId()));
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public ConversationDTO hideConversation(String conversationId, ConversationPinRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getPin() == null || request.getPin().trim().length() < 4) {
+            throw new IllegalArgumentException("PIN must be at least 4 characters");
+        }
+        ensureParticipant(conversation, request.getUserId());
+
+        HiddenConversation hiddenConversation = hiddenConversationRepository
+                .findByUserIdAndConversationId(request.getUserId(), conversationId)
+                .orElseGet(HiddenConversation::new);
+
+        hiddenConversation.setUserId(request.getUserId());
+        hiddenConversation.setConversationId(conversationId);
+        hiddenConversation.setHidden(true);
+        hiddenConversation.setPinHash(PIN_ENCODER.encode(request.getPin().trim()));
+        hiddenConversation.setRequirePinUnlock(true);
+        hiddenConversation.setLastAccessAt(LocalDateTime.now());
+        if (hiddenConversation.getCreatedAt() == null) {
+            hiddenConversation.setCreatedAt(LocalDateTime.now());
+        }
+        hiddenConversation.setUpdatedAt(LocalDateTime.now());
+
+        hiddenConversationRepository.save(hiddenConversation);
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(true);
+        dto.setHiddenRequiresPin(true);
+        dto.setClearBeforeAt(hiddenConversation.getClearBeforeAt());
+        return dto;
+    }
+
+    public ConversationDTO unhideConversation(String conversationId, ConversationPinRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getPin() == null || request.getPin().trim().isBlank()) {
+            throw new IllegalArgumentException("PIN is required");
+        }
+        ensureParticipant(conversation, request.getUserId());
+
+        HiddenConversation hiddenConversation = hiddenConversationRepository
+                .findByUserIdAndConversationId(request.getUserId(), conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("No hidden conversation found for this user"));
+
+        if (!hiddenConversation.isRequirePinUnlock()) {
+            throw new IllegalArgumentException("This conversation does not require PIN unlock");
+        }
+
+        if (hiddenConversation.getPinHash() == null || !PIN_ENCODER.matches(request.getPin().trim(), hiddenConversation.getPinHash())) {
+            throw new IllegalArgumentException("Invalid PIN");
+        }
+
+        hiddenConversation.setHidden(false);
+        hiddenConversation.setRequirePinUnlock(false);
+        hiddenConversation.setLastAccessAt(LocalDateTime.now());
+        hiddenConversation.setUpdatedAt(LocalDateTime.now());
+        hiddenConversationRepository.save(hiddenConversation);
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(false);
+        dto.setHiddenRequiresPin(false);
+        dto.setClearBeforeAt(hiddenConversation.getClearBeforeAt());
+        return dto;
+    }
+
+    public ConversationDTO clearConversationForUser(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        ensureParticipant(conversation, userId);
+
+        HiddenConversation visibility = hiddenConversationRepository
+                .findByUserIdAndConversationId(userId, conversationId)
+                .orElseGet(HiddenConversation::new);
+
+        visibility.setUserId(userId);
+        visibility.setConversationId(conversationId);
+        visibility.setHidden(true);
+        visibility.setRequirePinUnlock(false);
+        visibility.setPinHash(null);
+        visibility.setClearBeforeAt(LocalDateTime.now());
+        visibility.setLastAccessAt(LocalDateTime.now());
+        if (visibility.getCreatedAt() == null) {
+            visibility.setCreatedAt(LocalDateTime.now());
+        }
+        visibility.setUpdatedAt(LocalDateTime.now());
+        hiddenConversationRepository.save(visibility);
+
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("conversationId", conversationId);
+        payload.put("clearBeforeAt", visibility.getClearBeforeAt() != null ? visibility.getClearBeforeAt().toString() : null);
+        socketEmitterService.emitToUserById(
+            userId,
+            SocketEventDTO.of("CONVERSATION_CLEARED", userId, payload)
+        );
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(true);
+        dto.setHiddenRequiresPin(false);
+        dto.setClearBeforeAt(visibility.getClearBeforeAt());
+        return dto;
+    }
+
+    public ConversationDTO restoreConversation(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        ensureParticipant(conversation, userId);
+
+        HiddenConversation visibility = hiddenConversationRepository
+                .findByUserIdAndConversationId(userId, conversationId)
+                .orElse(null);
+
+        if (visibility != null) {
+            if (visibility.isRequirePinUnlock()) {
+                throw new IllegalArgumentException("This conversation is PIN-locked. Use unhide with PIN.");
+            }
+            visibility.setHidden(false);
+            visibility.setLastAccessAt(LocalDateTime.now());
+            visibility.setUpdatedAt(LocalDateTime.now());
+            hiddenConversationRepository.save(visibility);
+
+            socketEmitterService.emitToUserById(
+                    userId,
+                    SocketEventDTO.of(
+                            "CONVERSATION_RESTORED",
+                            userId,
+                            java.util.Map.of("conversationId", conversationId)
+                    )
+            );
+        }
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(false);
+        dto.setHiddenRequiresPin(false);
+        dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
+        return dto;
     }
 
     public List<ConversationDTO> getGroupConversations() {
@@ -60,7 +265,21 @@ public class ConversationService {
         List<Conversation> conversations = conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId1);
         for (Conversation conv : conversations) {
             if (!conv.isGroup() && conv.getParticipantIds().contains(userId1) && conv.getParticipantIds().contains(userId2)) {
-                return toDTO(conv);
+                HiddenConversation visibility = hiddenConversationRepository
+                        .findByUserIdAndConversationId(userId1, conv.getId())
+                        .orElse(null);
+                if (visibility != null && visibility.isHidden() && !visibility.isRequirePinUnlock()) {
+                    visibility.setHidden(false);
+                    visibility.setLastAccessAt(LocalDateTime.now());
+                    visibility.setUpdatedAt(LocalDateTime.now());
+                    hiddenConversationRepository.save(visibility);
+                }
+
+                ConversationDTO dto = toDTO(conv);
+                dto.setHiddenForCurrentUser(visibility != null && visibility.isHidden());
+                dto.setHiddenRequiresPin(visibility != null && visibility.isHidden() && visibility.isRequirePinUnlock());
+                dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
+                return dto;
             }
         }
         
@@ -125,6 +344,11 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
 
+        String oldGroupName = conversation.getGroupName();
+        boolean oldApprovalsRequired = conversation.isApprovalsRequired();
+        boolean oldOnlyAdminsCanSend = conversation.isOnlyAdminsCanSend();
+        boolean oldOnlyAdminsCanAddMembers = conversation.isOnlyAdminsCanAddMembers();
+
         if (request.getRequesterId() == null || request.getRequesterId().isBlank()) {
             throw new IllegalArgumentException("requesterId is required");
         }
@@ -145,12 +369,54 @@ public class ConversationService {
             String avatar = request.getGroupAvatar().trim();
             conversation.setGroupAvatar(avatar.isBlank() ? conversation.getGroupAvatar() : avatar);
         }
+        if (request.getDescription() != null) {
+            conversation.setDescription(request.getDescription().trim());
+        }
         if (request.getApprovalsRequired() != null && conversation.isGroup()) {
             conversation.setApprovalsRequired(request.getApprovalsRequired());
         }
+        if (request.getOnlyAdminsCanSend() != null && conversation.isGroup()) {
+            conversation.setOnlyAdminsCanSend(request.getOnlyAdminsCanSend());
+        }
+        if (request.getOnlyAdminsCanAddMembers() != null && conversation.isGroup()) {
+            conversation.setOnlyAdminsCanAddMembers(request.getOnlyAdminsCanAddMembers());
+        }
 
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        if (conversation.isGroup()) {
+            String actor = getParticipantDisplayName(conversation, request.getRequesterId());
+                if (request.getGroupName() != null
+                    && saved.getGroupName() != null
+                    && !saved.getGroupName().equals(oldGroupName)) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "GROUP_RENAMED",
+                        actor + " da doi ten nhom thanh \"" + saved.getGroupName() + "\"");
+            }
+
+            if (oldApprovalsRequired != saved.isApprovalsRequired()) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "JOIN_APPROVALS_UPDATED",
+                        actor + (saved.isApprovalsRequired()
+                                ? " da bat duyet thanh vien moi"
+                                : " da tat duyet thanh vien moi"));
+            }
+
+            if (oldOnlyAdminsCanSend != saved.isOnlyAdminsCanSend()) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "SEND_PERMISSION_UPDATED",
+                        actor + (saved.isOnlyAdminsCanSend()
+                                ? " da bat che do chi admin duoc gui tin"
+                                : " da tat che do chi admin duoc gui tin"));
+            }
+
+            if (oldOnlyAdminsCanAddMembers != saved.isOnlyAdminsCanAddMembers()) {
+                emitGroupSystemEvent(saved, request.getRequesterId(), "ADD_MEMBER_PERMISSION_UPDATED",
+                        actor + (saved.isOnlyAdminsCanAddMembers()
+                                ? " da bat che do chi admin duoc them thanh vien"
+                                : " da tat che do chi admin duoc them thanh vien"));
+            }
+        }
+
+        return toDTO(saved);
     }
 
     public ConversationDTO leaveGroup(String conversationId, LeaveGroupRequest request) {
@@ -170,6 +436,7 @@ public class ConversationService {
         }
 
         boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getRequesterId());
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
         if (isOwner) {
             String newOwnerId = request.getNewOwnerId();
             if (newOwnerId == null || newOwnerId.isBlank()) {
@@ -187,6 +454,10 @@ public class ConversationService {
             if (conversation.getAdminIds() != null) {
                 conversation.getAdminIds().remove(newOwnerId);
             }
+
+            String newOwnerName = resolveUserDisplayName(newOwnerId);
+            emitGroupSystemEvent(conversation, request.getRequesterId(), "OWNER_TRANSFERRED",
+                    actorName + " da chuyen quyen chu nhom cho " + newOwnerName);
         }
 
         Set<String> participants = new HashSet<>(conversation.getParticipantIds());
@@ -201,7 +472,11 @@ public class ConversationService {
             conversation.getAdminIds().remove(request.getRequesterId());
         }
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBER_LEFT", actorName + " da roi nhom");
+
+        return toDTO(saved);
     }
 
     public ConversationDTO requestToJoin(String conversationId, String requesterId) {
@@ -305,6 +580,11 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
 
+        if (request.isApproved()) {
+            String joinerName = resolveUserDisplayName(request.getRequesterId());
+            emitGroupSystemEvent(saved, request.getApproverId(), "JOIN_REQUEST_APPROVED", joinerName + " da tham gia nhom");
+        }
+
         // Notify requester about decision
         try {
             SocketEventDTO event = new SocketEventDTO();
@@ -357,7 +637,11 @@ public class ConversationService {
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot add members to a direct conversation");
         }
-        ensureManager(conversation, request.getRequesterId());
+        if (conversation.isOnlyAdminsCanAddMembers()) {
+            ensureManager(conversation, request.getRequesterId());
+        } else {
+            ensureParticipant(conversation, request.getRequesterId());
+        }
 
         Set<String> newMembers = sanitizeIds(request.getParticipantIds());
         if (newMembers.isEmpty()) {
@@ -373,7 +657,14 @@ public class ConversationService {
 
         conversation.setParticipantIds(new ArrayList<>(participants));
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
+        List<String> addedNames = newMembers.stream().map(this::resolveUserDisplayName).toList();
+        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBERS_ADDED",
+            actorName + " da them " + String.join(", ", addedNames) + " vao nhom");
+
+        return toDTO(saved);
     }
 
     public ConversationDTO removeMember(String conversationId, RemoveMemberRequest request) {
@@ -423,12 +714,22 @@ public class ConversationService {
 
         conversation.setParticipantIds(new ArrayList<>(participants));
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
+        String removedName = resolveUserDisplayName(request.getParticipantId());
+        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBER_REMOVED",
+            actorName + " da xoa " + removedName + " khoi nhom");
+
+        return toDTO(saved);
     }
 
     public ConversationDTO updateGroupRoles(String conversationId, GroupRoleUpdateRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        String oldOwnerId = conversation.getOwnerId();
+        Set<String> oldAdmins = sanitizeIds(conversation.getAdminIds());
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Roles can only be updated for group conversations");
@@ -458,7 +759,30 @@ public class ConversationService {
         }
 
         conversation.setUpdatedAt(LocalDateTime.now());
-        return toDTO(conversationRepository.save(conversation));
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
+        if (oldOwnerId != null && !oldOwnerId.equals(saved.getOwnerId())) {
+            emitGroupSystemEvent(saved, request.getRequesterId(), "OWNER_TRANSFERRED",
+                    actorName + " da chuyen quyen chu nhom cho " + resolveUserDisplayName(saved.getOwnerId()));
+        }
+
+        Set<String> newAdmins = sanitizeIds(saved.getAdminIds());
+        Set<String> promoted = new HashSet<>(newAdmins);
+        promoted.removeAll(oldAdmins);
+        if (!promoted.isEmpty()) {
+            emitGroupSystemEvent(saved, request.getRequesterId(), "ADMINS_UPDATED",
+                    actorName + " da bo nhiem admin: " + promoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
+        }
+
+        Set<String> demoted = new HashSet<>(oldAdmins);
+        demoted.removeAll(newAdmins);
+        if (!demoted.isEmpty()) {
+            emitGroupSystemEvent(saved, request.getRequesterId(), "ADMINS_UPDATED",
+                    actorName + " da go admin: " + demoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
+        }
+
+        return toDTO(saved);
     }
 
     private ConversationDTO createGroupConversation(ConversationDTO conversationDTO) {
@@ -510,12 +834,69 @@ public class ConversationService {
         }
     }
 
+    private void ensureParticipant(Conversation conversation, String requesterId) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+        if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(requesterId)) {
+            throw new IllegalArgumentException("Requester is not a participant of this conversation");
+        }
+    }
+
     private Set<String> sanitizeIds(List<String> ids) {
         if (ids == null) return new HashSet<>();
         return ids.stream()
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private void emitGroupSystemEvent(Conversation conversation, String actorUserId, String action, String content) {
+        if (conversation == null || !conversation.isGroup()) {
+            return;
+        }
+        try {
+            messageService.createSystemMessage(conversation.getId(), actorUserId, action, content);
+        } catch (Exception e) {
+            log.warn("Failed to create system message {} in conversation {}: {}", action, conversation.getId(), e.getMessage());
+        }
+    }
+
+    private String getParticipantDisplayName(Conversation conversation, String userId) {
+        if (conversation != null
+                && conversation.getParticipantIds() != null
+                && conversation.getParticipantNames() != null
+                && userId != null) {
+            int index = conversation.getParticipantIds().indexOf(userId);
+            if (index >= 0 && index < conversation.getParticipantNames().size()) {
+                String name = conversation.getParticipantNames().get(index);
+                if (name != null && !name.isBlank()) {
+                    return name;
+                }
+            }
+        }
+        return resolveUserDisplayName(userId);
+    }
+
+    private String resolveUserDisplayName(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return "Unknown";
+        }
+        try {
+            UserDTO user = commonServiceClientFacade.getUserById(userId);
+            if (user == null) {
+                return userId;
+            }
+            if (user.getFullName() != null && !user.getFullName().isBlank()) {
+                return user.getFullName();
+            }
+            if (user.getUsername() != null && !user.getUsername().isBlank()) {
+                return user.getUsername();
+            }
+            return userId;
+        } catch (Exception ex) {
+            return userId;
+        }
     }
 
     private ConversationDTO toDTO(Conversation conversation) {
@@ -549,6 +930,9 @@ public class ConversationService {
         dto.setGroup(conversation.isGroup());
         dto.setGroupName(conversation.getGroupName());
         dto.setGroupAvatar(conversation.getGroupAvatar());
+        dto.setDescription(conversation.getDescription());
+        dto.setOnlyAdminsCanSend(conversation.isOnlyAdminsCanSend());
+        dto.setOnlyAdminsCanAddMembers(conversation.isOnlyAdminsCanAddMembers());
         dto.setOwnerId(conversation.getOwnerId());
         dto.setAdminIds(conversation.getAdminIds());
         dto.setApprovalsRequired(conversation.isApprovalsRequired());
@@ -568,6 +952,9 @@ public class ConversationService {
         conversation.setGroup(dto.isGroup());
         conversation.setGroupName(dto.getGroupName());
         conversation.setGroupAvatar(dto.getGroupAvatar());
+        conversation.setDescription(dto.getDescription());
+        conversation.setOnlyAdminsCanSend(dto.isOnlyAdminsCanSend());
+        conversation.setOnlyAdminsCanAddMembers(dto.isOnlyAdminsCanAddMembers());
         conversation.setOwnerId(dto.getOwnerId());
         conversation.setAdminIds(dto.getAdminIds());
         conversation.setApprovalsRequired(dto.isApprovalsRequired());

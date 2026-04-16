@@ -2,6 +2,8 @@ package edu.iuh.fit.se.messegeservice.controller;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
 import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.ConversationPinRequest;
+import edu.iuh.fit.se.messegeservice.dto.ConversationVisibilityRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.LeaveGroupRequest;
@@ -32,6 +34,14 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.getGroupConversations());
     }
 
+    @GetMapping("/groups/search")
+    public ResponseEntity<List<ConversationDTO>> searchGroupConversations(
+            @RequestParam String userId,
+            @RequestParam String keyword
+    ) {
+        return ResponseEntity.ok(conversationService.searchGroupConversations(userId, keyword));
+    }
+
     @GetMapping("/direct")
     public ResponseEntity<List<ConversationDTO>> getDirectConversations() {
         return ResponseEntity.ok(conversationService.getDirectConversations());
@@ -47,6 +57,32 @@ public class ConversationController {
     @GetMapping("/{id}")
     public ResponseEntity<ConversationDTO> getConversationById(@PathVariable String id) {
         return ResponseEntity.ok(conversationService.getConversationById(id));
+    }
+
+    @PostMapping("/{id}/hide")
+    public ResponseEntity<ConversationDTO> hideConversation(@PathVariable String id, @RequestBody ConversationPinRequest request) {
+        return ResponseEntity.ok(conversationService.hideConversation(id, request));
+    }
+
+    @PostMapping("/{id}/unhide")
+    public ResponseEntity<ConversationDTO> unhideConversation(@PathVariable String id, @RequestBody ConversationPinRequest request) {
+        return ResponseEntity.ok(conversationService.unhideConversation(id, request));
+    }
+
+    @PostMapping("/{id}/clear-for-user")
+    public ResponseEntity<ConversationDTO> clearConversationForUser(
+            @PathVariable String id,
+            @RequestBody ConversationVisibilityRequest request
+    ) {
+        return ResponseEntity.ok(conversationService.clearConversationForUser(id, request.getUserId()));
+    }
+
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<ConversationDTO> restoreConversation(
+            @PathVariable String id,
+            @RequestBody ConversationVisibilityRequest request
+    ) {
+        return ResponseEntity.ok(conversationService.restoreConversation(id, request.getUserId()));
     }
 
     @PostMapping
