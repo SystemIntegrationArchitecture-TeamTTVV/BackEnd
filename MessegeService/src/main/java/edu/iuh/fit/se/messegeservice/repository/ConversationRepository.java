@@ -11,5 +11,9 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
     List<Conversation> findByParticipantIdsContainingOrderByLastMessageAtDesc(String userId);
     List<Conversation> findByIsGroupTrueOrderByLastMessageAtDesc();
     List<Conversation> findByIsGroupFalseOrderByLastMessageAtDesc();
+    List<Conversation> findByParticipantIdsContainingAndIsGroupTrueAndGroupNameContainingIgnoreCaseOrderByLastMessageAtDesc(
+            String userId,
+            String keyword
+    );
 }
 

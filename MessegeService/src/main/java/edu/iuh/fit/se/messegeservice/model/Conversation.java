@@ -30,6 +30,17 @@ public class Conversation {
     private boolean isGroup = false;
     private String groupName;
     private String groupAvatar;
+    private String description;
+
+    /**
+     * When true, only owner/admin can send messages in this group.
+     */
+    private boolean onlyAdminsCanSend = false;
+
+    /**
+     * When true, only owner/admin can add new members.
+     */
+    private boolean onlyAdminsCanAddMembers = true;
 
     private String lastMessagePreview;
     private LocalDateTime lastMessageAt;

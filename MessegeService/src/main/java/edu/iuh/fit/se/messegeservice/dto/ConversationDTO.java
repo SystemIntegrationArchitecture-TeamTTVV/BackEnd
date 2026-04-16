@@ -26,6 +26,10 @@ public class ConversationDTO {
     private Boolean isGroup;
     private String groupName;
     private String groupAvatar;
+    private String description;
+    private Boolean onlyAdminsCanSend;
+    private Boolean onlyAdminsCanAddMembers;
+    private Boolean hiddenForCurrentUser;
     private String lastMessagePreview;
     private LocalDateTime lastMessageAt;
     private LocalDateTime createdAt;
@@ -52,6 +56,16 @@ public class ConversationDTO {
     @JsonIgnore
     public boolean isApprovalsRequired() {
         return Boolean.TRUE.equals(approvalsRequired);
+    }
+
+    @JsonIgnore
+    public boolean isOnlyAdminsCanSend() {
+        return Boolean.TRUE.equals(onlyAdminsCanSend);
+    }
+
+    @JsonIgnore
+    public boolean isOnlyAdminsCanAddMembers() {
+        return onlyAdminsCanAddMembers == null || Boolean.TRUE.equals(onlyAdminsCanAddMembers);
     }
 }
 

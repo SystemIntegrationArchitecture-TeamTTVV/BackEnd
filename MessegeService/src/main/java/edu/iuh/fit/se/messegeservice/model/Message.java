@@ -26,14 +26,24 @@ public class Message {
     private String senderName;
     private String senderAvatar;
 
+    /** TEXT | SYSTEM | POLL */
+    private String messageType = "TEXT";
+
+    /** For SYSTEM messages, e.g. PINNED, UNPINNED, POLL_CREATED. */
+    private String systemAction;
+
     private String content; // text
     private List<String> emojis; // quick reactions on message (emoji codes)
 
     private List<MessageAttachment> attachments;
 
+    /** Mentioned users parsed from message content tokens like @[Name]. */
+    private List<String> mentionUserIds;
+
     // Message-level flags and metadata
     private boolean pinned = false;              // pinned for the whole conversation
     private List<String> starredByUserIds;       // users who starred this message
+    private List<String> seenByUserIds;
 
     private boolean isDeleted = false;
     private boolean isEdited = false;
@@ -42,6 +52,11 @@ public class Message {
     private String replyToMessageId;
     private String replyToSenderName;
     private String replyToContentPreview;
+
+    private String pollQuestion;
+    private boolean pollMultipleChoice = false;
+    private boolean pollClosed = false;
+    private List<PollOption> pollOptions;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

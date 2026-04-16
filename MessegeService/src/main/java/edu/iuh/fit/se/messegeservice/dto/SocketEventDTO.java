@@ -75,4 +75,13 @@ public class SocketEventDTO {
         event.setTimestamp(LocalDateTime.now());
         return event;
     }
+
+    public static SocketEventDTO of(String type, String recipientUserId, Object data) {
+        SocketEventDTO event = new SocketEventDTO();
+        event.setType(type);
+        event.setUserId(recipientUserId);
+        event.setData(data);
+        event.setTimestamp(LocalDateTime.now());
+        return event;
+    }
 }

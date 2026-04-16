@@ -2,6 +2,7 @@ package edu.iuh.fit.se.messegeservice.service;
 
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
 import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
+import edu.iuh.fit.se.messegeservice.dto.ConversationPinRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.JoinRequestUpdateRequest;
@@ -10,10 +11,14 @@ import edu.iuh.fit.se.messegeservice.dto.RemoveMemberRequest;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
+import edu.iuh.fit.se.messegeservice.model.HiddenConversation;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
+import edu.iuh.fit.se.messegeservice.repository.HiddenConversationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -29,7 +34,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ConversationService {
 
+    private static final PasswordEncoder PIN_ENCODER = new BCryptPasswordEncoder();
+
     private final ConversationRepository conversationRepository;
+    private final HiddenConversationRepository hiddenConversationRepository;
     private final RestTemplate restTemplate;
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
@@ -38,9 +46,105 @@ public class ConversationService {
     private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
+        Set<String> hiddenConversationIds = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId).stream()
+                .map(HiddenConversation::getConversationId)
+                .collect(Collectors.toSet());
+
         return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
-                .map(this::toDTO)
+                .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
+                .map(conversation -> {
+                    ConversationDTO dto = toDTO(conversation);
+                    dto.setHiddenForCurrentUser(false);
+                    return dto;
+                })
                 .collect(Collectors.toList());
+    }
+
+    public List<ConversationDTO> searchGroupConversations(String userId, String keyword) {
+        String normalized = keyword == null ? "" : keyword.trim();
+        if (normalized.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        Set<String> hiddenConversationIds = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId).stream()
+                .map(HiddenConversation::getConversationId)
+                .collect(Collectors.toSet());
+
+        return conversationRepository
+                .findByParticipantIdsContainingAndIsGroupTrueAndGroupNameContainingIgnoreCaseOrderByLastMessageAtDesc(
+                        userId,
+                        normalized
+                )
+                .stream()
+                .map(conversation -> {
+                    ConversationDTO dto = toDTO(conversation);
+                    dto.setHiddenForCurrentUser(hiddenConversationIds.contains(conversation.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public ConversationDTO hideConversation(String conversationId, ConversationPinRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getPin() == null || request.getPin().trim().length() < 4) {
+            throw new IllegalArgumentException("PIN must be at least 4 characters");
+        }
+        ensureParticipant(conversation, request.getUserId());
+
+        HiddenConversation hiddenConversation = hiddenConversationRepository
+                .findByUserIdAndConversationId(request.getUserId(), conversationId)
+                .orElseGet(HiddenConversation::new);
+
+        hiddenConversation.setUserId(request.getUserId());
+        hiddenConversation.setConversationId(conversationId);
+        hiddenConversation.setHidden(true);
+        hiddenConversation.setPinHash(PIN_ENCODER.encode(request.getPin().trim()));
+        hiddenConversation.setLastAccessAt(LocalDateTime.now());
+        if (hiddenConversation.getCreatedAt() == null) {
+            hiddenConversation.setCreatedAt(LocalDateTime.now());
+        }
+        hiddenConversation.setUpdatedAt(LocalDateTime.now());
+
+        hiddenConversationRepository.save(hiddenConversation);
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(true);
+        return dto;
+    }
+
+    public ConversationDTO unhideConversation(String conversationId, ConversationPinRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getPin() == null || request.getPin().trim().isBlank()) {
+            throw new IllegalArgumentException("PIN is required");
+        }
+        ensureParticipant(conversation, request.getUserId());
+
+        HiddenConversation hiddenConversation = hiddenConversationRepository
+                .findByUserIdAndConversationId(request.getUserId(), conversationId)
+                .orElseThrow(() -> new IllegalArgumentException("No hidden conversation found for this user"));
+
+        if (hiddenConversation.getPinHash() == null || !PIN_ENCODER.matches(request.getPin().trim(), hiddenConversation.getPinHash())) {
+            throw new IllegalArgumentException("Invalid PIN");
+        }
+
+        hiddenConversation.setHidden(false);
+        hiddenConversation.setLastAccessAt(LocalDateTime.now());
+        hiddenConversation.setUpdatedAt(LocalDateTime.now());
+        hiddenConversationRepository.save(hiddenConversation);
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(false);
+        return dto;
     }
 
     public List<ConversationDTO> getGroupConversations() {
@@ -145,8 +249,17 @@ public class ConversationService {
             String avatar = request.getGroupAvatar().trim();
             conversation.setGroupAvatar(avatar.isBlank() ? conversation.getGroupAvatar() : avatar);
         }
+        if (request.getDescription() != null) {
+            conversation.setDescription(request.getDescription().trim());
+        }
         if (request.getApprovalsRequired() != null && conversation.isGroup()) {
             conversation.setApprovalsRequired(request.getApprovalsRequired());
+        }
+        if (request.getOnlyAdminsCanSend() != null && conversation.isGroup()) {
+            conversation.setOnlyAdminsCanSend(request.getOnlyAdminsCanSend());
+        }
+        if (request.getOnlyAdminsCanAddMembers() != null && conversation.isGroup()) {
+            conversation.setOnlyAdminsCanAddMembers(request.getOnlyAdminsCanAddMembers());
         }
 
         conversation.setUpdatedAt(LocalDateTime.now());
@@ -357,7 +470,11 @@ public class ConversationService {
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot add members to a direct conversation");
         }
-        ensureManager(conversation, request.getRequesterId());
+        if (conversation.isOnlyAdminsCanAddMembers()) {
+            ensureManager(conversation, request.getRequesterId());
+        } else {
+            ensureParticipant(conversation, request.getRequesterId());
+        }
 
         Set<String> newMembers = sanitizeIds(request.getParticipantIds());
         if (newMembers.isEmpty()) {
@@ -510,6 +627,15 @@ public class ConversationService {
         }
     }
 
+    private void ensureParticipant(Conversation conversation, String requesterId) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+        if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(requesterId)) {
+            throw new IllegalArgumentException("Requester is not a participant of this conversation");
+        }
+    }
+
     private Set<String> sanitizeIds(List<String> ids) {
         if (ids == null) return new HashSet<>();
         return ids.stream()
@@ -549,6 +675,9 @@ public class ConversationService {
         dto.setGroup(conversation.isGroup());
         dto.setGroupName(conversation.getGroupName());
         dto.setGroupAvatar(conversation.getGroupAvatar());
+        dto.setDescription(conversation.getDescription());
+        dto.setOnlyAdminsCanSend(conversation.isOnlyAdminsCanSend());
+        dto.setOnlyAdminsCanAddMembers(conversation.isOnlyAdminsCanAddMembers());
         dto.setOwnerId(conversation.getOwnerId());
         dto.setAdminIds(conversation.getAdminIds());
         dto.setApprovalsRequired(conversation.isApprovalsRequired());
@@ -568,6 +697,9 @@ public class ConversationService {
         conversation.setGroup(dto.isGroup());
         conversation.setGroupName(dto.getGroupName());
         conversation.setGroupAvatar(dto.getGroupAvatar());
+        conversation.setDescription(dto.getDescription());
+        conversation.setOnlyAdminsCanSend(dto.isOnlyAdminsCanSend());
+        conversation.setOnlyAdminsCanAddMembers(dto.isOnlyAdminsCanAddMembers());
         conversation.setOwnerId(dto.getOwnerId());
         conversation.setAdminIds(dto.getAdminIds());
         conversation.setApprovalsRequired(dto.isApprovalsRequired());
