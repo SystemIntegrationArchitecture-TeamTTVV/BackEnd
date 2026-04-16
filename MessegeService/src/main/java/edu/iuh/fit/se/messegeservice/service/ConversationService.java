@@ -12,11 +12,15 @@ import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
 import edu.iuh.fit.se.messegeservice.model.HiddenConversation;
+import edu.iuh.fit.se.messegeservice.model.Message;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.HiddenConversationRepository;
+import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,9 +39,14 @@ import java.util.stream.Collectors;
 public class ConversationService {
 
     private static final PasswordEncoder PIN_ENCODER = new BCryptPasswordEncoder();
+    private static final String TYPE_SYSTEM = "SYSTEM";
+    private static final String TYPE_POLL = "POLL";
+    private static final int PREVIEW_SCAN_PAGE_SIZE = 50;
+    private static final int PREVIEW_SCAN_MAX_PAGES = 20;
 
     private final ConversationRepository conversationRepository;
     private final HiddenConversationRepository hiddenConversationRepository;
+    private final MessageRepository messageRepository;
     private final RestTemplate restTemplate;
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
@@ -47,15 +56,24 @@ public class ConversationService {
     private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
-        Set<String> hiddenConversationIds = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId).stream()
+        List<HiddenConversation> visibilityRows = hiddenConversationRepository.findByUserId(userId);
+        Set<String> hiddenConversationIds = visibilityRows.stream()
+            .filter(HiddenConversation::isHidden)
                 .map(HiddenConversation::getConversationId)
                 .collect(Collectors.toSet());
+        java.util.Map<String, HiddenConversation> visibilityByConversationId = visibilityRows.stream()
+            .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
 
         return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
                 .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
                 .map(conversation -> {
                     ConversationDTO dto = toDTO(conversation);
+                HiddenConversation visibility = visibilityByConversationId.get(conversation.getId());
+                LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
+                applyUserVisibleLastMessage(dto, userId, clearCutoff);
                     dto.setHiddenForCurrentUser(false);
+                dto.setHiddenRequiresPin(false);
+                dto.setClearBeforeAt(clearCutoff);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -67,8 +85,9 @@ public class ConversationService {
             return new ArrayList<>();
         }
 
-        List<HiddenConversation> hiddenRows = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId);
+        List<HiddenConversation> hiddenRows = hiddenConversationRepository.findByUserId(userId);
         Set<String> hiddenConversationIds = hiddenRows.stream()
+            .filter(HiddenConversation::isHidden)
             .map(HiddenConversation::getConversationId)
             .collect(Collectors.toSet());
         java.util.Map<String, HiddenConversation> hiddenByConversationId = hiddenRows.stream()
@@ -83,12 +102,16 @@ public class ConversationService {
                 .map(conversation -> {
                     ConversationDTO dto = toDTO(conversation);
                     HiddenConversation visibility = hiddenByConversationId.get(conversation.getId());
+                    LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
+                    applyUserVisibleLastMessage(dto, userId, clearCutoff);
                     if (visibility != null) {
-                        dto.setHiddenForCurrentUser(true);
+                        dto.setHiddenForCurrentUser(visibility.isHidden());
                         dto.setHiddenRequiresPin(visibility.isRequirePinUnlock());
                         dto.setClearBeforeAt(visibility.getClearBeforeAt());
                     } else {
-                        dto.setHiddenForCurrentUser(hiddenConversationIds.contains(conversation.getId()));
+                        dto.setHiddenForCurrentUser(false);
+                        dto.setHiddenRequiresPin(false);
+                        dto.setClearBeforeAt(null);
                     }
                     return dto;
                 })
@@ -276,6 +299,7 @@ public class ConversationService {
                 }
 
                 ConversationDTO dto = toDTO(conv);
+                applyUserVisibleLastMessage(dto, userId1, visibility != null ? visibility.getClearBeforeAt() : null);
                 dto.setHiddenForCurrentUser(visibility != null && visibility.isHidden());
                 dto.setHiddenRequiresPin(visibility != null && visibility.isHidden() && visibility.isRequirePinUnlock());
                 dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
@@ -897,6 +921,85 @@ public class ConversationService {
         } catch (Exception ex) {
             return userId;
         }
+    }
+
+    private void applyUserVisibleLastMessage(ConversationDTO dto, String userId, LocalDateTime clearCutoff) {
+        if (dto == null || dto.getId() == null || userId == null || userId.isBlank()) {
+            return;
+        }
+
+        Message latest = findLatestVisibleMessage(dto.getId(), userId, clearCutoff);
+        if (latest == null) {
+            dto.setLastMessagePreview("");
+            dto.setLastMessageAt(null);
+            return;
+        }
+
+        dto.setLastMessagePreview(buildLastMessagePreview(latest));
+        dto.setLastMessageAt(latest.getCreatedAt());
+    }
+
+    private Message findLatestVisibleMessage(String conversationId, String userId, LocalDateTime clearCutoff) {
+        for (int pageIndex = 0; pageIndex < PREVIEW_SCAN_MAX_PAGES; pageIndex++) {
+            Pageable pageable = PageRequest.of(pageIndex, PREVIEW_SCAN_PAGE_SIZE);
+            List<Message> batch = messageRepository
+                    .findByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(conversationId, pageable);
+            if (batch.isEmpty()) {
+                return null;
+            }
+
+            for (Message message : batch) {
+                if (message.getCreatedAt() == null) {
+                    continue;
+                }
+                if (clearCutoff != null && !message.getCreatedAt().isAfter(clearCutoff)) {
+                    continue;
+                }
+                List<String> hiddenForUserIds = message.getHiddenForUserIds();
+                if (hiddenForUserIds != null && hiddenForUserIds.contains(userId)) {
+                    continue;
+                }
+                return message;
+            }
+
+            if (batch.size() < PREVIEW_SCAN_PAGE_SIZE) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private static String buildLastMessagePreview(Message message) {
+        if (message == null) {
+            return "";
+        }
+
+        if (TYPE_SYSTEM.equalsIgnoreCase(message.getMessageType())) {
+            String content = message.getContent();
+            return content == null ? "" : (content.length() > 80 ? content.substring(0, 80) + "..." : content);
+        }
+        if (TYPE_POLL.equalsIgnoreCase(message.getMessageType())) {
+            String question = message.getPollQuestion() != null ? message.getPollQuestion() : message.getContent();
+            if (question == null || question.isBlank()) {
+                return "[Poll]";
+            }
+            String text = "[Poll] " + question;
+            return text.length() > 80 ? text.substring(0, 80) + "..." : text;
+        }
+
+        String content = message.getContent();
+        if (content != null && !content.trim().isEmpty()) {
+            return content.length() > 80 ? content.substring(0, 80) + "..." : content;
+        }
+        if (message.getAttachments() != null && !message.getAttachments().isEmpty()) {
+            return "[Attachment]";
+        }
+        if (message.getReplyToMessageId() != null) {
+            String p = message.getReplyToContentPreview();
+            return "[Reply] " + (p != null ? p : "");
+        }
+        return "";
     }
 
     private ConversationDTO toDTO(Conversation conversation) {
