@@ -239,7 +239,7 @@ public class MessageService {
         
         // Emit to other participants; sender already has optimistic local state.
         try {
-            emitMessageReceivedToConversation(conversation, savedDTO, messageDTO.getSenderId());
+            emitMessageReceivedToConversation(conversation, savedDTO);
         } catch (Exception e) {
             log.error("❌ Failed to emit socket event for new message: {}", e.getMessage(), e);
             // Don't fail the entire operation if socket emit fails
@@ -444,7 +444,7 @@ public class MessageService {
         conversationRepository.save(conversation);
 
         MessageDTO savedDTO = toDTO(saved);
-        emitMessageReceivedToConversation(conversation, savedDTO, userId);
+        emitMessageReceivedToConversation(conversation, savedDTO);
 
         String actorName = resolveParticipantDisplayName(conversation, userId);
         createAndEmitSystemMessage(conversation, userId, "POLL_CREATED", actorName + " da tao binh chon");
@@ -674,6 +674,64 @@ public class MessageService {
         );
     }
 
+    public MessageDTO forwardMessage(String sourceMessageId, String requesterId, String targetConversationId, String note) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+        if (targetConversationId == null || targetConversationId.isBlank()) {
+            throw new IllegalArgumentException("targetConversationId is required");
+        }
+
+        Message source = messageRepository.findById(sourceMessageId)
+                .orElseThrow(() -> new RuntimeException("Message not found with id: " + sourceMessageId));
+        if (source.isDeleted()) {
+            throw new IllegalArgumentException("Cannot forward a deleted message");
+        }
+        if (isHiddenForUser(source, requesterId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requester cannot forward this message");
+        }
+
+        Conversation sourceConversation = conversationRepository.findById(source.getConversationId())
+                .orElseThrow(() -> new RuntimeException("Conversation not found: " + source.getConversationId()));
+        ensureParticipant(sourceConversation, requesterId);
+
+        Conversation targetConversation = conversationRepository.findById(targetConversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found: " + targetConversationId));
+        ensureParticipant(targetConversation, requesterId);
+        ensureCanSend(targetConversation, requesterId);
+
+        Message forwarded = new Message();
+        forwarded.setConversation(targetConversation);
+        forwarded.setConversationId(targetConversation.getId());
+        forwarded.setSenderId(requesterId);
+        forwarded.setSenderName(resolveParticipantDisplayName(targetConversation, requesterId));
+        forwarded.setSenderAvatar(null);
+        forwarded.setMessageType(TYPE_TEXT);
+        forwarded.setSystemAction(null);
+        forwarded.setContent(buildForwardedContent(source, note));
+        forwarded.setAttachments(source.getAttachments() == null ? null : new ArrayList<>(source.getAttachments()));
+        forwarded.setMentionUserIds(new ArrayList<>());
+        forwarded.setSeenByUserIds(new ArrayList<>(List.of(requesterId)));
+        forwarded.setHiddenForUserIds(new ArrayList<>());
+        forwarded.setDeleted(false);
+        forwarded.setEdited(false);
+        forwarded.setCreatedAt(LocalDateTime.now());
+        forwarded.setUpdatedAt(LocalDateTime.now());
+
+        Message saved = messageRepository.save(forwarded);
+        unhideSoftDeletedConversationForParticipants(targetConversation);
+
+        targetConversation.setLastMessagePreview(buildLastMessagePreview(saved));
+        targetConversation.setLastMessageAt(saved.getCreatedAt());
+        targetConversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(targetConversation);
+        emitConversationMetaUpdated(targetConversation);
+
+        MessageDTO dto = toDTO(saved);
+        emitMessageReceivedToConversation(targetConversation, dto);
+        return dto;
+    }
+
     public MessageDTO createSystemMessage(String conversationId, String actorUserId, String action, String content) {
         if (conversationId == null || conversationId.isBlank()) {
             throw new IllegalArgumentException("conversationId is required");
@@ -743,6 +801,27 @@ public class MessageService {
             return "↩ " + (p != null ? p : "");
         }
         return "";
+    }
+
+    private String buildForwardedContent(Message source, String note) {
+        String sourceContent = source.getContent();
+        if (sourceContent == null || sourceContent.trim().isEmpty()) {
+            if (source.getAttachments() != null && !source.getAttachments().isEmpty()) {
+                sourceContent = "[Forwarded attachment]";
+            } else if (TYPE_POLL.equalsIgnoreCase(source.getMessageType())) {
+                sourceContent = "[Forwarded poll]";
+            } else if (TYPE_SYSTEM.equalsIgnoreCase(source.getMessageType())) {
+                sourceContent = "[Forwarded system message]";
+            } else {
+                sourceContent = "[Forwarded message]";
+            }
+        }
+
+        if (note == null || note.trim().isEmpty()) {
+            return sourceContent;
+        }
+
+        return note.trim() + "\n" + sourceContent;
     }
 
     private List<Message> collectCursorBatch(
@@ -986,7 +1065,7 @@ public class MessageService {
         return userId;
     }
 
-    private void emitMessageReceivedToConversation(Conversation conversation, MessageDTO messageDTO, String excludeUserId) {
+    private void emitMessageReceivedToConversation(Conversation conversation, MessageDTO messageDTO) {
         if (conversation.getParticipantIds() == null || conversation.getParticipantIds().isEmpty()) {
             return;
         }
@@ -995,9 +1074,6 @@ public class MessageService {
         socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
 
         for (String participantId : conversation.getParticipantIds()) {
-            if (excludeUserId != null && excludeUserId.equals(participantId)) {
-                continue;
-            }
             try {
                 socketEmitterService.emitToUserById(
                         participantId,
@@ -1033,7 +1109,7 @@ public class MessageService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
 
-        emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage), null);
+        emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage));
 
         return savedSystemMessage;
     }

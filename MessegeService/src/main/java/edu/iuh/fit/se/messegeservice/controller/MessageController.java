@@ -2,6 +2,7 @@ package edu.iuh.fit.se.messegeservice.controller;
 
 import edu.iuh.fit.se.messegeservice.dto.MessageDTO;
 import edu.iuh.fit.se.messegeservice.dto.MessagePageDTO;
+import edu.iuh.fit.se.messegeservice.dto.ForwardMessageRequest;
 import edu.iuh.fit.se.messegeservice.dto.PollCreateRequest;
 import edu.iuh.fit.se.messegeservice.dto.PollVoteRequest;
 import edu.iuh.fit.se.messegeservice.dto.SeenEventRequest;
@@ -120,6 +121,15 @@ public class MessageController {
             @RequestParam String userId) {
         messageService.deleteMessageForMe(id, userId);
         return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/{id}/forward")
+    public ResponseEntity<MessageDTO> forwardMessage(
+            @PathVariable String id,
+            @RequestBody ForwardMessageRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(messageService.forwardMessage(id, request.getRequesterId(), request.getTargetConversationId(), request.getNote()));
     }
 
     @PostMapping("/{id}/pin")
