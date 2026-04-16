@@ -243,19 +243,41 @@ public class MessageService {
     }
 
     public MessageDTO updateMessage(String id, MessageDTO messageDTO) {
+        if (messageDTO.getSenderId() == null || messageDTO.getSenderId().isBlank()) {
+            throw new IllegalArgumentException("senderId is required for editing message");
+        }
+
         Message message = messageRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
 
+        if (message.isDeleted()) {
+            throw new IllegalStateException("Cannot edit a deleted message");
+        }
+        if (!TYPE_TEXT.equalsIgnoreCase(message.getMessageType())) {
+            throw new IllegalArgumentException("Only text messages can be edited");
+        }
+        if (!messageDTO.getSenderId().equals(message.getSenderId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only sender can edit this message");
+        }
+
         Conversation conversation = conversationRepository.findById(message.getConversationId())
             .orElseThrow(() -> new RuntimeException("Conversation not found: " + message.getConversationId()));
+        ensureParticipant(conversation, messageDTO.getSenderId());
+
+        String nextContent = messageDTO.getContent() == null ? "" : messageDTO.getContent().trim();
+        if (nextContent.isBlank() && (messageDTO.getAttachments() == null || messageDTO.getAttachments().isEmpty())) {
+            throw new IllegalArgumentException("Edited message cannot be empty");
+        }
         
-        message.setContent(messageDTO.getContent());
+        message.setContent(nextContent);
         message.setAttachments(messageDTO.getAttachments());
         message.setMentionUserIds(resolveMentionUserIds(messageDTO, conversation));
         message.setEdited(true);
         message.setUpdatedAt(LocalDateTime.now());
         
         Message updated = messageRepository.save(message);
+        refreshConversationLastMessage(conversation);
+        emitConversationMetaUpdated(conversation);
         emitEventToConversationParticipants(
             conversation,
             "MESSAGE_EDITED",
@@ -598,6 +620,7 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
         if (conversation != null && conversation.getParticipantIds() != null) {
             refreshConversationLastMessage(conversation);
+            emitConversationMetaUpdated(conversation);
             Map<String, String> payload = new HashMap<>();
             payload.put("conversationId", message.getConversationId());
             payload.put("messageId", id);
@@ -823,6 +846,20 @@ public class MessageService {
         }
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
+    }
+
+    private void emitConversationMetaUpdated(Conversation conversation) {
+        if (conversation == null || conversation.getId() == null) {
+            return;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("conversationId", conversation.getId());
+        payload.put("lastMessagePreview", conversation.getLastMessagePreview());
+        payload.put(
+                "lastMessageAt",
+                conversation.getLastMessageAt() != null ? conversation.getLastMessageAt().toString() : null
+        );
+        emitEventToConversationParticipants(conversation, "CONVERSATION_META_UPDATED", payload, null);
     }
 
     private LocalDateTime parseCursor(String cursor) {
