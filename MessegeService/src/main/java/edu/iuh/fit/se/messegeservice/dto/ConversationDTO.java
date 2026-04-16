@@ -30,6 +30,8 @@ public class ConversationDTO {
     private Boolean onlyAdminsCanSend;
     private Boolean onlyAdminsCanAddMembers;
     private Boolean hiddenForCurrentUser;
+    private Boolean hiddenRequiresPin;
+    private LocalDateTime clearBeforeAt;
     private String lastMessagePreview;
     private LocalDateTime lastMessageAt;
     private LocalDateTime createdAt;

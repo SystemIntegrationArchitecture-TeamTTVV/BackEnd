@@ -3,6 +3,7 @@ package edu.iuh.fit.se.messegeservice.controller;
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
 import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.ConversationPinRequest;
+import edu.iuh.fit.se.messegeservice.dto.ConversationVisibilityRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupMemberUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.GroupRoleUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.LeaveGroupRequest;
@@ -66,6 +67,22 @@ public class ConversationController {
     @PostMapping("/{id}/unhide")
     public ResponseEntity<ConversationDTO> unhideConversation(@PathVariable String id, @RequestBody ConversationPinRequest request) {
         return ResponseEntity.ok(conversationService.unhideConversation(id, request));
+    }
+
+    @PostMapping("/{id}/clear-for-user")
+    public ResponseEntity<ConversationDTO> clearConversationForUser(
+            @PathVariable String id,
+            @RequestBody ConversationVisibilityRequest request
+    ) {
+        return ResponseEntity.ok(conversationService.clearConversationForUser(id, request.getUserId()));
+    }
+
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<ConversationDTO> restoreConversation(
+            @PathVariable String id,
+            @RequestBody ConversationVisibilityRequest request
+    ) {
+        return ResponseEntity.ok(conversationService.restoreConversation(id, request.getUserId()));
     }
 
     @PostMapping

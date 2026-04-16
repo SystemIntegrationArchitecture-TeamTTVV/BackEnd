@@ -67,9 +67,12 @@ public class ConversationService {
             return new ArrayList<>();
         }
 
-        Set<String> hiddenConversationIds = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId).stream()
-                .map(HiddenConversation::getConversationId)
-                .collect(Collectors.toSet());
+        List<HiddenConversation> hiddenRows = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId);
+        Set<String> hiddenConversationIds = hiddenRows.stream()
+            .map(HiddenConversation::getConversationId)
+            .collect(Collectors.toSet());
+        java.util.Map<String, HiddenConversation> hiddenByConversationId = hiddenRows.stream()
+            .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
 
         return conversationRepository
                 .findByParticipantIdsContainingAndIsGroupTrueAndGroupNameContainingIgnoreCaseOrderByLastMessageAtDesc(
@@ -79,7 +82,14 @@ public class ConversationService {
                 .stream()
                 .map(conversation -> {
                     ConversationDTO dto = toDTO(conversation);
-                    dto.setHiddenForCurrentUser(hiddenConversationIds.contains(conversation.getId()));
+                    HiddenConversation visibility = hiddenByConversationId.get(conversation.getId());
+                    if (visibility != null) {
+                        dto.setHiddenForCurrentUser(true);
+                        dto.setHiddenRequiresPin(visibility.isRequirePinUnlock());
+                        dto.setClearBeforeAt(visibility.getClearBeforeAt());
+                    } else {
+                        dto.setHiddenForCurrentUser(hiddenConversationIds.contains(conversation.getId()));
+                    }
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -105,6 +115,7 @@ public class ConversationService {
         hiddenConversation.setConversationId(conversationId);
         hiddenConversation.setHidden(true);
         hiddenConversation.setPinHash(PIN_ENCODER.encode(request.getPin().trim()));
+        hiddenConversation.setRequirePinUnlock(true);
         hiddenConversation.setLastAccessAt(LocalDateTime.now());
         if (hiddenConversation.getCreatedAt() == null) {
             hiddenConversation.setCreatedAt(LocalDateTime.now());
@@ -115,6 +126,8 @@ public class ConversationService {
 
         ConversationDTO dto = toDTO(conversation);
         dto.setHiddenForCurrentUser(true);
+        dto.setHiddenRequiresPin(true);
+        dto.setClearBeforeAt(hiddenConversation.getClearBeforeAt());
         return dto;
     }
 
@@ -134,17 +147,104 @@ public class ConversationService {
                 .findByUserIdAndConversationId(request.getUserId(), conversationId)
                 .orElseThrow(() -> new IllegalArgumentException("No hidden conversation found for this user"));
 
+        if (!hiddenConversation.isRequirePinUnlock()) {
+            throw new IllegalArgumentException("This conversation does not require PIN unlock");
+        }
+
         if (hiddenConversation.getPinHash() == null || !PIN_ENCODER.matches(request.getPin().trim(), hiddenConversation.getPinHash())) {
             throw new IllegalArgumentException("Invalid PIN");
         }
 
         hiddenConversation.setHidden(false);
+        hiddenConversation.setRequirePinUnlock(false);
         hiddenConversation.setLastAccessAt(LocalDateTime.now());
         hiddenConversation.setUpdatedAt(LocalDateTime.now());
         hiddenConversationRepository.save(hiddenConversation);
 
         ConversationDTO dto = toDTO(conversation);
         dto.setHiddenForCurrentUser(false);
+        dto.setHiddenRequiresPin(false);
+        dto.setClearBeforeAt(hiddenConversation.getClearBeforeAt());
+        return dto;
+    }
+
+    public ConversationDTO clearConversationForUser(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        ensureParticipant(conversation, userId);
+
+        HiddenConversation visibility = hiddenConversationRepository
+                .findByUserIdAndConversationId(userId, conversationId)
+                .orElseGet(HiddenConversation::new);
+
+        visibility.setUserId(userId);
+        visibility.setConversationId(conversationId);
+        visibility.setHidden(true);
+        visibility.setRequirePinUnlock(false);
+        visibility.setPinHash(null);
+        visibility.setClearBeforeAt(LocalDateTime.now());
+        visibility.setLastAccessAt(LocalDateTime.now());
+        if (visibility.getCreatedAt() == null) {
+            visibility.setCreatedAt(LocalDateTime.now());
+        }
+        visibility.setUpdatedAt(LocalDateTime.now());
+        hiddenConversationRepository.save(visibility);
+
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("conversationId", conversationId);
+        payload.put("clearBeforeAt", visibility.getClearBeforeAt() != null ? visibility.getClearBeforeAt().toString() : null);
+        socketEmitterService.emitToUserById(
+            userId,
+            SocketEventDTO.of("CONVERSATION_CLEARED", userId, payload)
+        );
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(true);
+        dto.setHiddenRequiresPin(false);
+        dto.setClearBeforeAt(visibility.getClearBeforeAt());
+        return dto;
+    }
+
+    public ConversationDTO restoreConversation(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        ensureParticipant(conversation, userId);
+
+        HiddenConversation visibility = hiddenConversationRepository
+                .findByUserIdAndConversationId(userId, conversationId)
+                .orElse(null);
+
+        if (visibility != null) {
+            if (visibility.isRequirePinUnlock()) {
+                throw new IllegalArgumentException("This conversation is PIN-locked. Use unhide with PIN.");
+            }
+            visibility.setHidden(false);
+            visibility.setLastAccessAt(LocalDateTime.now());
+            visibility.setUpdatedAt(LocalDateTime.now());
+            hiddenConversationRepository.save(visibility);
+
+            socketEmitterService.emitToUserById(
+                    userId,
+                    SocketEventDTO.of(
+                            "CONVERSATION_RESTORED",
+                            userId,
+                            java.util.Map.of("conversationId", conversationId)
+                    )
+            );
+        }
+
+        ConversationDTO dto = toDTO(conversation);
+        dto.setHiddenForCurrentUser(false);
+        dto.setHiddenRequiresPin(false);
+        dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
         return dto;
     }
 
@@ -165,7 +265,21 @@ public class ConversationService {
         List<Conversation> conversations = conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId1);
         for (Conversation conv : conversations) {
             if (!conv.isGroup() && conv.getParticipantIds().contains(userId1) && conv.getParticipantIds().contains(userId2)) {
-                return toDTO(conv);
+                HiddenConversation visibility = hiddenConversationRepository
+                        .findByUserIdAndConversationId(userId1, conv.getId())
+                        .orElse(null);
+                if (visibility != null && visibility.isHidden() && !visibility.isRequirePinUnlock()) {
+                    visibility.setHidden(false);
+                    visibility.setLastAccessAt(LocalDateTime.now());
+                    visibility.setUpdatedAt(LocalDateTime.now());
+                    hiddenConversationRepository.save(visibility);
+                }
+
+                ConversationDTO dto = toDTO(conv);
+                dto.setHiddenForCurrentUser(visibility != null && visibility.isHidden());
+                dto.setHiddenRequiresPin(visibility != null && visibility.isHidden() && visibility.isRequirePinUnlock());
+                dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
+                return dto;
             }
         }
         

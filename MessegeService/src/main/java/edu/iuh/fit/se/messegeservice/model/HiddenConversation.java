@@ -20,6 +20,12 @@ public class HiddenConversation {
     private String conversationId;
     private boolean hidden = true;
     private String pinHash;
+    private boolean requirePinUnlock = false;
+
+    /**
+     * Messages created at or before this timestamp are hidden for this user.
+     */
+    private LocalDateTime clearBeforeAt;
 
     private LocalDateTime lastAccessAt;
     private LocalDateTime createdAt;

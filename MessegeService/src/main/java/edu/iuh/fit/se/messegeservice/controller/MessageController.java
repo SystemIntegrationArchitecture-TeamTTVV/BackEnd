@@ -22,17 +22,21 @@ public class MessageController {
     private final MessageService messageService;
 
     @GetMapping("/conversation/{conversationId}")
-    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(@PathVariable String conversationId) {
-        return ResponseEntity.ok(messageService.getMessagesByConversationId(conversationId));
+    public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(
+            @PathVariable String conversationId,
+            @RequestParam(required = false) String userId
+    ) {
+        return ResponseEntity.ok(messageService.getMessagesByConversationId(conversationId, userId));
     }
 
     @GetMapping("/conversation/{conversationId}/cursor")
     public ResponseEntity<MessagePageDTO> getMessagesByCursor(
             @PathVariable String conversationId,
             @RequestParam(required = false) String before,
-            @RequestParam(required = false) Integer limit
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String userId
     ) {
-        return ResponseEntity.ok(messageService.getMessagesByConversationCursor(conversationId, before, limit));
+        return ResponseEntity.ok(messageService.getMessagesByConversationCursor(conversationId, before, limit, userId));
     }
 
     @GetMapping("/sender/{senderId}")
@@ -108,6 +112,14 @@ public class MessageController {
             @RequestParam String userId) {
         messageService.deleteMessage(id, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/delete-for-me")
+    public ResponseEntity<Void> deleteMessageForMe(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        messageService.deleteMessageForMe(id, userId);
+        return ResponseEntity.accepted().build();
     }
 
     @PostMapping("/{id}/pin")

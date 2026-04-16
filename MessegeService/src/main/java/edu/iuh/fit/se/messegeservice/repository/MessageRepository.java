@@ -13,11 +13,22 @@ public interface MessageRepository extends MongoRepository<Message, String> {
     List<Message> findByConversationIdOrderByCreatedAtAsc(String conversationId);
     List<Message> findBySenderIdOrderByCreatedAtDesc(String senderId);
     List<Message> findByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(String conversationId, Pageable pageable);
+        List<Message> findByConversationIdAndIsDeletedFalseAndCreatedAtAfterOrderByCreatedAtDesc(
+            String conversationId,
+            LocalDateTime after,
+            Pageable pageable
+        );
     List<Message> findByConversationIdAndIsDeletedFalseAndCreatedAtBeforeOrderByCreatedAtDesc(
             String conversationId,
             LocalDateTime before,
             Pageable pageable
     );
+        List<Message> findByConversationIdAndIsDeletedFalseAndCreatedAtAfterAndCreatedAtBeforeOrderByCreatedAtDesc(
+            String conversationId,
+            LocalDateTime after,
+            LocalDateTime before,
+            Pageable pageable
+        );
     List<Message> findByConversationIdAndIsDeletedFalseAndPinnedTrueOrderByCreatedAtDesc(String conversationId);
     List<Message> findByConversationIdAndIsDeletedFalseAndAttachmentsIsNotNullOrderByCreatedAtDesc(String conversationId);
     long countByConversationId(String conversationId);

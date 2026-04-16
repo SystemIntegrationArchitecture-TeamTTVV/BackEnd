@@ -4,9 +4,11 @@ import edu.iuh.fit.se.messegeservice.dto.MessageDTO;
 import edu.iuh.fit.se.messegeservice.dto.MessagePageDTO;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.model.Conversation;
+import edu.iuh.fit.se.messegeservice.model.HiddenConversation;
 import edu.iuh.fit.se.messegeservice.model.Message;
 import edu.iuh.fit.se.messegeservice.model.PollOption;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
+import edu.iuh.fit.se.messegeservice.repository.HiddenConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,11 +41,28 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
+    private final HiddenConversationRepository hiddenConversationRepository;
     private final SocketEmitterService socketEmitterService;
 
     public List<MessageDTO> getMessagesByConversationId(String conversationId) {
+        return getMessagesByConversationId(conversationId, null);
+    }
+
+    public List<MessageDTO> getMessagesByConversationId(String conversationId, String userId) {
+        LocalDateTime clearCutoff = null;
+        if (userId != null && !userId.isBlank()) {
+            Conversation conversation = conversationRepository.findById(conversationId)
+                    .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+            ensureParticipant(conversation, userId);
+            clearCutoff = resolveClearCutoff(conversationId, userId);
+        }
+        final LocalDateTime finalClearCutoff = clearCutoff;
+        final String finalUserId = userId;
+
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
                 .filter(msg -> !msg.isDeleted())
+                .filter(msg -> finalClearCutoff == null || (msg.getCreatedAt() != null && msg.getCreatedAt().isAfter(finalClearCutoff)))
+                .filter(msg -> !isHiddenForUser(msg, finalUserId))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -52,10 +71,15 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
+        LocalDateTime clearCutoff = resolveClearCutoff(conversationId, userId);
+        final LocalDateTime finalClearCutoff = clearCutoff;
+        final String finalUserId = userId;
 
         return messageRepository
                 .findByConversationIdAndIsDeletedFalseAndPinnedTrueOrderByCreatedAtDesc(conversationId)
                 .stream()
+            .filter(m -> finalClearCutoff == null || (m.getCreatedAt() != null && m.getCreatedAt().isAfter(finalClearCutoff)))
+            .filter(m -> !isHiddenForUser(m, finalUserId))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -64,12 +88,17 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
+        LocalDateTime clearCutoff = resolveClearCutoff(conversationId, userId);
+        final LocalDateTime finalClearCutoff = clearCutoff;
+        final String finalUserId = userId;
 
         String normalizedType = type == null ? "" : type.trim().toLowerCase(Locale.ROOT);
 
         return messageRepository
                 .findByConversationIdAndIsDeletedFalseAndAttachmentsIsNotNullOrderByCreatedAtDesc(conversationId)
                 .stream()
+                .filter(m -> finalClearCutoff == null || (m.getCreatedAt() != null && m.getCreatedAt().isAfter(finalClearCutoff)))
+                .filter(m -> !isHiddenForUser(m, finalUserId))
                 .filter(m -> m.getAttachments() != null && !m.getAttachments().isEmpty())
                 .filter(m -> normalizedType.isBlank() || m.getAttachments().stream().anyMatch(a -> {
                     if (a == null || a.getType() == null) {
@@ -82,25 +111,29 @@ public class MessageService {
     }
 
     public MessagePageDTO getMessagesByConversationCursor(String conversationId, String before, Integer limit) {
-        int pageSize = (limit == null || limit <= 0) ? 20 : Math.min(limit, 100);
-        Pageable pageable = PageRequest.of(0, pageSize);
+        return getMessagesByConversationCursor(conversationId, before, limit, null);
+    }
 
-        List<Message> batch;
-        if (before == null || before.isBlank()) {
-            batch = messageRepository.findByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(conversationId, pageable);
-        } else {
-            LocalDateTime beforeTime = parseCursor(before);
-            batch = messageRepository.findByConversationIdAndIsDeletedFalseAndCreatedAtBeforeOrderByCreatedAtDesc(
-                    conversationId,
-                    beforeTime,
-                    pageable
-            );
+    public MessagePageDTO getMessagesByConversationCursor(String conversationId, String before, Integer limit, String userId) {
+        int pageSize = (limit == null || limit <= 0) ? 20 : Math.min(limit, 100);
+        LocalDateTime clearCutoff = null;
+
+        if (userId != null && !userId.isBlank()) {
+            Conversation conversation = conversationRepository.findById(conversationId)
+                    .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+            ensureParticipant(conversation, userId);
+            clearCutoff = resolveClearCutoff(conversationId, userId);
+        }
+
+        List<Message> batch = collectCursorBatch(conversationId, before, clearCutoff, userId, pageSize);
+        boolean hasMore = batch.size() > pageSize;
+        if (hasMore) {
+            batch = new ArrayList<>(batch.subList(0, pageSize));
         }
 
         List<MessageDTO> payload = batch.stream().map(this::toDTO).collect(Collectors.toList());
         Collections.reverse(payload);
 
-        boolean hasMore = batch.size() >= pageSize;
         String nextCursor = null;
         if (!batch.isEmpty()) {
             Message oldest = batch.get(batch.size() - 1);
@@ -166,6 +199,7 @@ public class MessageService {
         message.setPollClosed(false);
         message.setMentionUserIds(resolveMentionUserIds(messageDTO, conversation));
         message.setSeenByUserIds(new ArrayList<>(List.of(messageDTO.getSenderId())));
+        message.setHiddenForUserIds(new ArrayList<>());
         applyReplySnapshotIfPresent(messageDTO, conversation, message);
         message.setCreatedAt(LocalDateTime.now());
         message.setUpdatedAt(LocalDateTime.now());
@@ -177,6 +211,7 @@ public class MessageService {
             message.getConversation() != null ? message.getConversation().getId() : "null");
         
         Message saved = messageRepository.save(message);
+        unhideSoftDeletedConversationForParticipants(conversation);
         
         log.info("✅ After save - id: {}, conversationId: {}, conversation: {}", 
             saved.getId(),
@@ -366,12 +401,14 @@ public class MessageService {
                         .collect(Collectors.toList())
         );
         poll.setSeenByUserIds(new ArrayList<>(List.of(userId)));
+        poll.setHiddenForUserIds(new ArrayList<>());
         poll.setDeleted(false);
         poll.setEdited(false);
         poll.setCreatedAt(LocalDateTime.now());
         poll.setUpdatedAt(LocalDateTime.now());
 
         Message saved = messageRepository.save(poll);
+        unhideSoftDeletedConversationForParticipants(conversation);
 
         conversation.setLastMessagePreview(buildLastMessagePreview(saved));
         conversation.setLastMessageAt(LocalDateTime.now());
@@ -495,7 +532,7 @@ public class MessageService {
         if (target == null) {
             for (int i = all.size() - 1; i >= 0; i--) {
                 Message m = all.get(i);
-                if (!m.isDeleted() && !userId.equals(m.getSenderId())) {
+                if (!m.isDeleted() && !userId.equals(m.getSenderId()) && !isHiddenForUser(m, userId)) {
                     target = m;
                     break;
                 }
@@ -509,6 +546,9 @@ public class MessageService {
         List<Message> changed = new ArrayList<>();
         for (Message m : all) {
             if (m.isDeleted()) {
+                continue;
+            }
+            if (isHiddenForUser(m, userId)) {
                 continue;
             }
             if (userId.equals(m.getSenderId())) {
@@ -552,10 +592,12 @@ public class MessageService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the sender can delete this message");
         }
         message.setDeleted(true);
+        message.setUpdatedAt(LocalDateTime.now());
         messageRepository.save(message);
 
         Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
         if (conversation != null && conversation.getParticipantIds() != null) {
+            refreshConversationLastMessage(conversation);
             Map<String, String> payload = new HashMap<>();
             payload.put("conversationId", message.getConversationId());
             payload.put("messageId", id);
@@ -569,6 +611,37 @@ public class MessageService {
                 }
             }
         }
+    }
+
+    public void deleteMessageForMe(String id, String requesterId) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        Message message = messageRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new RuntimeException("Conversation not found: " + message.getConversationId()));
+        ensureParticipant(conversation, requesterId);
+
+        List<String> hiddenForUserIds = message.getHiddenForUserIds();
+        if (hiddenForUserIds == null) {
+            hiddenForUserIds = new ArrayList<>();
+        }
+        if (!hiddenForUserIds.contains(requesterId)) {
+            hiddenForUserIds.add(requesterId);
+            message.setHiddenForUserIds(hiddenForUserIds);
+            message.setUpdatedAt(LocalDateTime.now());
+            messageRepository.save(message);
+        }
+
+        Map<String, String> payload = new HashMap<>();
+        payload.put("conversationId", message.getConversationId());
+        payload.put("messageId", id);
+        socketEmitterService.emitToUserById(
+                requesterId,
+                SocketEventDTO.of("MESSAGE_DELETED_FOR_ME", requesterId, payload)
+        );
     }
 
     public MessageDTO createSystemMessage(String conversationId, String actorUserId, String action, String content) {
@@ -640,6 +713,116 @@ public class MessageService {
             return "↩ " + (p != null ? p : "");
         }
         return "";
+    }
+
+    private List<Message> collectCursorBatch(
+            String conversationId,
+            String before,
+            LocalDateTime clearCutoff,
+            String userId,
+            int pageSize
+    ) {
+        final int fetchSize = Math.min(Math.max(pageSize * 3, pageSize + 1), 100);
+        LocalDateTime cursor = (before == null || before.isBlank()) ? null : parseCursor(before);
+        List<Message> collected = new ArrayList<>();
+
+        for (int i = 0; i < 10 && collected.size() <= pageSize; i++) {
+            List<Message> rawBatch = fetchRawCursorBatch(conversationId, cursor, clearCutoff, fetchSize);
+            if (rawBatch.isEmpty()) {
+                break;
+            }
+
+            for (Message m : rawBatch) {
+                if (userId != null && !userId.isBlank() && isHiddenForUser(m, userId)) {
+                    continue;
+                }
+                collected.add(m);
+                if (collected.size() > pageSize) {
+                    break;
+                }
+            }
+
+            if (rawBatch.size() < fetchSize) {
+                break;
+            }
+
+            Message oldest = rawBatch.get(rawBatch.size() - 1);
+            if (oldest.getCreatedAt() == null) {
+                break;
+            }
+            cursor = oldest.getCreatedAt();
+        }
+
+        return collected;
+    }
+
+    private List<Message> fetchRawCursorBatch(
+            String conversationId,
+            LocalDateTime before,
+            LocalDateTime clearCutoff,
+            int fetchSize
+    ) {
+        Pageable pageable = PageRequest.of(0, fetchSize);
+
+        if (before == null) {
+            if (clearCutoff == null) {
+                return messageRepository.findByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(conversationId, pageable);
+            }
+            return messageRepository.findByConversationIdAndIsDeletedFalseAndCreatedAtAfterOrderByCreatedAtDesc(
+                    conversationId,
+                    clearCutoff,
+                    pageable
+            );
+        }
+
+        if (clearCutoff == null) {
+            return messageRepository.findByConversationIdAndIsDeletedFalseAndCreatedAtBeforeOrderByCreatedAtDesc(
+                    conversationId,
+                    before,
+                    pageable
+            );
+        }
+
+        return messageRepository.findByConversationIdAndIsDeletedFalseAndCreatedAtAfterAndCreatedAtBeforeOrderByCreatedAtDesc(
+                conversationId,
+                clearCutoff,
+                before,
+                pageable
+        );
+    }
+
+    private boolean isHiddenForUser(Message message, String userId) {
+        if (userId == null || userId.isBlank()) {
+            return false;
+        }
+        List<String> hiddenForUserIds = message.getHiddenForUserIds();
+        return hiddenForUserIds != null && hiddenForUserIds.contains(userId);
+    }
+
+    private void refreshConversationLastMessage(Conversation conversation) {
+        if (conversation == null || conversation.getId() == null) {
+            return;
+        }
+
+        List<Message> all = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
+        Message latest = null;
+        for (int i = all.size() - 1; i >= 0; i--) {
+            Message candidate = all.get(i);
+            if (!candidate.isDeleted()) {
+                latest = candidate;
+                break;
+            }
+        }
+
+        if (latest != null) {
+            conversation.setLastMessagePreview(buildLastMessagePreview(latest));
+            conversation.setLastMessageAt(latest.getCreatedAt());
+        } else {
+            conversation.setLastMessagePreview("");
+            conversation.setLastMessageAt(null);
+        }
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
     }
 
     private LocalDateTime parseCursor(String cursor) {
@@ -774,12 +957,14 @@ public class MessageService {
         systemMessage.setSystemAction(action);
         systemMessage.setContent(content);
         systemMessage.setSeenByUserIds(actorUserId == null ? new ArrayList<>() : new ArrayList<>(List.of(actorUserId)));
+        systemMessage.setHiddenForUserIds(new ArrayList<>());
         systemMessage.setDeleted(false);
         systemMessage.setEdited(false);
         systemMessage.setCreatedAt(LocalDateTime.now());
         systemMessage.setUpdatedAt(LocalDateTime.now());
 
         Message savedSystemMessage = messageRepository.save(systemMessage);
+        unhideSoftDeletedConversationForParticipants(conversation);
 
         conversation.setLastMessagePreview(buildLastMessagePreview(savedSystemMessage));
         conversation.setLastMessageAt(LocalDateTime.now());
@@ -789,6 +974,32 @@ public class MessageService {
         emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage), null);
 
         return savedSystemMessage;
+    }
+
+    private LocalDateTime resolveClearCutoff(String conversationId, String userId) {
+        return hiddenConversationRepository
+                .findByUserIdAndConversationId(userId, conversationId)
+                .map(HiddenConversation::getClearBeforeAt)
+                .orElse(null);
+    }
+
+    private void unhideSoftDeletedConversationForParticipants(Conversation conversation) {
+        if (conversation == null || conversation.getId() == null) {
+            return;
+        }
+        List<HiddenConversation> rows = hiddenConversationRepository
+                .findByConversationIdAndHiddenTrueAndRequirePinUnlockFalse(conversation.getId());
+        if (rows.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        for (HiddenConversation row : rows) {
+            row.setHidden(false);
+            row.setLastAccessAt(now);
+            row.setUpdatedAt(now);
+        }
+        hiddenConversationRepository.saveAll(rows);
     }
 
     private List<String> resolveMentionUserIds(MessageDTO dto, Conversation conversation) {
