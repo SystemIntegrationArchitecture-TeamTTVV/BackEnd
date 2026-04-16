@@ -90,4 +90,17 @@ public class SocketEmitterService {
             log.error("❌ Failed to emit socket event to topic {}: {}", topic, e.getMessage());
         }
     }
+
+    /**
+     * Emit socket event to a conversation room channel.
+     */
+    public void emitToRoom(String roomId, SocketEventDTO event) {
+        try {
+            log.info("🚀 Emitting {} event to room {}", event.getType(), roomId);
+            commonServiceClientFacade.emitToRoom(roomId, event);
+            log.info("✅ Socket event emitted successfully to room {}", roomId);
+        } catch (Exception e) {
+            log.error("❌ Failed to emit socket event to room {}: {}", roomId, e.getMessage());
+        }
+    }
 }

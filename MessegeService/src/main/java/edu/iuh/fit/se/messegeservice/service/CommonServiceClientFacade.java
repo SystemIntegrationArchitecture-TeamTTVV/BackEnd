@@ -82,5 +82,19 @@ public class CommonServiceClientFacade {
         log.warn("⚠️ [CommonServiceClient] Failed to emitToTopic({}) due to {}. Event type: {}",
                 topic, throwable.getMessage(), event != null ? event.getType() : "null");
     }
+
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToRoomFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "emitToRoomFallback")
+    @Retry(name = "commonService", fallbackMethod = "emitToRoomFallback")
+    @CircuitBreaker(name = "commonService", fallbackMethod = "emitToRoomFallback")
+    public void emitToRoom(String roomId, SocketEventDTO event) {
+        commonServiceClient.emitToRoom(roomId, event);
+    }
+
+    @SuppressWarnings("unused")
+    private void emitToRoomFallback(String roomId, SocketEventDTO event, Throwable throwable) {
+        log.warn("⚠️ [CommonServiceClient] Failed to emitToRoom({}) due to {}. Event type: {}",
+                roomId, throwable.getMessage(), event != null ? event.getType() : "null");
+    }
 }
 

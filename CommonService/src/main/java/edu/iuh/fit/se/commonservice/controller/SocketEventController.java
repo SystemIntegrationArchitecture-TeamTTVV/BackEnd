@@ -70,6 +70,20 @@ public class SocketEventController {
     }
 
     /**
+     * Emit socket event to a conversation room channel.
+     * POST /api/socket/emit/room/{roomId}
+     */
+    @PostMapping("/emit/room/{roomId}")
+    public ResponseEntity<Void> emitToRoom(
+            @PathVariable String roomId,
+            @RequestBody SocketEventDTO event
+    ) {
+        log.info("📨 Received request to emit {} event to room: {}", event.getType(), roomId);
+        socketService.sendToRoom(roomId, event);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
      * Health check endpoint
      * GET /api/socket/health
      */

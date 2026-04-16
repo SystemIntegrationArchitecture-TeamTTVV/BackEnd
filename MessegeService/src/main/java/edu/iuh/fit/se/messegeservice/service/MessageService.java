@@ -746,6 +746,9 @@ public class MessageService {
             return;
         }
 
+        SocketEventDTO roomEvent = SocketEventDTO.of("MESSAGE_RECEIVED", null, messageDTO);
+        socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
+
         for (String participantId : conversation.getParticipantIds()) {
             if (excludeUserId != null && excludeUserId.equals(participantId)) {
                 continue;
@@ -753,7 +756,7 @@ public class MessageService {
             try {
                 socketEmitterService.emitToUserById(
                         participantId,
-                        SocketEventDTO.messageReceived(participantId, messageDTO)
+                        cloneForRecipient(roomEvent, participantId)
                 );
             } catch (Exception e) {
                 log.warn("Failed to emit MESSAGE_RECEIVED to {}: {}", participantId, e.getMessage());
@@ -840,16 +843,29 @@ public class MessageService {
             return;
         }
 
+        SocketEventDTO roomEvent = SocketEventDTO.of(type, null, payload);
+        socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
+
         for (String participantId : conversation.getParticipantIds()) {
             if (excludeUserId != null && excludeUserId.equals(participantId)) {
                 continue;
             }
             try {
-                socketEmitterService.emitToUserById(participantId, SocketEventDTO.of(type, participantId, payload));
+                socketEmitterService.emitToUserById(participantId, cloneForRecipient(roomEvent, participantId));
             } catch (Exception e) {
                 log.warn("Failed to emit {} to {}: {}", type, participantId, e.getMessage());
             }
         }
+    }
+
+    private SocketEventDTO cloneForRecipient(SocketEventDTO source, String recipientUserId) {
+        SocketEventDTO cloned = new SocketEventDTO();
+        cloned.setEventId(source.getEventId());
+        cloned.setType(source.getType());
+        cloned.setUserId(recipientUserId);
+        cloned.setData(source.getData());
+        cloned.setTimestamp(source.getTimestamp());
+        return cloned;
     }
 }
 

@@ -27,5 +27,8 @@ public interface CommonServiceClient {
 
     @PostMapping("/api/socket/emit/topic/{topic}")
     void emitToTopic(@PathVariable("topic") String topic, @RequestBody SocketEventDTO event);
+
+    @PostMapping("/api/socket/emit/room/{roomId}")
+    void emitToRoom(@PathVariable("roomId") String roomId, @RequestBody SocketEventDTO event);
 }
 
