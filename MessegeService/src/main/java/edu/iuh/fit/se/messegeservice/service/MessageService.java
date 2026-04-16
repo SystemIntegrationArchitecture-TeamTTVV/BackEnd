@@ -12,12 +12,14 @@ import edu.iuh.fit.se.messegeservice.repository.HiddenConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -38,11 +40,15 @@ public class MessageService {
     private static final String TYPE_TEXT = "TEXT";
     private static final String TYPE_SYSTEM = "SYSTEM";
     private static final String TYPE_POLL = "POLL";
+    private static final long DEFAULT_RECALL_WINDOW_SECONDS = 120L;
 
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final HiddenConversationRepository hiddenConversationRepository;
     private final SocketEmitterService socketEmitterService;
+
+    @Value("${chat.message.recall-window-seconds:120}")
+    private long recallWindowSeconds;
 
     public List<MessageDTO> getMessagesByConversationId(String conversationId) {
         return getMessagesByConversationId(conversationId, null);
@@ -613,6 +619,7 @@ public class MessageService {
         if (!message.getSenderId().equals(requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the sender can delete this message");
         }
+        ensureWithinRecallWindow(message);
         message.setDeleted(true);
         message.setUpdatedAt(LocalDateTime.now());
         messageRepository.save(message);
@@ -846,6 +853,24 @@ public class MessageService {
         }
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
+    }
+
+    private void ensureWithinRecallWindow(Message message) {
+        if (message == null || message.getCreatedAt() == null) {
+            return;
+        }
+
+        long elapsedSeconds = Duration.between(message.getCreatedAt(), LocalDateTime.now()).getSeconds();
+        if (elapsedSeconds > getEffectiveRecallWindowSeconds()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Recall window expired. You can recall a message within " + getEffectiveRecallWindowSeconds() + " seconds."
+            );
+        }
+    }
+
+    private long getEffectiveRecallWindowSeconds() {
+        return recallWindowSeconds > 0 ? recallWindowSeconds : DEFAULT_RECALL_WINDOW_SECONDS;
     }
 
     private void emitConversationMetaUpdated(Conversation conversation) {
