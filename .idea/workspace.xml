@@ -6,10 +6,17 @@
   <component name="ChangeListManager">
     <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/WebSocketConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/WebSocketConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/ApiExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/ApiExceptionHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/FriendController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/FriendController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/dto/SocketEventDTO.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/dto/SocketEventDTO.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/FriendService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/FriendService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/PresenceService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/PresenceService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/SocketService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/SocketService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/MessegeServiceApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/MessegeServiceApplication.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/ConversationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/ConversationController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/MessageController.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/MessageController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationDTO.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationDTO.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationMetaUpdateRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/ConversationMetaUpdateRequest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/MessageDTO.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/MessageDTO.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/SocketEventDTO.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/dto/SocketEventDTO.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/Conversation.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/model/Conversation.java" afterDir="false" />
@@ -84,33 +91,33 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Maven.CommonService [clean].executor": "Run",
-    "Maven.CommonService [compile].executor": "Run",
-    "RequestMappingsPanelOrder0": "0",
-    "RequestMappingsPanelOrder1": "1",
-    "RequestMappingsPanelWidth0": "75",
-    "RequestMappingsPanelWidth1": "75",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "Spring Boot.ApiGatewayApplication.executor": "Run",
-    "Spring Boot.CommonServiceApplication.executor": "Run",
-    "Spring Boot.EurekaServerApplication.executor": "Run",
-    "Spring Boot.MessegeServiceApplication.executor": "Run",
-    "git-widget-placeholder": "22637901-thach",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "E:/hk2nam4/KIenTruc/BE",
-    "node.js.detected.package.eslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "run.configurations.included.in.services": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Maven.CommonService [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CommonService [compile].executor&quot;: &quot;Run&quot;,
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;Spring Boot.ApiGatewayApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Spring Boot.CommonServiceApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Spring Boot.EurekaServerApplication.executor&quot;: &quot;Run&quot;,
+    &quot;Spring Boot.MessegeServiceApplication.executor&quot;: &quot;Run&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;22637901-thach&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/hk2nam4/KIenTruc/BE&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.configurations.included.in.services&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunDashboard">
     <option name="configurationTypes">
       <set>
@@ -193,7 +200,9 @@
       <workItem from="1775300296617" duration="1468000" />
       <workItem from="1775439644498" duration="156000" />
       <workItem from="1775448557454" duration="3310000" />
-      <workItem from="1776293918268" duration="1883000" />
+      <workItem from="1776293918268" duration="3072000" />
+      <workItem from="1776665561556" duration="2000" />
+      <workItem from="1776775495021" duration="3058000" />
     </task>
     <servers />
   </component>

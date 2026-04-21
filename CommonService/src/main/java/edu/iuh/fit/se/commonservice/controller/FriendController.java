@@ -41,5 +41,10 @@ public class FriendController {
     public ResponseEntity<List<FriendDTO>> getMutualFriends(@RequestParam String userId1, @RequestParam String userId2) {
         return ResponseEntity.ok(friendService.getMutualFriends(userId1, userId2));
     }
+
+    @GetMapping("/status")
+    public ResponseEntity<String> getFriendStatus(@RequestParam String userId, @RequestParam String friendId) {
+        return ResponseEntity.ok(friendService.getFriendStatus(userId, friendId));
+    }
 }
 

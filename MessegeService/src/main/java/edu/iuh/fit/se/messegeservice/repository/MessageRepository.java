@@ -31,6 +31,7 @@ public interface MessageRepository extends MongoRepository<Message, String> {
         );
     List<Message> findByConversationIdAndIsDeletedFalseAndPinnedTrueOrderByCreatedAtDesc(String conversationId);
     List<Message> findByConversationIdAndIsDeletedFalseAndAttachmentsIsNotNullOrderByCreatedAtDesc(String conversationId);
+    List<Message> findByConversationIdAndContentRegexAndIsDeletedFalseOrderByCreatedAtDesc(String conversationId, String regex);
     long countByConversationId(String conversationId);
 }
 

@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 public class FriendService {
 
     private final FriendRepository friendRepository;
+    private final edu.iuh.fit.se.commonservice.repository.FriendRequestRepository friendRequestRepository;
     private final UserRepository userRepository;
 
     public List<FriendDTO> getFriendsByUserId(String userId) {
@@ -56,6 +57,19 @@ public class FriendService {
     public boolean checkIfFriends(String userId, String friendId) {
         return friendRepository.existsByUserIdAndFriendId(userId, friendId) ||
                friendRepository.existsByUserIdAndFriendId(friendId, userId);
+    }
+
+    public String getFriendStatus(String userId, String targetUserId) {
+        if (checkIfFriends(userId, targetUserId)) {
+            return "ACCEPTED";
+        }
+        if (friendRequestRepository.existsBySenderIdAndReceiverIdAndStatus(userId, targetUserId, "PENDING")) {
+            return "REQUEST_SENT";
+        }
+        if (friendRequestRepository.existsBySenderIdAndReceiverIdAndStatus(targetUserId, userId, "PENDING")) {
+            return "REQUEST_RECEIVED";
+        }
+        return "NONE";
     }
 
     public List<FriendDTO> getMutualFriends(String userId1, String userId2) {

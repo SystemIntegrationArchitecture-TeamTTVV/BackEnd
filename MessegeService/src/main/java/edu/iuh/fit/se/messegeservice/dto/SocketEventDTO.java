@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.messegeservice.dto;
 
+import edu.iuh.fit.se.messegeservice.config.socket.SocketEventTypes;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,7 +31,7 @@ public class SocketEventDTO {
     public static SocketEventDTO messageReceived(String userId, Object messageData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("MESSAGE_RECEIVED");
+        event.setType(SocketEventTypes.MESSAGE_RECEIVED);
         event.setUserId(userId);
         event.setData(messageData);
         event.setTimestamp(LocalDateTime.now());
@@ -46,7 +47,7 @@ public class SocketEventDTO {
     public static SocketEventDTO messageSent(String userId, Object messageData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("MESSAGE_SENT");
+        event.setType(SocketEventTypes.MESSAGE_SENT);
         event.setUserId(userId);
         event.setData(messageData);
         event.setTimestamp(LocalDateTime.now());
@@ -62,7 +63,7 @@ public class SocketEventDTO {
     public static SocketEventDTO typing(String userId, String conversationId) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("TYPING");
+        event.setType(SocketEventTypes.TYPING);
         event.setUserId(userId);
         event.setData(conversationId);
         event.setTimestamp(LocalDateTime.now());
@@ -75,7 +76,7 @@ public class SocketEventDTO {
     public static SocketEventDTO messageDeleted(String recipientUserId, Object data) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("MESSAGE_DELETED");
+        event.setType(SocketEventTypes.MESSAGE_DELETED);
         event.setUserId(recipientUserId);
         event.setData(data);
         event.setTimestamp(LocalDateTime.now());

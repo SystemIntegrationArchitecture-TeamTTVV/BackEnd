@@ -1,5 +1,7 @@
 package edu.iuh.fit.se.messegeservice.service;
 
+import edu.iuh.fit.se.messegeservice.exception.ResourceNotFoundException;
+import edu.iuh.fit.se.messegeservice.config.socket.SocketEventTypes;
 import edu.iuh.fit.se.messegeservice.dto.ConversationDTO;
 import edu.iuh.fit.se.messegeservice.dto.ConversationMetaUpdateRequest;
 import edu.iuh.fit.se.messegeservice.dto.ConversationPinRequest;
@@ -30,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -120,7 +123,7 @@ public class ConversationService {
 
     public ConversationDTO hideConversation(String conversationId, ConversationPinRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (request.getUserId() == null || request.getUserId().isBlank()) {
             throw new IllegalArgumentException("userId is required");
@@ -156,7 +159,7 @@ public class ConversationService {
 
     public ConversationDTO unhideConversation(String conversationId, ConversationPinRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (request.getUserId() == null || request.getUserId().isBlank()) {
             throw new IllegalArgumentException("userId is required");
@@ -193,7 +196,7 @@ public class ConversationService {
 
     public ConversationDTO clearConversationForUser(String conversationId, String userId) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("userId is required");
@@ -222,7 +225,7 @@ public class ConversationService {
         payload.put("clearBeforeAt", visibility.getClearBeforeAt() != null ? visibility.getClearBeforeAt().toString() : null);
         socketEmitterService.emitToUserById(
             userId,
-            SocketEventDTO.of("CONVERSATION_CLEARED", userId, payload)
+            SocketEventDTO.of(SocketEventTypes.CONVERSATION_CLEARED, userId, payload)
         );
 
         ConversationDTO dto = toDTO(conversation);
@@ -234,7 +237,7 @@ public class ConversationService {
 
     public ConversationDTO restoreConversation(String conversationId, String userId) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("userId is required");
@@ -257,7 +260,7 @@ public class ConversationService {
             socketEmitterService.emitToUserById(
                     userId,
                     SocketEventDTO.of(
-                            "CONVERSATION_RESTORED",
+                            SocketEventTypes.CONVERSATION_RESTORED,
                             userId,
                             java.util.Map.of("conversationId", conversationId)
                     )
@@ -317,7 +320,7 @@ public class ConversationService {
     public ConversationDTO getConversationById(String id) {
         return conversationRepository.findById(id)
                 .map(this::toDTO)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
     }
 
     public ConversationDTO createConversation(ConversationDTO conversationDTO) {
@@ -352,7 +355,7 @@ public class ConversationService {
 
     public ConversationDTO updateConversation(String id, ConversationDTO conversationDTO) {
         Conversation conversation = conversationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
         
         conversation.setGroupName(conversationDTO.getGroupName());
         conversation.setGroupAvatar(conversationDTO.getGroupAvatar());
@@ -366,7 +369,7 @@ public class ConversationService {
 
     public ConversationDTO updateConversationMeta(String conversationId, ConversationMetaUpdateRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         String oldGroupName = conversation.getGroupName();
         boolean oldApprovalsRequired = conversation.isApprovalsRequired();
@@ -414,26 +417,26 @@ public class ConversationService {
                 if (request.getGroupName() != null
                     && saved.getGroupName() != null
                     && !saved.getGroupName().equals(oldGroupName)) {
-                emitGroupSystemEvent(saved, request.getRequesterId(), "GROUP_RENAMED",
+                emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.GROUP_RENAMED,
                         actor + " da doi ten nhom thanh \"" + saved.getGroupName() + "\"");
             }
 
             if (oldApprovalsRequired != saved.isApprovalsRequired()) {
-                emitGroupSystemEvent(saved, request.getRequesterId(), "JOIN_APPROVALS_UPDATED",
+                emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.JOIN_APPROVALS_UPDATED,
                         actor + (saved.isApprovalsRequired()
                                 ? " da bat duyet thanh vien moi"
                                 : " da tat duyet thanh vien moi"));
             }
 
             if (oldOnlyAdminsCanSend != saved.isOnlyAdminsCanSend()) {
-                emitGroupSystemEvent(saved, request.getRequesterId(), "SEND_PERMISSION_UPDATED",
+                emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.SEND_PERMISSION_UPDATED,
                         actor + (saved.isOnlyAdminsCanSend()
                                 ? " da bat che do chi admin duoc gui tin"
                                 : " da tat che do chi admin duoc gui tin"));
             }
 
             if (oldOnlyAdminsCanAddMembers != saved.isOnlyAdminsCanAddMembers()) {
-                emitGroupSystemEvent(saved, request.getRequesterId(), "ADD_MEMBER_PERMISSION_UPDATED",
+                emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.ADD_MEMBER_PERMISSION_UPDATED,
                         actor + (saved.isOnlyAdminsCanAddMembers()
                                 ? " da bat che do chi admin duoc them thanh vien"
                                 : " da tat che do chi admin duoc them thanh vien"));
@@ -445,7 +448,7 @@ public class ConversationService {
 
     public ConversationDTO leaveGroup(String conversationId, LeaveGroupRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot leave a direct conversation using this endpoint");
@@ -480,7 +483,7 @@ public class ConversationService {
             }
 
             String newOwnerName = resolveUserDisplayName(newOwnerId);
-            emitGroupSystemEvent(conversation, request.getRequesterId(), "OWNER_TRANSFERRED",
+            emitGroupSystemEvent(conversation, request.getRequesterId(), SocketEventTypes.OWNER_TRANSFERRED,
                     actorName + " da chuyen quyen chu nhom cho " + newOwnerName);
         }
 
@@ -498,14 +501,14 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
 
-        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBER_LEFT", actorName + " da roi nhom");
+        emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.MEMBER_LEFT, actorName + " da roi nhom");
 
         return toDTO(saved);
     }
 
     public ConversationDTO requestToJoin(String conversationId, String requesterId) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Join requests are only supported for group conversations");
@@ -534,7 +537,7 @@ public class ConversationService {
         // Emit realtime notification to owner & admins
         try {
             SocketEventDTO event = new SocketEventDTO();
-            event.setType("JOIN_REQUEST_CREATED");
+            event.setType(SocketEventTypes.JOIN_REQUEST_CREATED);
             event.setUserId(requesterId);
             java.util.Map<String, Object> payload = new java.util.HashMap<>();
             payload.put("conversationId", saved.getId());
@@ -561,7 +564,7 @@ public class ConversationService {
 
     public List<String> getPendingJoinRequests(String conversationId, String requesterId) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Join requests are only supported for group conversations");
@@ -573,7 +576,7 @@ public class ConversationService {
 
     public ConversationDTO handleJoinRequest(String conversationId, JoinRequestUpdateRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Join requests are only supported for group conversations");
@@ -606,13 +609,13 @@ public class ConversationService {
 
         if (request.isApproved()) {
             String joinerName = resolveUserDisplayName(request.getRequesterId());
-            emitGroupSystemEvent(saved, request.getApproverId(), "JOIN_REQUEST_APPROVED", joinerName + " da tham gia nhom");
+            emitGroupSystemEvent(saved, request.getApproverId(), SocketEventTypes.JOIN_REQUEST_APPROVED, joinerName + " da tham gia nhom");
         }
 
         // Notify requester about decision
         try {
             SocketEventDTO event = new SocketEventDTO();
-            event.setType("JOIN_REQUEST_UPDATED");
+            event.setType(SocketEventTypes.JOIN_REQUEST_UPDATED);
             event.setUserId(request.getRequesterId());
             java.util.Map<String, Object> payload = new java.util.HashMap<>();
             payload.put("conversationId", saved.getId());
@@ -631,7 +634,7 @@ public class ConversationService {
 
     public void deleteConversation(String id, String requesterId) {
         Conversation conversation = conversationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
 
         // For groups: only owner can delete. requesterId is required.
         if (conversation.isGroup()) {
@@ -656,7 +659,7 @@ public class ConversationService {
 
     public ConversationDTO addMembers(String conversationId, GroupMemberUpdateRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot add members to a direct conversation");
@@ -685,7 +688,7 @@ public class ConversationService {
 
         String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
         List<String> addedNames = newMembers.stream().map(this::resolveUserDisplayName).toList();
-        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBERS_ADDED",
+        emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.MEMBERS_ADDED,
             actorName + " da them " + String.join(", ", addedNames) + " vao nhom");
 
         return toDTO(saved);
@@ -693,7 +696,7 @@ public class ConversationService {
 
     public ConversationDTO removeMember(String conversationId, RemoveMemberRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot remove members from a direct conversation");
@@ -742,7 +745,7 @@ public class ConversationService {
 
         String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
         String removedName = resolveUserDisplayName(request.getParticipantId());
-        emitGroupSystemEvent(saved, request.getRequesterId(), "MEMBER_REMOVED",
+        emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.MEMBER_REMOVED,
             actorName + " da xoa " + removedName + " khoi nhom");
 
         return toDTO(saved);
@@ -750,7 +753,7 @@ public class ConversationService {
 
     public ConversationDTO updateGroupRoles(String conversationId, GroupRoleUpdateRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found with id: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 
         String oldOwnerId = conversation.getOwnerId();
         Set<String> oldAdmins = sanitizeIds(conversation.getAdminIds());
@@ -787,7 +790,7 @@ public class ConversationService {
 
         String actorName = getParticipantDisplayName(conversation, request.getRequesterId());
         if (oldOwnerId != null && !oldOwnerId.equals(saved.getOwnerId())) {
-            emitGroupSystemEvent(saved, request.getRequesterId(), "OWNER_TRANSFERRED",
+            emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.OWNER_TRANSFERRED,
                     actorName + " da chuyen quyen chu nhom cho " + resolveUserDisplayName(saved.getOwnerId()));
         }
 
@@ -795,14 +798,14 @@ public class ConversationService {
         Set<String> promoted = new HashSet<>(newAdmins);
         promoted.removeAll(oldAdmins);
         if (!promoted.isEmpty()) {
-            emitGroupSystemEvent(saved, request.getRequesterId(), "ADMINS_UPDATED",
+            emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.ADMINS_UPDATED,
                     actorName + " da bo nhiem admin: " + promoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
         }
 
         Set<String> demoted = new HashSet<>(oldAdmins);
         demoted.removeAll(newAdmins);
         if (!demoted.isEmpty()) {
-            emitGroupSystemEvent(saved, request.getRequesterId(), "ADMINS_UPDATED",
+            emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.ADMINS_UPDATED,
                     actorName + " da go admin: " + demoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
         }
 
@@ -865,6 +868,183 @@ public class ConversationService {
         if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(requesterId)) {
             throw new IllegalArgumentException("Requester is not a participant of this conversation");
         }
+    }
+
+    // ── Phase A Methods ─────────────────────────────────────────────────────
+
+    private Conversation getConversationEntity(String conversationId) {
+        return conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new edu.iuh.fit.se.messegeservice.exception.ResourceNotFoundException("Conversation not found"));
+    }
+
+    public ConversationDTO toggleMute(String conversationId, String userId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, userId);
+
+        List<String> muted = conversation.getMutedByUserIds();
+        if (muted == null) {
+            muted = new ArrayList<>();
+        }
+        if (muted.contains(userId)) {
+            muted.remove(userId);
+        } else {
+            muted.add(userId);
+        }
+        conversation.setMutedByUserIds(muted);
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO togglePin(String conversationId, String userId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, userId);
+
+        List<String> pinned = conversation.getPinnedByUserIds();
+        if (pinned == null) {
+            pinned = new ArrayList<>();
+        }
+        if (pinned.contains(userId)) {
+            pinned.remove(userId);
+        } else {
+            pinned.add(userId);
+        }
+        conversation.setPinnedByUserIds(pinned);
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO toggleBan(String conversationId, String requesterId, String targetUserId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureManager(conversation, requesterId);
+
+        if (targetUserId == null || targetUserId.isBlank()) {
+            throw new IllegalArgumentException("targetUserId is required");
+        }
+
+        List<String> banned = conversation.getBannedUserIds();
+        if (banned == null) {
+            banned = new ArrayList<>();
+        }
+
+        if (banned.contains(targetUserId)) {
+            banned.remove(targetUserId);
+            emitGroupSystemEvent(conversation, requesterId, SocketEventTypes.MEMBERS_ADDED, 
+                    getParticipantDisplayName(conversation, requesterId) + " da go ban cho " + resolveUserDisplayName(targetUserId));
+        } else {
+            banned.add(targetUserId);
+            // If they are a member, remove them
+            if (conversation.getParticipantIds() != null && conversation.getParticipantIds().contains(targetUserId)) {
+                conversation.getParticipantIds().remove(targetUserId);
+            }
+            emitGroupSystemEvent(conversation, requesterId, SocketEventTypes.MEMBER_REMOVED, 
+                    getParticipantDisplayName(conversation, requesterId) + " da ban " + resolveUserDisplayName(targetUserId));
+        }
+        conversation.setBannedUserIds(banned);
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    public ConversationDTO updateNickname(String conversationId, String requesterId, String nickname) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, requesterId);
+
+        java.util.Map<String, String> nicknames = conversation.getNicknames();
+        if (nicknames == null) {
+            nicknames = new java.util.HashMap<>();
+        }
+
+        if (nickname == null || nickname.isBlank()) {
+            nicknames.remove(requesterId);
+        } else {
+            nicknames.put(requesterId, nickname);
+        }
+        conversation.setNicknames(nicknames);
+
+        if (conversation.isGroup()) {
+            emitGroupSystemEvent(conversation, requesterId, SocketEventTypes.CONVERSATION_META_UPDATED, 
+                resolveUserDisplayName(requesterId) + " da doi biet danh thanh " + nickname);
+        }
+
+        return toDTO(conversationRepository.save(conversation));
+    }
+
+    // ── Phase B Methods ─────────────────────────────────────────────────────
+
+    public String getInviteLink(String conversationId, String requesterId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, requesterId);
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Invite links are only for groups");
+        }
+
+        if (conversation.getInviteLinkToken() == null || conversation.getInviteLinkToken().isBlank()) {
+            conversation.setInviteLinkToken(java.util.UUID.randomUUID().toString());
+            conversationRepository.save(conversation);
+        }
+
+        return conversation.getInviteLinkToken();
+    }
+
+    public String resetInviteLink(String conversationId, String requesterId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureManager(conversation, requesterId);
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Invite links are only for groups");
+        }
+
+        conversation.setInviteLinkToken(java.util.UUID.randomUUID().toString());
+        conversationRepository.save(conversation);
+
+        return conversation.getInviteLinkToken();
+    }
+
+    public ConversationDTO joinByInviteLink(String token, String requesterId) {
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        Conversation conversation = conversationRepository.findByInviteLinkToken(token)
+                .orElseThrow(() -> new edu.iuh.fit.se.messegeservice.exception.ResourceNotFoundException("Invalid or expired invite link"));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Cannot join this type of conversation via link");
+        }
+
+        List<String> banned = conversation.getBannedUserIds();
+        if (banned != null && banned.contains(requesterId)) {
+            throw new IllegalArgumentException("You are banned from this group");
+        }
+
+        List<String> participants = conversation.getParticipantIds();
+        if (participants == null) {
+            participants = new ArrayList<>();
+        }
+
+        if (participants.contains(requesterId)) {
+            return toDTO(conversation); // Already a member
+        }
+
+        if (conversation.isApprovalsRequired()) {
+            List<String> pending = conversation.getPendingJoinIds();
+            if (pending == null) pending = new ArrayList<>();
+            if (!pending.contains(requesterId)) {
+                pending.add(requesterId);
+                conversation.setPendingJoinIds(pending);
+                conversationRepository.save(conversation);
+                // Can emit JOIN_REQUEST_CREATED here
+                emitGroupSystemEvent(conversation, requesterId, SocketEventTypes.JOIN_REQUEST_CREATED, 
+                        resolveUserDisplayName(requesterId) + " da yeu cau tham gia nhom");
+            }
+            return toDTO(conversation);
+        }
+
+        participants.add(requesterId);
+        conversation.setParticipantIds(participants);
+        Conversation saved = conversationRepository.save(conversation);
+
+        emitGroupSystemEvent(saved, requesterId, SocketEventTypes.MEMBERS_ADDED, 
+                resolveUserDisplayName(requesterId) + " da tham gia qua link moi");
+
+        return toDTO(saved);
     }
 
     private Set<String> sanitizeIds(List<String> ids) {
@@ -970,6 +1150,41 @@ public class ConversationService {
         return null;
     }
 
+    public ConversationDTO toggleBlock(String conversationId, String requesterId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        List<String> blockedBy = conversation.getBlockedByUserIds();
+        if (blockedBy == null) {
+            blockedBy = new ArrayList<>();
+        }
+
+        if (blockedBy.contains(requesterId)) {
+            blockedBy.remove(requesterId);
+        } else {
+            blockedBy.add(requesterId);
+        }
+        conversation.setBlockedByUserIds(blockedBy);
+
+        Conversation saved = conversationRepository.save(conversation);
+        
+        // Emit event (only to the one who blocked? or both? Usually just a state update)
+        // For now, no system message for block.
+        
+        return toDTO(saved);
+    }
+
+    public ConversationDTO updateBackground(String conversationId, String backgroundUrl) {
+        Conversation conversation = getConversationEntity(conversationId);
+        conversation.setBackgroundUrl(backgroundUrl);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        
+        Conversation saved = conversationRepository.save(conversation);
+        
+        // Emit event
+        emitGroupSystemEvent(saved, null, SocketEventTypes.CONVERSATION_META_UPDATED, "Hinh nen da duoc thay doi");
+        
+        return toDTO(saved);
+    }
+
     private static String buildLastMessagePreview(Message message) {
         if (message == null) {
             return "";
@@ -1040,6 +1255,17 @@ public class ConversationService {
         dto.setAdminIds(conversation.getAdminIds());
         dto.setApprovalsRequired(conversation.isApprovalsRequired());
         dto.setPendingJoinIds(conversation.getPendingJoinIds());
+        
+        // ── Phase A+B Maps ──
+        dto.setMutedByUserIds(conversation.getMutedByUserIds());
+        dto.setPinnedByUserIds(conversation.getPinnedByUserIds());
+        dto.setBannedUserIds(conversation.getBannedUserIds());
+        dto.setNicknames(conversation.getNicknames());
+        dto.setInviteLinkToken(conversation.getInviteLinkToken());
+        dto.setBlockedByUserIds(conversation.getBlockedByUserIds());
+        dto.setBackgroundUrl(conversation.getBackgroundUrl());
+        dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
+
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
         dto.setLastMessageAt(conversation.getLastMessageAt());
         dto.setCreatedAt(conversation.getCreatedAt());
@@ -1062,7 +1288,16 @@ public class ConversationService {
         conversation.setAdminIds(dto.getAdminIds());
         conversation.setApprovalsRequired(dto.isApprovalsRequired());
         conversation.setPendingJoinIds(dto.getPendingJoinIds());
+
+        // ── Phase A+B Maps ──
+        conversation.setMutedByUserIds(dto.getMutedByUserIds());
+        conversation.setPinnedByUserIds(dto.getPinnedByUserIds());
+        conversation.setBannedUserIds(dto.getBannedUserIds());
+        conversation.setNicknames(dto.getNicknames());
+        conversation.setInviteLinkToken(dto.getInviteLinkToken());
+        conversation.setBlockedByUserIds(dto.getBlockedByUserIds());
+        conversation.setBackgroundUrl(dto.getBackgroundUrl());
+        conversation.setAiAssistantEnabled(dto.getAiAssistantEnabled() != null && dto.getAiAssistantEnabled());
         return conversation;
     }
 }
-
