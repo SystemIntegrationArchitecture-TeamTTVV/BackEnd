@@ -1,8 +1,6 @@
-package edu.iuh.fit.se.commonservice.controller;
+package edu.iuh.fit.se.messegeservice.exception;
 
-import edu.iuh.fit.se.commonservice.dto.ErrorResponseDTO;
-import edu.iuh.fit.se.commonservice.exception.ApiErrorMapper;
-import edu.iuh.fit.se.commonservice.exception.ResourceNotFoundException;
+import edu.iuh.fit.se.messegeservice.dto.ErrorResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -13,7 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @RestControllerAdvice
-public class ApiExceptionHandler {
+public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponseDTO> handleResponseStatusException(

@@ -40,7 +40,37 @@ public class Conversation {
     /**
      * When true, only owner/admin can add new members.
      */
+    /**
+     * When true, only owner/admin can add new members.
+     */
     private boolean onlyAdminsCanAddMembers = true;
+
+    // ── Mute / Pin / Ban ────────────────────────────────────────────────────
+    /** UserIds who muted this conversation (no notifications). */
+    private List<String> mutedByUserIds;
+
+    /** UserIds who pinned this conversation to top of their list. */
+    private List<String> pinnedByUserIds;
+
+    /** UserIds who are banned from this group (cannot rejoin). */
+    private List<String> bannedUserIds;
+
+    // ── Nicknames ────────────────────────────────────────────────────────────
+    /** Per-user display nicknames within this conversation. Key = userId, Value = nickname. */
+    private java.util.Map<String, String> nicknames;
+
+    // ── Invite Link ─────────────────────────────────────────────────────────
+    /** Unique invite token for group join-by-link. */
+    private String inviteLinkToken;
+
+    /** UserIds who blocked the other party (only relevant for 1-1). */
+    private List<String> blockedByUserIds;
+
+    /** Custom background URL/image for the conversation. */
+    private String backgroundUrl;
+
+    /** Enable AI Assistant for this conversation. */
+    private boolean aiAssistantEnabled = false;
 
     private String lastMessagePreview;
     private LocalDateTime lastMessageAt;

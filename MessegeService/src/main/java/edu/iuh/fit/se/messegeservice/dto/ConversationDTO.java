@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -36,6 +37,16 @@ public class ConversationDTO {
     private LocalDateTime lastMessageAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // ── Phase A: Quick Wins ─────────────────────────────────────────────────
+    private List<String> mutedByUserIds;
+    private List<String> pinnedByUserIds;
+    private List<String> bannedUserIds;
+    private Map<String, String> nicknames;
+    private String inviteLinkToken;
+    private List<String> blockedByUserIds;
+    private String backgroundUrl;
+    private Boolean aiAssistantEnabled;
 
     /**
      * Giữ lại kiểu getter isGroup() quen thuộc nhưng null-safe.

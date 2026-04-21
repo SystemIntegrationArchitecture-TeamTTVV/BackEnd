@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import edu.iuh.fit.se.commonservice.config.socket.SocketEventTypes;
 import edu.iuh.fit.se.commonservice.dto.PresenceStatusDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.User;
@@ -129,7 +130,7 @@ public class PresenceService {
             payload.put("online", online);
             payload.put("lastSeenAt", lastSeenAt != null ? lastSeenAt.toString() : null);
 
-            socketService.sendToAll(SocketEventDTO.of("USER_PRESENCE_CHANGED", userId, payload));
+            socketService.sendToAll(SocketEventDTO.of(SocketEventTypes.USER_PRESENCE_CHANGED, userId, payload));
         } catch (Exception e) {
             log.warn("Failed to publish USER_PRESENCE_CHANGED for {}: {}", username, e.getMessage());
         }

@@ -158,5 +158,57 @@ public class ConversationController {
         conversationService.deleteConversation(id, requesterId);
         return ResponseEntity.noContent().build();
     }
+
+    // ── Phase A Endpoints ───────────────────────────────────────────────────
+
+    @PostMapping("/{id}/mute")
+    public ResponseEntity<ConversationDTO> toggleMute(@PathVariable String id, @RequestBody edu.iuh.fit.se.messegeservice.dto.ConversationActionRequest request) {
+        return ResponseEntity.ok(conversationService.toggleMute(id, request.getUserId()));
+    }
+
+    @PostMapping("/{id}/pin")
+    public ResponseEntity<ConversationDTO> togglePin(@PathVariable String id, @RequestBody edu.iuh.fit.se.messegeservice.dto.ConversationActionRequest request) {
+        return ResponseEntity.ok(conversationService.togglePin(id, request.getUserId()));
+    }
+
+    @PostMapping("/{id}/ban")
+    public ResponseEntity<ConversationDTO> toggleBan(@PathVariable String id, @RequestBody edu.iuh.fit.se.messegeservice.dto.ConversationActionRequest request) {
+        return ResponseEntity.ok(conversationService.toggleBan(id, request.getUserId(), request.getPayload())); // Payload is the target userId
+    }
+
+    @PostMapping("/{id}/nickname")
+    public ResponseEntity<ConversationDTO> updateNickname(@PathVariable String id, @RequestBody edu.iuh.fit.se.messegeservice.dto.ConversationActionRequest request) {
+        // Payload is the nickname, userId is the target user
+        return ResponseEntity.ok(conversationService.updateNickname(id, request.getUserId(), request.getPayload()));
+    }
+
+    // ── Phase B: Invite Links ───────────────────────────────────────────────
+
+    @GetMapping("/{id}/invite-link")
+    public ResponseEntity<String> getInviteLink(@PathVariable String id, @RequestParam String requesterId) {
+        return ResponseEntity.ok(conversationService.getInviteLink(id, requesterId));
+    }
+
+    @PostMapping("/{id}/invite-link/reset")
+    public ResponseEntity<String> resetInviteLink(@PathVariable String id, @RequestParam String requesterId) {
+        return ResponseEntity.ok(conversationService.resetInviteLink(id, requesterId));
+    }
+
+    @PostMapping("/join-by-url")
+    public ResponseEntity<ConversationDTO> joinByInviteLink(@RequestParam String token, @RequestParam String requesterId) {
+        return ResponseEntity.ok(conversationService.joinByInviteLink(token, requesterId));
+    }
+
+    // ── Phase C: Advanced ───────────────────────────────────────────────────
+
+    @PostMapping("/{id}/block")
+    public ResponseEntity<ConversationDTO> toggleBlock(@PathVariable String id, @RequestParam String userId) {
+        return ResponseEntity.ok(conversationService.toggleBlock(id, userId));
+    }
+
+    @PostMapping("/{id}/background")
+    public ResponseEntity<ConversationDTO> updateBackground(@PathVariable String id, @RequestParam String backgroundUrl) {
+        return ResponseEntity.ok(conversationService.updateBackground(id, backgroundUrl));
+    }
 }
 

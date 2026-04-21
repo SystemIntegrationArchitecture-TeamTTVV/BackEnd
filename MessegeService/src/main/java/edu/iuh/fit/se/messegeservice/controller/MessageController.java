@@ -67,6 +67,23 @@ public class MessageController {
         return ResponseEntity.ok(messageService.getMediaMessages(conversationId, userId, type));
     }
 
+    @GetMapping("/conversation/{conversationId}/storage-stats")
+    public ResponseEntity<java.util.Map<String, Object>> getStorageStats(
+            @PathVariable String conversationId,
+            @RequestParam String userId
+    ) {
+        return ResponseEntity.ok(messageService.getStorageStats(conversationId, userId));
+    }
+
+    @GetMapping("/conversation/{conversationId}/search")
+    public ResponseEntity<List<MessageDTO>> searchMessages(
+            @PathVariable String conversationId,
+            @RequestParam String keyword,
+            @RequestParam String userId
+    ) {
+        return ResponseEntity.ok(messageService.searchMessages(conversationId, keyword, userId));
+    }
+
     @PostMapping("/conversation/{conversationId}/typing")
     public ResponseEntity<Void> typing(
             @PathVariable String conversationId,
@@ -79,9 +96,18 @@ public class MessageController {
     @PostMapping("/conversation/{conversationId}/seen")
     public ResponseEntity<Void> seen(
             @PathVariable String conversationId,
-            @RequestBody SeenEventRequest request
+            @RequestBody edu.iuh.fit.se.messegeservice.dto.SeenEventRequest request
     ) {
         messageService.markSeen(conversationId, request.getUserId(), request.getLastSeenMessageId());
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/conversation/{conversationId}/delivered")
+    public ResponseEntity<Void> delivered(
+            @PathVariable String conversationId,
+            @RequestBody edu.iuh.fit.se.messegeservice.dto.DeliveredEventRequest request
+    ) {
+        messageService.markDelivered(conversationId, request.getUserId(), request.getLastDeliveredMessageId());
         return ResponseEntity.accepted().build();
     }
 

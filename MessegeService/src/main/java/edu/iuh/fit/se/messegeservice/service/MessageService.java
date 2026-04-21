@@ -1,5 +1,7 @@
 package edu.iuh.fit.se.messegeservice.service;
 
+import edu.iuh.fit.se.messegeservice.exception.ResourceNotFoundException;
+import edu.iuh.fit.se.messegeservice.config.socket.SocketEventTypes;
 import edu.iuh.fit.se.messegeservice.dto.MessageDTO;
 import edu.iuh.fit.se.messegeservice.dto.MessagePageDTO;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
@@ -58,7 +60,7 @@ public class MessageService {
         LocalDateTime clearCutoff = null;
         if (userId != null && !userId.isBlank()) {
             Conversation conversation = conversationRepository.findById(conversationId)
-                    .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
             ensureParticipant(conversation, userId);
             clearCutoff = resolveClearCutoff(conversationId, userId);
         }
@@ -75,7 +77,7 @@ public class MessageService {
 
     public List<MessageDTO> getPinnedMessages(String conversationId, String userId) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
         LocalDateTime clearCutoff = resolveClearCutoff(conversationId, userId);
         final LocalDateTime finalClearCutoff = clearCutoff;
@@ -92,7 +94,7 @@ public class MessageService {
 
     public List<MessageDTO> getMediaMessages(String conversationId, String userId, String type) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
         LocalDateTime clearCutoff = resolveClearCutoff(conversationId, userId);
         final LocalDateTime finalClearCutoff = clearCutoff;
@@ -126,7 +128,7 @@ public class MessageService {
 
         if (userId != null && !userId.isBlank()) {
             Conversation conversation = conversationRepository.findById(conversationId)
-                    .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
             ensureParticipant(conversation, userId);
             clearCutoff = resolveClearCutoff(conversationId, userId);
         }
@@ -165,7 +167,69 @@ public class MessageService {
     public MessageDTO getMessageById(String id) {
         return messageRepository.findById(id)
                 .map(this::toDTO)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
+    }
+
+    public List<MessageDTO> searchMessages(String conversationId, String keyword, String userId) {
+        if (conversationId == null || conversationId.isBlank() || keyword == null || keyword.isBlank()) {
+            return new ArrayList<>();
+        }
+        
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+        
+        if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(userId)) {
+            throw new IllegalArgumentException("Requester is not a participant of this conversation");
+        }
+        
+        // Ensure keyword is regex-safe or just use containing
+        // We defined findByConversationIdAndContentRegexAndIsDeletedFalseOrderByCreatedAtDesc
+        String regex = ".*" + java.util.regex.Pattern.quote(keyword) + ".*";
+        
+        List<Message> messages = messageRepository.findByConversationIdAndContentRegexAndIsDeletedFalseOrderByCreatedAtDesc(
+                conversationId, regex);
+                
+        return messages.stream()
+                .filter(m -> m.getHiddenForUserIds() == null || !m.getHiddenForUserIds().contains(userId))
+                .filter(m -> TYPE_TEXT.equals(m.getMessageType())) // Only search in text messages
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public Map<String, Object> getStorageStats(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+        ensureParticipant(conversation, userId);
+
+        List<Message> messagesWithAttachments = messageRepository
+                .findByConversationIdAndIsDeletedFalseAndAttachmentsIsNotNullOrderByCreatedAtDesc(conversationId);
+
+        long totalSize = 0;
+        Map<String, Long> sizeByType = new HashMap<>();
+        Map<String, Integer> countByType = new HashMap<>();
+
+        for (Message msg : messagesWithAttachments) {
+            if (msg.getAttachments() == null) continue;
+            for (edu.iuh.fit.se.messegeservice.model.MessageAttachment att : msg.getAttachments()) {
+                if (att.getFileSize() != null) {
+                    long size = att.getFileSize();
+                    totalSize += size;
+                    String type = att.getType() != null ? att.getType() : "OTHER";
+                    sizeByType.put(type, sizeByType.getOrDefault(type, 0L) + size);
+                }
+                String type = att.getType() != null ? att.getType() : "OTHER";
+                countByType.put(type, countByType.getOrDefault(type, 0) + 1);
+            }
+        }
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("conversationId", conversationId);
+        stats.put("totalSize", totalSize);
+        stats.put("sizeByType", sizeByType);
+        stats.put("countByType", countByType);
+        stats.put("totalCount", countByType.values().stream().mapToInt(Integer::intValue).sum());
+
+        return stats;
     }
 
     public MessageDTO createMessage(MessageDTO messageDTO) {
@@ -187,7 +251,7 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(messageDTO.getConversationId())
                 .orElseThrow(() -> {
                     log.error("❌ Conversation not found: {}", messageDTO.getConversationId());
-                    return new RuntimeException("Conversation not found: " + messageDTO.getConversationId());
+                    return new ResourceNotFoundException("Conversation not found: " + messageDTO.getConversationId());
                 });
 
         if (conversation.getParticipantIds() == null || !conversation.getParticipantIds().contains(messageDTO.getSenderId())) {
@@ -254,7 +318,7 @@ public class MessageService {
         }
 
         Message message = messageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
 
         if (message.isDeleted()) {
             throw new IllegalStateException("Cannot edit a deleted message");
@@ -267,7 +331,7 @@ public class MessageService {
         }
 
         Conversation conversation = conversationRepository.findById(message.getConversationId())
-            .orElseThrow(() -> new RuntimeException("Conversation not found: " + message.getConversationId()));
+            .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + message.getConversationId()));
         ensureParticipant(conversation, messageDTO.getSenderId());
 
         String nextContent = messageDTO.getContent() == null ? "" : messageDTO.getContent().trim();
@@ -286,7 +350,7 @@ public class MessageService {
         emitConversationMetaUpdated(conversation);
         emitEventToConversationParticipants(
             conversation,
-            "MESSAGE_EDITED",
+            SocketEventTypes.MESSAGE_EDITED,
             Map.of("conversationId", conversation.getId(), "message", toDTO(updated)),
             null
         );
@@ -298,9 +362,9 @@ public class MessageService {
             throw new IllegalArgumentException("userId is required");
         }
         Message message = messageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
         Conversation conversation = conversationRepository.findById(message.getConversationId())
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + message.getConversationId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + message.getConversationId()));
         ensureParticipant(conversation, userId);
 
         message.setPinned(!message.isPinned());
@@ -309,7 +373,7 @@ public class MessageService {
 
         emitEventToConversationParticipants(
             conversation,
-            "MESSAGE_PINNED",
+            SocketEventTypes.MESSAGE_PINNED,
             Map.of(
                 "conversationId", conversation.getId(),
                 "messageId", updated.getId(),
@@ -333,7 +397,7 @@ public class MessageService {
             throw new IllegalArgumentException("userId is required to star a message");
         }
         Message message = messageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
 
         List<String> starredBy = message.getStarredByUserIds();
         if (starredBy == null) {
@@ -354,7 +418,7 @@ public class MessageService {
             throw new IllegalArgumentException("emoji is required");
         }
         Message message = messageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
 
         List<String> emojis = message.getEmojis();
         if (emojis == null) {
@@ -373,7 +437,7 @@ public class MessageService {
         if (conversation != null) {
             emitEventToConversationParticipants(
                     conversation,
-                    "MESSAGE_REACTED",
+                    SocketEventTypes.MESSAGE_REACTED,
                     Map.of(
                             "conversationId", conversation.getId(),
                             "messageId", updated.getId(),
@@ -394,7 +458,7 @@ public class MessageService {
             boolean multipleChoice
     ) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
         ensureCanSend(conversation, userId);
 
@@ -446,8 +510,19 @@ public class MessageService {
         MessageDTO savedDTO = toDTO(saved);
         emitMessageReceivedToConversation(conversation, savedDTO);
 
+        // ── Phase C: AI Assistant Stub ──────────────────────────────────────────
+        if (conversation.isAiAssistantEnabled() && saved.getContent() != null && saved.getContent().contains("@ZalaBot")) {
+            new Thread(() -> {
+                try {
+                    Thread.sleep(2000); // Simulate processing
+                    createAndEmitSystemMessage(conversation, "ZalaBot", "AI_REPLY", 
+                        "Chao ban! Toi la ZalaBot. Hien tai toi dang trong qua trinh nang cap, hay thu lai sau nhe!");
+                } catch (InterruptedException ignored) {}
+            }).start();
+        }
+
         String actorName = resolveParticipantDisplayName(conversation, userId);
-        createAndEmitSystemMessage(conversation, userId, "POLL_CREATED", actorName + " da tao binh chon");
+        createAndEmitSystemMessage(conversation, userId, SocketEventTypes.POLL_CREATED, actorName + " da tao binh chon");
 
         return savedDTO;
     }
@@ -458,7 +533,7 @@ public class MessageService {
         }
 
         Message poll = messageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + messageId));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
         if (!TYPE_POLL.equalsIgnoreCase(poll.getMessageType())) {
             throw new IllegalArgumentException("Message is not a poll");
         }
@@ -467,7 +542,7 @@ public class MessageService {
         }
 
         Conversation conversation = conversationRepository.findById(poll.getConversationId())
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + poll.getConversationId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + poll.getConversationId()));
         ensureParticipant(conversation, userId);
 
         List<String> selectedOptionIds = (optionIds == null ? new ArrayList<String>() : optionIds)
@@ -516,7 +591,7 @@ public class MessageService {
 
         emitEventToConversationParticipants(
                 conversation,
-                "POLL_UPDATED",
+                SocketEventTypes.POLL_UPDATED,
                 Map.of(
                         "conversationId", conversation.getId(),
                         "message", dto
@@ -529,7 +604,7 @@ public class MessageService {
 
     public void emitTypingEvent(String conversationId, String userId, boolean typing) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
 
         Map<String, Object> payload = new HashMap<>();
@@ -537,12 +612,12 @@ public class MessageService {
         payload.put("userId", userId);
         payload.put("typing", typing);
 
-        emitEventToConversationParticipants(conversation, "TYPING", payload, userId);
+        emitEventToConversationParticipants(conversation, SocketEventTypes.TYPING, payload, userId);
     }
 
     public void markSeen(String conversationId, String userId, String lastSeenMessageId) {
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
         ensureParticipant(conversation, userId);
 
         List<Message> all = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
@@ -607,7 +682,78 @@ public class MessageService {
         payload.put("lastSeenMessageId", target.getId());
         payload.put("seenAt", LocalDateTime.now().toString());
 
-        emitEventToConversationParticipants(conversation, "MESSAGE_SEEN", payload, userId);
+        emitEventToConversationParticipants(conversation, SocketEventTypes.MESSAGE_SEEN, payload, userId);
+    }
+
+    public void markDelivered(String conversationId, String userId, String lastDeliveredMessageId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+        ensureParticipant(conversation, userId);
+
+        List<Message> all = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        if (all.isEmpty()) {
+            return;
+        }
+
+        Message target = null;
+        if (lastDeliveredMessageId != null && !lastDeliveredMessageId.isBlank()) {
+            target = all.stream()
+                    .filter(m -> lastDeliveredMessageId.equals(m.getId()))
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (target == null) {
+            for (int i = all.size() - 1; i >= 0; i--) {
+                Message m = all.get(i);
+                if (!m.isDeleted() && !userId.equals(m.getSenderId()) && !isHiddenForUser(m, userId)) {
+                    target = m;
+                    break;
+                }
+            }
+        }
+        if (target == null || target.getCreatedAt() == null) {
+            return;
+        }
+
+        LocalDateTime cutoff = target.getCreatedAt();
+        List<Message> changed = new ArrayList<>();
+        for (Message m : all) {
+            if (m.isDeleted()) {
+                continue;
+            }
+            if (isHiddenForUser(m, userId)) {
+                continue;
+            }
+            if (userId.equals(m.getSenderId())) {
+                continue;
+            }
+            if (m.getCreatedAt() == null || m.getCreatedAt().isAfter(cutoff)) {
+                continue;
+            }
+            List<String> deliveredTo = m.getDeliveredToUserIds();
+            if (deliveredTo == null) {
+                deliveredTo = new ArrayList<>();
+            }
+            // Cannot deliver if already seen by this user? Doesn't matter, just add to deliveredTo
+            if (!deliveredTo.contains(userId)) {
+                deliveredTo.add(userId);
+                m.setDeliveredToUserIds(deliveredTo);
+                m.setUpdatedAt(LocalDateTime.now());
+                changed.add(m);
+            }
+        }
+
+        if (!changed.isEmpty()) {
+            messageRepository.saveAll(changed);
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("conversationId", conversationId);
+        payload.put("userId", userId);
+        payload.put("lastDeliveredMessageId", target.getId());
+        payload.put("deliveredAt", LocalDateTime.now().toString());
+
+        emitEventToConversationParticipants(conversation, SocketEventTypes.MESSAGE_DELIVERED, payload, userId);
     }
 
     public void deleteMessage(String id, String requesterId) {
@@ -615,7 +761,7 @@ public class MessageService {
             throw new IllegalArgumentException("userId is required");
         }
         Message message = messageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
         if (!message.getSenderId().equals(requesterId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the sender can delete this message");
         }
@@ -649,9 +795,9 @@ public class MessageService {
         }
 
         Message message = messageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
         Conversation conversation = conversationRepository.findById(message.getConversationId())
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + message.getConversationId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + message.getConversationId()));
         ensureParticipant(conversation, requesterId);
 
         List<String> hiddenForUserIds = message.getHiddenForUserIds();
@@ -670,7 +816,7 @@ public class MessageService {
         payload.put("messageId", id);
         socketEmitterService.emitToUserById(
                 requesterId,
-                SocketEventDTO.of("MESSAGE_DELETED_FOR_ME", requesterId, payload)
+                SocketEventDTO.of(SocketEventTypes.MESSAGE_DELETED_FOR_ME, requesterId, payload)
         );
     }
 
@@ -683,7 +829,7 @@ public class MessageService {
         }
 
         Message source = messageRepository.findById(sourceMessageId)
-                .orElseThrow(() -> new RuntimeException("Message not found with id: " + sourceMessageId));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + sourceMessageId));
         if (source.isDeleted()) {
             throw new IllegalArgumentException("Cannot forward a deleted message");
         }
@@ -692,11 +838,11 @@ public class MessageService {
         }
 
         Conversation sourceConversation = conversationRepository.findById(source.getConversationId())
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + source.getConversationId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + source.getConversationId()));
         ensureParticipant(sourceConversation, requesterId);
 
         Conversation targetConversation = conversationRepository.findById(targetConversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + targetConversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + targetConversationId));
         ensureParticipant(targetConversation, requesterId);
         ensureCanSend(targetConversation, requesterId);
 
@@ -741,7 +887,7 @@ public class MessageService {
         }
 
         Conversation conversation = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
         Message saved = createAndEmitSystemMessage(conversation, actorUserId, action, content);
         return toDTO(saved);
@@ -963,7 +1109,7 @@ public class MessageService {
                 "lastMessageAt",
                 conversation.getLastMessageAt() != null ? conversation.getLastMessageAt().toString() : null
         );
-        emitEventToConversationParticipants(conversation, "CONVERSATION_META_UPDATED", payload, null);
+        emitEventToConversationParticipants(conversation, SocketEventTypes.CONVERSATION_META_UPDATED, payload, null);
     }
 
     private LocalDateTime parseCursor(String cursor) {
@@ -1003,6 +1149,7 @@ public class MessageService {
         dto.setPollOptions(message.getPollOptions());
         dto.setMentionUserIds(message.getMentionUserIds());
         dto.setSeenByUserIds(message.getSeenByUserIds());
+        dto.setDeliveredToUserIds(message.getDeliveredToUserIds());
         dto.setPinned(message.isPinned());
         dto.setStarredByUserIds(message.getStarredByUserIds());
         dto.setDeleted(message.isDeleted());
@@ -1036,6 +1183,7 @@ public class MessageService {
         message.setPollOptions(dto.getPollOptions());
         message.setMentionUserIds(dto.getMentionUserIds());
         message.setSeenByUserIds(dto.getSeenByUserIds());
+        message.setDeliveredToUserIds(dto.getDeliveredToUserIds());
         message.setPinned(dto.getPinned() != null && dto.getPinned());
         message.setStarredByUserIds(dto.getStarredByUserIds());
         return message;
@@ -1070,7 +1218,7 @@ public class MessageService {
             return;
         }
 
-        SocketEventDTO roomEvent = SocketEventDTO.of("MESSAGE_RECEIVED", null, messageDTO);
+        SocketEventDTO roomEvent = SocketEventDTO.of(SocketEventTypes.MESSAGE_RECEIVED, null, messageDTO);
         socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
 
         for (String participantId : conversation.getParticipantIds()) {

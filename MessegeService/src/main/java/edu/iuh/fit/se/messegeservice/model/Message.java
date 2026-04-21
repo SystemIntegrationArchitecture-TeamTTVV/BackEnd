@@ -44,6 +44,7 @@ public class Message {
     private boolean pinned = false;              // pinned for the whole conversation
     private List<String> starredByUserIds;       // users who starred this message
     private List<String> seenByUserIds;
+    private List<String> deliveredToUserIds;     // users who received the message but haven't read
     private List<String> hiddenForUserIds;
 
     private boolean isDeleted = false;

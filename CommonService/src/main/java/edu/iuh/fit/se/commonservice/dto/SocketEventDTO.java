@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.commonservice.dto;
 
+import edu.iuh.fit.se.commonservice.config.socket.SocketEventTypes;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,7 +22,7 @@ public class SocketEventDTO {
     public static SocketEventDTO notification(String userId, NotificationDTO notification) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("NOTIFICATION");
+        event.setType(SocketEventTypes.NOTIFICATION);
         event.setUserId(userId);
         event.setData(notification);
         event.setTimestamp(LocalDateTime.now());
@@ -32,7 +33,7 @@ public class SocketEventDTO {
     public static SocketEventDTO postCreated(String userId, PostDTO post) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("POST_CREATED");
+        event.setType(SocketEventTypes.POST_CREATED);
         event.setUserId(userId);
         event.setData(post);
         event.setTimestamp(LocalDateTime.now());
@@ -42,7 +43,7 @@ public class SocketEventDTO {
     public static SocketEventDTO postUpdated(String userId, PostDTO post) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("POST_UPDATED");
+        event.setType(SocketEventTypes.POST_UPDATED);
         event.setUserId(userId);
         event.setData(post);
         event.setTimestamp(LocalDateTime.now());
@@ -53,7 +54,7 @@ public class SocketEventDTO {
     public static SocketEventDTO commentCreated(String userId, CommentDTO comment) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("COMMENT_CREATED");
+        event.setType(SocketEventTypes.COMMENT_CREATED);
         event.setUserId(userId);
         event.setData(comment);
         event.setTimestamp(LocalDateTime.now());
@@ -64,7 +65,7 @@ public class SocketEventDTO {
     public static SocketEventDTO reactionAdded(String userId, ReactionDTO reaction) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("REACTION_ADDED");
+        event.setType(SocketEventTypes.REACTION_ADDED);
         event.setUserId(userId);
         event.setData(reaction);
         event.setTimestamp(LocalDateTime.now());
@@ -75,7 +76,7 @@ public class SocketEventDTO {
     public static SocketEventDTO messageReceived(String userId, Object messageData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("MESSAGE_RECEIVED");
+        event.setType(SocketEventTypes.MESSAGE_RECEIVED);
         event.setUserId(userId);
         event.setData(messageData);
         event.setTimestamp(LocalDateTime.now());
@@ -86,7 +87,7 @@ public class SocketEventDTO {
     public static SocketEventDTO callOffer(String userId, Object callData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("CALL_OFFER");
+        event.setType(SocketEventTypes.CALL_OFFER);
         event.setUserId(userId);
         event.setData(callData);
         event.setTimestamp(LocalDateTime.now());
@@ -96,7 +97,7 @@ public class SocketEventDTO {
     public static SocketEventDTO callAnswer(String userId, Object answerData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("CALL_ANSWER");
+        event.setType(SocketEventTypes.CALL_ANSWER);
         event.setUserId(userId);
         event.setData(answerData);
         event.setTimestamp(LocalDateTime.now());
@@ -106,7 +107,7 @@ public class SocketEventDTO {
     public static SocketEventDTO callIceCandidate(String userId, Object candidateData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("CALL_ICE_CANDIDATE");
+        event.setType(SocketEventTypes.CALL_ICE_CANDIDATE);
         event.setUserId(userId);
         event.setData(candidateData);
         event.setTimestamp(LocalDateTime.now());
@@ -116,7 +117,7 @@ public class SocketEventDTO {
     public static SocketEventDTO callReject(String userId, Object rejectData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("CALL_REJECT");
+        event.setType(SocketEventTypes.CALL_REJECT);
         event.setUserId(userId);
         event.setData(rejectData);
         event.setTimestamp(LocalDateTime.now());
@@ -126,7 +127,7 @@ public class SocketEventDTO {
     public static SocketEventDTO callEnd(String userId, Object endData) {
         SocketEventDTO event = new SocketEventDTO();
         event.setEventId(UUID.randomUUID().toString());
-        event.setType("CALL_END");
+        event.setType(SocketEventTypes.CALL_END);
         event.setUserId(userId);
         event.setData(endData);
         event.setTimestamp(LocalDateTime.now());

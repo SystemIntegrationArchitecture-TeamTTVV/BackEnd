@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.commonservice.service;
 
+import edu.iuh.fit.se.commonservice.config.socket.SocketDestinations;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ public class SocketService {
         log.info("📤 Sending notification to username {}: type={}, data={}", username, event.getType(), event.getData());
         // convertAndSendToUser uses the user's principal name (username), not userId
         // This will send to /user/{username}/queue/notifications
-        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", event);
+        messagingTemplate.convertAndSendToUser(username, SocketDestinations.QUEUE_NOTIFICATIONS, event);
         log.info("✅ Notification sent to username {} via /user/{}/queue/notifications", username, username);
     }
 
@@ -33,7 +34,7 @@ public class SocketService {
      */
     public void sendToAll(SocketEventDTO event) {
         log.debug("Sending event to all users: {}", event.getType());
-        messagingTemplate.convertAndSend("/topic/public", event);
+        messagingTemplate.convertAndSend(SocketDestinations.TOPIC_PUBLIC, event);
     }
 
     /**
@@ -41,7 +42,7 @@ public class SocketService {
      */
     public void sendToTopic(String topic, SocketEventDTO event) {
         log.debug("Sending event to topic {}: {}", topic, event.getType());
-        messagingTemplate.convertAndSend("/topic/" + topic, event);
+        messagingTemplate.convertAndSend(SocketDestinations.BROKER_TOPIC + "/" + topic, event);
     }
 
     /**
@@ -50,7 +51,7 @@ public class SocketService {
      */
     public void sendToRoom(String roomId, SocketEventDTO event) {
         log.debug("Sending event to room {}: {}", roomId, event.getType());
-        messagingTemplate.convertAndSend("/topic/rooms." + roomId, event);
+        messagingTemplate.convertAndSend(SocketDestinations.roomDestination(roomId), event);
     }
 
     /**

@@ -30,6 +30,7 @@ public class MessageDTO {
     private List<PollOption> pollOptions;
     private List<String> mentionUserIds;
     private List<String> seenByUserIds;
+    private List<String> deliveredToUserIds;
     private Boolean pinned;
     private List<String> starredByUserIds;
     

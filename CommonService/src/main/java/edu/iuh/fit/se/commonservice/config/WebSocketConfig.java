@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.commonservice.config;
 
+import edu.iuh.fit.se.commonservice.config.socket.SocketDestinations;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -19,11 +20,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // Enable simple broker for destinations prefixed with /topic and /queue
-        config.enableSimpleBroker("/topic", "/queue", "/user");
+        config.enableSimpleBroker(SocketDestinations.BROKER_TOPIC, SocketDestinations.BROKER_QUEUE, SocketDestinations.BROKER_USER);
         // Set application destination prefix
-        config.setApplicationDestinationPrefixes("/app");
+        config.setApplicationDestinationPrefixes(SocketDestinations.APP_PREFIX);
         // Set user destination prefix for private messages
-        config.setUserDestinationPrefix("/user");
+        config.setUserDestinationPrefix(SocketDestinations.USER_PREFIX);
     }
 
     @Override
