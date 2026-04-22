@@ -1,9 +1,21 @@
 package edu.iuh.fit.se.commonservice.service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.bson.Document;
+import org.bson.types.ObjectId;
+import com.mongodb.DBRef;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
@@ -11,6 +23,7 @@ import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +34,8 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final FriendRepository friendRepository;
+    private final MongoTemplate mongoTemplate;
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final FriendService friendService;
@@ -31,9 +46,12 @@ public class PostService {
     }
 
     public List<PostDTO> getAllPosts(String viewerId) {
-        return postRepository.findByIsDeletedFalseAndGroupIdIsNullOrderByCreatedAtDesc().stream()
-                .filter(post -> isPostVisibleToViewer(post, viewerId))
-                .map(this::toDTO)
+        Set<String> friendIds = buildFriendIdSet(viewerId);
+        List<Document> docs = findPostsAggregated(
+                Criteria.where("isDeleted").is(false).and("groupId").is(null));
+        return docs.stream()
+                .map(this::documentToPostDTO)
+                .filter(dto -> isDtoVisibleToViewer(dto, viewerId, friendIds))
                 .collect(Collectors.toList());
     }
 
@@ -48,9 +66,12 @@ public class PostService {
     }
 
     public List<PostDTO> getPostsByUserId(String userId, String viewerId) {
-        return postRepository.findByAuthorIdOrderByCreatedAtDesc(userId).stream()
-                .filter(post -> isPostVisibleToViewer(post, viewerId))
-                .map(this::toDTO)
+        Set<String> friendIds = buildFriendIdSet(viewerId);
+        Criteria criteria = Criteria.where("author.$id").is(new ObjectId(userId));
+        List<Document> docs = findPostsAggregated(criteria);
+        return docs.stream()
+                .map(this::documentToPostDTO)
+                .filter(dto -> isDtoVisibleToViewer(dto, viewerId, friendIds))
                 .collect(Collectors.toList());
     }
 
@@ -288,7 +309,117 @@ public class PostService {
         return post;
     }
 
+    /**
+     * Pre-load all friend IDs for the viewer in one query.
+     * Friendship may be stored one-way, so we check both directions.
+     */
+    private Set<String> buildFriendIdSet(String viewerId) {
+        if (viewerId == null || viewerId.isBlank()) {
+            return Collections.emptySet();
+        }
+        Set<String> ids = new HashSet<>();
+        // Single query for both directions
+        friendRepository.findByUserIdOrFriendId(viewerId, viewerId).forEach(f -> {
+            if (viewerId.equals(f.getUserId())) {
+                ids.add(f.getFriendId());
+            } else {
+                ids.add(f.getUserId());
+            }
+        });
+        return ids;
+    }
+
+    // ── Aggregation: batch-resolve authors in 1 query (eliminates @DBRef N+1) ──
+
+    /**
+     * Uses MongoDB Aggregation $lookup to batch-join posts with users collection.
+     * This replaces N+1 @DBRef resolution with a single server-side join.
+     */
+    private List<Document> findPostsAggregated(Criteria matchCriteria) {
+        Aggregation agg = Aggregation.newAggregation(
+                Aggregation.match(matchCriteria),
+                Aggregation.sort(Sort.Direction.DESC, "createdAt"),
+                Aggregation.limit(50),
+                Aggregation.lookup("users", "author.$id", "_id", "_authorData"),
+                Aggregation.unwind("_authorData", true)
+        );
+        return mongoTemplate.aggregate(agg, "posts", Document.class).getMappedResults();
+    }
+
+    /**
+     * Convert a raw aggregation Document (with embedded _authorData) to PostDTO.
+     */
+    @SuppressWarnings("unchecked")
+    private PostDTO documentToPostDTO(Document doc) {
+        PostDTO dto = new PostDTO();
+        dto.setId(extractId(doc.get("_id")));
+
+        // Author from $lookup result
+        Document author = doc.get("_authorData", Document.class);
+        if (author != null) {
+            dto.setAuthorId(extractId(author.get("_id")));
+            dto.setAuthorName(author.getString("fullName"));
+            dto.setAuthorAvatar(author.getString("avatar"));
+        }
+
+        dto.setContent(doc.getString("content"));
+        dto.setImages(doc.getList("images", String.class));
+        dto.setVideos(doc.getList("videos", String.class));
+        dto.setLocation(doc.getString("location"));
+        dto.setFeeling(doc.getString("feeling"));
+        dto.setActivity(doc.getString("activity"));
+        dto.setVisibility(normalizeVisibility(doc.getString("visibility")));
+        dto.setAllowComments(doc.getBoolean("allowComments"));
+        dto.setAllowSharing(doc.getBoolean("allowSharing"));
+        dto.setLikeCount(doc.getInteger("likeCount", 0));
+        dto.setCommentCount(doc.getInteger("commentCount", 0));
+        dto.setShareCount(doc.getInteger("shareCount", 0));
+
+        // groupId is a plain field
+        dto.setGroupId(doc.getString("groupId"));
+
+        // pageId from @DBRef page (stored as DBRef in raw Document)
+        Object pageRef = doc.get("page");
+        if (pageRef instanceof DBRef) {
+            dto.setPageId(extractId(((DBRef) pageRef).getId()));
+        }
+
+        dto.setCreatedAt(toLocalDateTime(doc.get("createdAt")));
+        dto.setUpdatedAt(toLocalDateTime(doc.get("updatedAt")));
+        return dto;
+    }
+
+    /** Visibility check on PostDTO (for aggregation results). */
+    private boolean isDtoVisibleToViewer(PostDTO dto, String viewerId, Set<String> friendIds) {
+        if (dto == null || dto.getAuthorId() == null) {
+            return false;
+        }
+        String visibility = dto.getVisibility();
+        if ("PUBLIC".equals(visibility)) return true;
+        if (viewerId == null || viewerId.isBlank()) return false;
+        if (dto.getAuthorId().equals(viewerId)) return true;
+        if ("FRIENDS".equals(visibility)) return friendIds.contains(dto.getAuthorId());
+        return false;
+    }
+
+    private static String extractId(Object idValue) {
+        if (idValue instanceof ObjectId) return ((ObjectId) idValue).toHexString();
+        return idValue != null ? idValue.toString() : null;
+    }
+
+    private static LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof Date) {
+            return ((Date) value).toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        }
+        if (value instanceof LocalDateTime) return (LocalDateTime) value;
+        return null;
+    }
+
     private boolean isPostVisibleToViewer(Post post, String viewerId) {
+        return isPostVisibleToViewer(post, viewerId, null);
+    }
+
+    private boolean isPostVisibleToViewer(Post post, String viewerId, Set<String> preloadedFriendIds) {
         if (post == null || post.getAuthor() == null || post.getAuthor().getId() == null) {
             return false;
         }
@@ -309,6 +440,9 @@ public class PostService {
         }
 
         if ("FRIENDS".equals(normalizedVisibility)) {
+            if (preloadedFriendIds != null) {
+                return preloadedFriendIds.contains(authorId);
+            }
             return friendService.checkIfFriends(authorId, viewerId);
         }
 

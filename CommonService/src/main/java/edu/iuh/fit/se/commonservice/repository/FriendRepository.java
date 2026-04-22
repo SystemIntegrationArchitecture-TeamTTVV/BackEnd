@@ -10,6 +10,9 @@ import java.util.Optional;
 @Repository
 public interface FriendRepository extends MongoRepository<Friend, String> {
     List<Friend> findByUserId(String userId);
+    List<Friend> findByFriendId(String friendId);
+    /** Single query to find both directions of friendship */
+    List<Friend> findByUserIdOrFriendId(String userId, String friendId);
     Optional<Friend> findByUserIdAndFriendId(String userId, String friendId);
     boolean existsByUserIdAndFriendId(String userId, String friendId);
 }

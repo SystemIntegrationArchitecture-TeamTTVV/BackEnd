@@ -356,19 +356,19 @@ resilience4j:
     instances:
       commonService:
         slidingWindowType: COUNT_BASED
-        slidingWindowSize: 20
-        minimumNumberOfCalls: 10
-        failureRateThreshold: 80
-        waitDurationInOpenState: 5s
-        permittedNumberOfCallsInHalfOpenState: 5
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 95
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 10
         automaticTransitionFromOpenToHalfOpenEnabled: true
       messageService:
         slidingWindowType: COUNT_BASED
-        slidingWindowSize: 20
-        minimumNumberOfCalls: 10
-        failureRateThreshold: 80
-        waitDurationInOpenState: 5s
-        permittedNumberOfCallsInHalfOpenState: 5
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 95
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 10
         automaticTransitionFromOpenToHalfOpenEnabled: true
 
 # Actuator
