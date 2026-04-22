@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,6 +44,52 @@ public class CallService {
         }
         Call saved = callRepository.save(call);
         return toDTO(saved);
+    }
+
+    public CallDTO initiateCall(String conversationId, String callerId, List<String> calleeIds, String type) {
+        Call call = new Call();
+        call.setConversationId(conversationId);
+        call.setCallerId(callerId);
+        call.setCalleeIds(calleeIds);
+        call.setType(normalizeType(type));
+        call.setStatus("RINGING");
+        call.setStartedAt(LocalDateTime.now());
+        call.setDurationSeconds(0);
+        return toDTO(callRepository.save(call));
+    }
+
+    public CallDTO joinCall(String id, String userId) {
+        Call call = callRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Call not found with id: " + id));
+        validateParticipant(call, userId);
+        if ("RINGING".equals(call.getStatus())) {
+            call.setStatus("ONGOING");
+        }
+        return toDTO(callRepository.save(call));
+    }
+
+    public CallDTO endCall(String id, String userId) {
+        Call call = callRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Call not found with id: " + id));
+        validateParticipant(call, userId);
+        call.setStatus("COMPLETED");
+        if (call.getStartedAt() == null) {
+            call.setStartedAt(LocalDateTime.now());
+        }
+        call.setEndedAt(LocalDateTime.now());
+        call.setDurationSeconds((int) Math.max(0, ChronoUnit.SECONDS.between(call.getStartedAt(), call.getEndedAt())));
+        return toDTO(callRepository.save(call));
+    }
+
+    public CallDTO markMissed(String id, String userId) {
+        Call call = callRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Call not found with id: " + id));
+        validateParticipant(call, userId);
+        if (call.getEndedAt() == null) {
+            call.setEndedAt(LocalDateTime.now());
+        }
+        call.setStatus("MISSED");
+        return toDTO(callRepository.save(call));
     }
 
     public CallDTO updateCall(String id, CallDTO callDTO) {
@@ -81,6 +129,25 @@ public class CallService {
         call.setStatus(dto.getStatus());
         call.setDurationSeconds(dto.getDurationSeconds());
         return call;
+    }
+
+    private String normalizeType(String type) {
+        if (type == null || type.isBlank()) {
+            return "VOICE";
+        }
+        String normalized = type.trim().toUpperCase(Locale.ROOT);
+        if ("VIDEO".equals(normalized)) {
+            return "VIDEO";
+        }
+        return "VOICE";
+    }
+
+    private void validateParticipant(Call call, String userId) {
+        boolean isCaller = userId != null && userId.equals(call.getCallerId());
+        boolean isCallee = userId != null && call.getCalleeIds() != null && call.getCalleeIds().contains(userId);
+        if (!isCaller && !isCallee) {
+            throw new RuntimeException("User is not a participant of this call");
+        }
     }
 }
 

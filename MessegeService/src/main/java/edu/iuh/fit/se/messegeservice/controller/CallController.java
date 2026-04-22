@@ -1,6 +1,8 @@
 package edu.iuh.fit.se.messegeservice.controller;
 
 import edu.iuh.fit.se.messegeservice.dto.CallDTO;
+import edu.iuh.fit.se.messegeservice.dto.CallActionRequest;
+import edu.iuh.fit.se.messegeservice.dto.CallInitiateRequest;
 import edu.iuh.fit.se.messegeservice.service.CallService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,6 +36,32 @@ public class CallController {
     @PostMapping
     public ResponseEntity<CallDTO> createCall(@RequestBody CallDTO callDTO) {
         return ResponseEntity.status(HttpStatus.CREATED).body(callService.createCall(callDTO));
+    }
+
+    @PostMapping("/initiate")
+    public ResponseEntity<CallDTO> initiate(@RequestBody CallInitiateRequest request) {
+        CallDTO call = callService.initiateCall(
+                request.getConversationId(),
+                request.getCallerId(),
+                request.getCalleeIds(),
+                request.getType()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(call);
+    }
+
+    @PostMapping("/{id}/join")
+    public ResponseEntity<CallDTO> join(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.joinCall(id, request.getUserId()));
+    }
+
+    @PostMapping("/{id}/end")
+    public ResponseEntity<CallDTO> end(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.endCall(id, request.getUserId()));
+    }
+
+    @PostMapping("/{id}/missed")
+    public ResponseEntity<CallDTO> missed(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.markMissed(id, request.getUserId()));
     }
 
     @PutMapping("/{id}")
