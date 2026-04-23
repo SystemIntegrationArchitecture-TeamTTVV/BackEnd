@@ -57,5 +57,15 @@ public class User {
     private String postVisibility = "PUBLIC"; // PUBLIC, FRIENDS, PRIVATE
     private Boolean showEmail = false;
     private Boolean showPhone = false;
+
+    // ── Messaging & Call Privacy ─────────────────────────────────────────
+    /** Who can send direct messages: EVERYONE | FRIENDS_ONLY */
+    private String allowMessageFrom = "EVERYONE";
+
+    /** Who can call (voice/video): EVERYONE | FRIENDS_ONLY */
+    private String allowCallFrom = "EVERYONE";
+
+    /** Who can invite to group chats: EVERYONE | FRIENDS_ONLY */
+    private String allowGroupInviteFrom = "EVERYONE";
 }
 

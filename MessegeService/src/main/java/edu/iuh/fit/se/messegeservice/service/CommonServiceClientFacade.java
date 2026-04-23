@@ -96,5 +96,52 @@ public class CommonServiceClientFacade {
         log.warn("⚠️ [CommonServiceClient] Failed to emitToRoom({}) due to {}. Event type: {}",
                 roomId, throwable.getMessage(), event != null ? event.getType() : "null");
     }
+
+    // ── Privacy Check Methods ───────────────────────────────────────────
+
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "canMessageFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "canMessageFallback")
+    @Retry(name = "commonService", fallbackMethod = "canMessageFallback")
+    @CircuitBreaker(name = "commonService", fallbackMethod = "canMessageFallback")
+    public boolean canMessage(String senderId, String receiverId) {
+        java.util.Map<String, Object> result = commonServiceClient.canMessage(senderId, receiverId);
+        return Boolean.TRUE.equals(result.get("allowed"));
+    }
+
+    @SuppressWarnings("unused")
+    private boolean canMessageFallback(String senderId, String receiverId, Throwable throwable) {
+        log.warn("⚠️ [Privacy] canMessage fallback for {}→{}: {}", senderId, receiverId, throwable.getMessage());
+        return true; // Fallback = allow
+    }
+
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "canCallFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "canCallFallback")
+    @Retry(name = "commonService", fallbackMethod = "canCallFallback")
+    @CircuitBreaker(name = "commonService", fallbackMethod = "canCallFallback")
+    public boolean canCall(String callerId, String receiverId) {
+        java.util.Map<String, Object> result = commonServiceClient.canCall(callerId, receiverId);
+        return Boolean.TRUE.equals(result.get("allowed"));
+    }
+
+    @SuppressWarnings("unused")
+    private boolean canCallFallback(String callerId, String receiverId, Throwable throwable) {
+        log.warn("⚠️ [Privacy] canCall fallback for {}→{}: {}", callerId, receiverId, throwable.getMessage());
+        return true;
+    }
+
+    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "canInviteGroupFallback")
+    @RateLimiter(name = "commonService", fallbackMethod = "canInviteGroupFallback")
+    @Retry(name = "commonService", fallbackMethod = "canInviteGroupFallback")
+    @CircuitBreaker(name = "commonService", fallbackMethod = "canInviteGroupFallback")
+    public boolean canInviteGroup(String inviterId, String targetUserId) {
+        java.util.Map<String, Object> result = commonServiceClient.canInviteGroup(inviterId, targetUserId);
+        return Boolean.TRUE.equals(result.get("allowed"));
+    }
+
+    @SuppressWarnings("unused")
+    private boolean canInviteGroupFallback(String inviterId, String targetUserId, Throwable throwable) {
+        log.warn("⚠️ [Privacy] canInviteGroup fallback for {}→{}: {}", inviterId, targetUserId, throwable.getMessage());
+        return true;
+    }
 }
 

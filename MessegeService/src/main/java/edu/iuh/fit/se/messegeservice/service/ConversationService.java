@@ -82,6 +82,32 @@ public class ConversationService {
                 .collect(Collectors.toList());
     }
 
+    public List<ConversationDTO> getHiddenConversationsByUserId(String userId) {
+        List<HiddenConversation> hiddenRows = hiddenConversationRepository.findByUserIdAndHiddenTrue(userId);
+        Set<String> hiddenConvIds = hiddenRows.stream()
+            .map(HiddenConversation::getConversationId)
+            .collect(Collectors.toSet());
+
+        if (hiddenConvIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        java.util.Map<String, HiddenConversation> hiddenByConvId = hiddenRows.stream()
+            .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
+
+        return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
+                .filter(c -> hiddenConvIds.contains(c.getId()))
+                .map(conversation -> {
+                    ConversationDTO dto = toDTO(conversation);
+                    HiddenConversation hc = hiddenByConvId.get(conversation.getId());
+                    dto.setHiddenForCurrentUser(true);
+                    dto.setHiddenRequiresPin(hc != null && hc.isRequirePinUnlock());
+                    dto.setClearBeforeAt(hc != null ? hc.getClearBeforeAt() : null);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
     public List<ConversationDTO> searchGroupConversations(String userId, String keyword) {
         String normalized = keyword == null ? "" : keyword.trim();
         if (normalized.isBlank()) {
@@ -305,11 +331,18 @@ public class ConversationService {
                 applyUserVisibleLastMessage(dto, userId1, visibility != null ? visibility.getClearBeforeAt() : null);
                 dto.setHiddenForCurrentUser(visibility != null && visibility.isHidden());
                 dto.setHiddenRequiresPin(visibility != null && visibility.isHidden() && visibility.isRequirePinUnlock());
-                dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
+                        dto.setClearBeforeAt(visibility != null ? visibility.getClearBeforeAt() : null);
                 return dto;
             }
         }
         
+        // Create new conversation — check privacy first
+        if (!commonServiceClientFacade.canMessage(userId1, userId2)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Người dùng này chỉ cho phép bạn bè nhắn tin");
+        }
+
         // Create new conversation
         ConversationDTO newConv = new ConversationDTO();
         newConv.setParticipantIds(java.util.Arrays.asList(userId1, userId2));
@@ -675,6 +708,24 @@ public class ConversationService {
             throw new IllegalArgumentException("participantIds cannot be empty");
         }
 
+        // Filter out banned users — cannot re-add banned members
+        List<String> banned = conversation.getBannedUserIds();
+        if (banned != null && !banned.isEmpty()) {
+            newMembers.removeAll(banned);
+            if (newMembers.isEmpty()) {
+                throw new IllegalArgumentException("All specified users are banned from this group");
+            }
+        }
+
+        // Filter out users who block group invites from non-friends
+        String inviterId = request.getRequesterId();
+        newMembers.removeIf(memberId -> !commonServiceClientFacade.canInviteGroup(inviterId, memberId));
+        if (newMembers.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Tất cả người dùng đã chặn lời mời nhóm từ người lạ");
+        }
+
         Set<String> participants = new HashSet<>(conversation.getParticipantIds());
         participants.addAll(newMembers);
 
@@ -839,7 +890,21 @@ public class ConversationService {
         conversationDTO.setAdminIds(new ArrayList<>(adminIds));
 
         if (conversationDTO.getGroupName() == null || conversationDTO.getGroupName().isBlank()) {
-            conversationDTO.setGroupName("New Group Chat");
+            // Auto-generate group name from first 3 participant display names
+            List<String> names = participantIds.stream()
+                    .limit(3)
+                    .map(this::resolveUserDisplayName)
+                    .filter(n -> n != null && !n.isBlank() && !n.equals("Unknown"))
+                    .collect(Collectors.toList());
+            if (names.isEmpty()) {
+                conversationDTO.setGroupName("New Group Chat");
+            } else {
+                String autoName = String.join(", ", names);
+                if (participantIds.size() > 3) {
+                    autoName += "...";
+                }
+                conversationDTO.setGroupName(autoName);
+            }
         }
 
         Conversation conversation = toEntity(conversationDTO);

@@ -79,9 +79,10 @@ public class MessageController {
     public ResponseEntity<List<MessageDTO>> searchMessages(
             @PathVariable String conversationId,
             @RequestParam String keyword,
-            @RequestParam String userId
+            @RequestParam String userId,
+            @RequestParam(required = false) String senderId
     ) {
-        return ResponseEntity.ok(messageService.searchMessages(conversationId, keyword, userId));
+        return ResponseEntity.ok(messageService.searchMessages(conversationId, keyword, userId, senderId));
     }
 
     @PostMapping("/conversation/{conversationId}/typing")

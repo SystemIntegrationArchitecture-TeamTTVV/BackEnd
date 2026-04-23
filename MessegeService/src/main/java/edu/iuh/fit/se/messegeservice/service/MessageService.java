@@ -48,6 +48,7 @@ public class MessageService {
     private final ConversationRepository conversationRepository;
     private final HiddenConversationRepository hiddenConversationRepository;
     private final SocketEmitterService socketEmitterService;
+    private final CommonServiceClientFacade commonServiceClientFacade;
 
     @Value("${chat.message.recall-window-seconds:120}")
     private long recallWindowSeconds;
@@ -170,7 +171,7 @@ public class MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
     }
 
-    public List<MessageDTO> searchMessages(String conversationId, String keyword, String userId) {
+    public List<MessageDTO> searchMessages(String conversationId, String keyword, String userId, String senderId) {
         if (conversationId == null || conversationId.isBlank() || keyword == null || keyword.isBlank()) {
             return new ArrayList<>();
         }
@@ -192,6 +193,7 @@ public class MessageService {
         return messages.stream()
                 .filter(m -> m.getHiddenForUserIds() == null || !m.getHiddenForUserIds().contains(userId))
                 .filter(m -> TYPE_TEXT.equals(m.getMessageType())) // Only search in text messages
+                .filter(m -> senderId == null || senderId.isBlank() || senderId.equals(m.getSenderId()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -1059,19 +1061,15 @@ public class MessageService {
             return;
         }
 
-        List<Message> all = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
-        Message latest = null;
-        for (int i = all.size() - 1; i >= 0; i--) {
-            Message candidate = all.get(i);
-            if (!candidate.isDeleted()) {
-                latest = candidate;
-                break;
-            }
-        }
+        // Fetch only the latest non-deleted message (limit 1) instead of loading ALL messages
+        List<Message> latest = messageRepository.findByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(
+                conversation.getId(),
+                org.springframework.data.domain.PageRequest.of(0, 1)
+        );
 
-        if (latest != null) {
-            conversation.setLastMessagePreview(buildLastMessagePreview(latest));
-            conversation.setLastMessageAt(latest.getCreatedAt());
+        if (!latest.isEmpty()) {
+            conversation.setLastMessagePreview(buildLastMessagePreview(latest.get(0)));
+            conversation.setLastMessageAt(latest.get(0).getCreatedAt());
         } else {
             conversation.setLastMessagePreview("");
             conversation.setLastMessageAt(null);
@@ -1190,13 +1188,52 @@ public class MessageService {
     }
 
     private void ensureCanSend(Conversation conversation, String userId) {
-        if (!conversation.isGroup() || !conversation.isOnlyAdminsCanSend()) {
-            return;
+        // Check if user is banned from this group
+        if (conversation.getBannedUserIds() != null && conversation.getBannedUserIds().contains(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are banned from this conversation");
         }
-        boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(userId);
-        boolean isAdmin = conversation.getAdminIds() != null && conversation.getAdminIds().contains(userId);
-        if (!isOwner && !isAdmin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owner/admin can send messages in this group");
+
+        // Check if user is blocked in 1-on-1 conversation
+        if (!conversation.isGroup() && conversation.getBlockedByUserIds() != null && !conversation.getBlockedByUserIds().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot send messages in a blocked conversation");
+        }
+
+        // ── Privacy check: stranger blocking for DM conversations ──
+        if (!conversation.isGroup() && conversation.getParticipantIds() != null && conversation.getParticipantIds().size() == 2) {
+            String receiverId = conversation.getParticipantIds().stream()
+                    .filter(pid -> !pid.equals(userId))
+                    .findFirst().orElse(null);
+            if (receiverId != null) {
+                boolean allowed = commonServiceClientFacade.canMessage(userId, receiverId);
+                if (!allowed) {
+                    log.warn("🚫 [Privacy] Message blocked: {} → {} (receiver has FRIENDS_ONLY)", userId, receiverId);
+                    // Emit MESSAGE_BLOCKED event to sender in realtime
+                    try {
+                        Map<String, Object> payload = new HashMap<>();
+                        payload.put("conversationId", conversation.getId());
+                        payload.put("receiverId", receiverId);
+                        payload.put("reason", "PRIVACY_FRIENDS_ONLY");
+                        SocketEventDTO blockedEvent = SocketEventDTO.builder()
+                                .type(SocketEventTypes.MESSAGE_BLOCKED)
+                                .payload(payload)
+                                .build();
+                        socketEmitterService.emitToUserById(userId, blockedEvent);
+                    } catch (Exception e) {
+                        log.error("Failed to emit MESSAGE_BLOCKED event: {}", e.getMessage());
+                    }
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Cannot send message: recipient only accepts messages from friends");
+                }
+            }
+        }
+
+        // Check onlyAdminsCanSend permission for groups
+        if (conversation.isGroup() && conversation.isOnlyAdminsCanSend()) {
+            boolean isOwner = conversation.getOwnerId() != null && conversation.getOwnerId().equals(userId);
+            boolean isAdmin = conversation.getAdminIds() != null && conversation.getAdminIds().contains(userId);
+            if (!isOwner && !isAdmin) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owner/admin can send messages in this group");
+            }
         }
     }
 

@@ -15,5 +15,11 @@ public interface FriendRepository extends MongoRepository<Friend, String> {
     List<Friend> findByUserIdOrFriendId(String userId, String friendId);
     Optional<Friend> findByUserIdAndFriendId(String userId, String friendId);
     boolean existsByUserIdAndFriendId(String userId, String friendId);
+
+    /** Check friendship in both directions */
+    default boolean areFriends(String userIdA, String userIdB) {
+        return existsByUserIdAndFriendId(userIdA, userIdB)
+            || existsByUserIdAndFriendId(userIdB, userIdA);
+    }
 }
 

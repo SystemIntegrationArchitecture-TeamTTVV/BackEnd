@@ -214,8 +214,39 @@ public class FriendRequestService {
         FriendRequest friendRequest = friendRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Friend request not found with id: " + id));
         
+        // Save info before deleting
+        String senderId = friendRequest.getSenderId();
+        String receiverId = friendRequest.getReceiverId();
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        
         friendRequestRepository.delete(friendRequest);
         log.info("🗑️ Rejected (deleted) friend request: id={}", id);
+        
+        // Send socket notification to sender (transient, not persisted)
+        NotificationDTO notification = new NotificationDTO();
+        notification.setRecipientId(senderId);
+        notification.setActorId(receiverId);
+        notification.setActorName(receiver.getFullName());
+        notification.setActorAvatar(receiver.getAvatar());
+        notification.setType("FRIEND_REJECTED");
+        notification.setTitle("Friend Request Rejected");
+        notification.setContent(receiver.getFullName() + " đã từ chối lời mời kết bạn của bạn");
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        
+        socketService.sendNotification(
+            sender.getUsername(),
+            SocketEventDTO.notification(senderId, notification)
+        );
+        log.info("📤 Sent FRIEND_REJECTED socket to sender {} (username={})", senderId, sender.getUsername());
+        
+        // Delete the FRIEND_REQUEST notification from DB
+        notificationService.deleteNotificationByRecipientAndRelatedIdAndType(
+            receiverId, id, "FRIEND_REQUEST"
+        );
     }
 
     public void cancelFriendRequest(String id) {
@@ -223,8 +254,38 @@ public class FriendRequestService {
         FriendRequest friendRequest = friendRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Friend request not found with id: " + id));
         
+        String senderId = friendRequest.getSenderId();
+        String receiverId = friendRequest.getReceiverId();
+        User senderUser = userRepository.findById(senderId)
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        User receiverUser = userRepository.findById(receiverId)
+                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+        
         friendRequestRepository.delete(friendRequest);
         log.info("🗑️ Cancelled (deleted) friend request: id={}", id);
+        
+        // Send socket notification to receiver (transient, not persisted)
+        NotificationDTO notification = new NotificationDTO();
+        notification.setRecipientId(receiverId);
+        notification.setActorId(senderId);
+        notification.setActorName(senderUser.getFullName());
+        notification.setActorAvatar(senderUser.getAvatar());
+        notification.setType("FRIEND_CANCELLED");
+        notification.setTitle("Friend Request Cancelled");
+        notification.setContent(senderUser.getFullName() + " đã thu hồi lời mời kết bạn");
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        
+        socketService.sendNotification(
+            receiverUser.getUsername(),
+            SocketEventDTO.notification(receiverId, notification)
+        );
+        log.info("📤 Sent FRIEND_CANCELLED socket to receiver {} (username={})", receiverId, receiverUser.getUsername());
+        
+        // Delete the FRIEND_REQUEST notification from DB
+        notificationService.deleteNotificationByRecipientAndRelatedIdAndType(
+            receiverId, id, "FRIEND_REQUEST"
+        );
     }
     
     /**
@@ -259,6 +320,29 @@ public class FriendRequestService {
                 });
         
         log.info("✅ Unfriended: user1={}, user2={}", userId1, userId2);
+        
+        // Send socket notification to user2 (the other user)
+        User user1 = userRepository.findById(userId1)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user2 = userRepository.findById(userId2)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        NotificationDTO notification = new NotificationDTO();
+        notification.setRecipientId(userId2);
+        notification.setActorId(userId1);
+        notification.setActorName(user1.getFullName());
+        notification.setActorAvatar(user1.getAvatar());
+        notification.setType("FRIEND_REMOVED");
+        notification.setTitle("Friend Removed");
+        notification.setContent(user1.getFullName() + " đã xóa bạn khỏi danh sách bạn bè");
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        
+        socketService.sendNotification(
+            user2.getUsername(),
+            SocketEventDTO.notification(userId2, notification)
+        );
+        log.info("📤 Sent FRIEND_REMOVED socket to user {} (username={})", userId2, user2.getUsername());
     }
 
     public void deleteFriendRequest(String id) {
