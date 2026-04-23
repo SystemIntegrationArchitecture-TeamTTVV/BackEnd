@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * OpenFeign client for calling CommonService from MessegeService.
@@ -30,5 +31,15 @@ public interface CommonServiceClient {
 
     @PostMapping("/api/socket/emit/room/{roomId}")
     void emitToRoom(@PathVariable("roomId") String roomId, @RequestBody SocketEventDTO event);
+
+    // ── Privacy Check ───────────────────────────────────────────────────
+    @GetMapping("/api/common/privacy/can-message")
+    java.util.Map<String, Object> canMessage(@RequestParam("senderId") String senderId, @RequestParam("receiverId") String receiverId);
+
+    @GetMapping("/api/common/privacy/can-call")
+    java.util.Map<String, Object> canCall(@RequestParam("callerId") String callerId, @RequestParam("receiverId") String receiverId);
+
+    @GetMapping("/api/common/privacy/can-invite-group")
+    java.util.Map<String, Object> canInviteGroup(@RequestParam("inviterId") String inviterId, @RequestParam("targetUserId") String targetUserId);
 }
 

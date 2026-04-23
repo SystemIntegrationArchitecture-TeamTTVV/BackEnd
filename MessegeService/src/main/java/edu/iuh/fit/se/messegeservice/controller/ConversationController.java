@@ -29,6 +29,11 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.getConversationsByUserId(userId));
     }
 
+    @GetMapping("/user/{userId}/hidden")
+    public ResponseEntity<List<ConversationDTO>> getHiddenConversationsByUserId(@PathVariable String userId) {
+        return ResponseEntity.ok(conversationService.getHiddenConversationsByUserId(userId));
+    }
+
     @GetMapping("/groups")
     public ResponseEntity<List<ConversationDTO>> getGroupConversations() {
         return ResponseEntity.ok(conversationService.getGroupConversations());

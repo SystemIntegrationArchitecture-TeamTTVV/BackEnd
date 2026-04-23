@@ -102,7 +102,7 @@ public class ReminderService {
         data.put("conversationId", reminder.getConversationId());
         data.put("triggeredAt", LocalDateTime.now().toString());
 
-        SocketEventDTO event = SocketEventDTO.of(SocketEventTypes.NOTIFICATION, null, data);
+        SocketEventDTO event = SocketEventDTO.of(SocketEventTypes.REMINDER_TRIGGERED, null, data);
         
         if (conversation.getParticipantIds() != null) {
             for (String userId : conversation.getParticipantIds()) {

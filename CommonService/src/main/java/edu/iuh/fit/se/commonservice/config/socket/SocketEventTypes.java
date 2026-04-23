@@ -24,6 +24,7 @@ public final class SocketEventTypes {
     public static final String MESSAGE_EDITED = "MESSAGE_EDITED";
     public static final String MESSAGE_PINNED = "MESSAGE_PINNED";
     public static final String MESSAGE_REACTED = "MESSAGE_REACTED";
+    public static final String MESSAGE_BLOCKED = "MESSAGE_BLOCKED";
 
     // ── Conversation Events ─────────────────────────────────────────────────
     public static final String CONVERSATION_CLEARED = "CONVERSATION_CLEARED";
@@ -47,6 +48,9 @@ public final class SocketEventTypes {
     // ── Poll Events ─────────────────────────────────────────────────────────
     public static final String POLL_CREATED = "POLL_CREATED";
     public static final String POLL_UPDATED = "POLL_UPDATED";
+
+    // ── Reminder Events ─────────────────────────────────────────────────────
+    public static final String REMINDER_TRIGGERED = "REMINDER_TRIGGERED";
 
     // ── Presence Events ─────────────────────────────────────────────────────
     public static final String USER_PRESENCE_CHANGED = "USER_PRESENCE_CHANGED";

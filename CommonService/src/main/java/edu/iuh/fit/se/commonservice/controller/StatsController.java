@@ -251,28 +251,46 @@ public class StatsController {
 
     private Map<String, Integer> calculateUserGrowthByMonth(List<User> users) {
         Map<String, Integer> growth = new LinkedHashMap<>();
-        // Tạo 7 tháng gần đây
         Calendar cal = Calendar.getInstance();
-        for (int i = 6; i >= 0; i--) {
-            String month = "T" + (cal.get(Calendar.MONTH) + 1);
+        // Build 7 months in reverse then reverse the map
+        List<String> months = new ArrayList<>();
+        List<Integer> counts = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            int year = cal.get(Calendar.YEAR);
+            int month = cal.get(Calendar.MONTH); // 0-based
+            String label = "T" + (month + 1);
             int count = (int) users.stream()
-                    .filter(u -> u.getCreatedAt() != null)
-                    .count() + (i * 50); // Simple estimation
-            growth.put(month, count);
+                    .filter(u -> u.getCreatedAt() != null
+                            && u.getCreatedAt().getYear() == year
+                            && u.getCreatedAt().getMonthValue() == (month + 1))
+                    .count();
+            months.add(label);
+            counts.add(count);
             cal.add(Calendar.MONTH, -1);
+        }
+        // Reverse to chronological order
+        for (int i = months.size() - 1; i >= 0; i--) {
+            growth.put(months.get(i), counts.get(i));
         }
         return growth;
     }
 
     private Map<String, Integer> calculateDailyEngagement(List<Post> posts, List<Comment> comments) {
         Map<String, Integer> daily = new LinkedHashMap<>();
-        int baseEngagement = (int) (posts.stream()
-                .mapToLong(p -> (p.getLikeCount() != null ? p.getLikeCount() : 0)
-                        + (p.getCommentCount() != null ? p.getCommentCount() : 0))
-                .sum() / 7); // Average per day for last 7 days
-
-        for (int i = 1; i <= 7; i++) {
-            daily.put("T" + i, Math.max(baseEngagement + (i * 1000), 5000));
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 6; i >= 0; i--) {
+            LocalDateTime dayStart = now.minusDays(i).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime dayEnd = dayStart.plusDays(1);
+            int postEngagement = (int) posts.stream()
+                    .filter(p -> p.getCreatedAt() != null && !p.getCreatedAt().isBefore(dayStart) && p.getCreatedAt().isBefore(dayEnd))
+                    .mapToLong(p -> (p.getLikeCount() != null ? p.getLikeCount() : 0)
+                            + (p.getCommentCount() != null ? p.getCommentCount() : 0))
+                    .sum();
+            int commentCount = (int) comments.stream()
+                    .filter(c -> c.getCreatedAt() != null && !c.getCreatedAt().isBefore(dayStart) && c.getCreatedAt().isBefore(dayEnd))
+                    .count();
+            String label = "T" + (7 - i);
+            daily.put(label, postEngagement + commentCount);
         }
         return daily;
     }

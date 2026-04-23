@@ -4,18 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/ApiGateway/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/ApiExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/ApiExceptionHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/ProductController.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/controller/ProductController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/repository/FriendRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/repository/FriendRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/PostService.java" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/java/edu/iuh/fit/se/commonservice/service/PostService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CommonService/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/CommonService/src/main/resources/application.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/CallController.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/controller/CallController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/service/CallService.java" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/java/edu/iuh/fit/se/messegeservice/service/CallService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/MessegeService/src/main/resources/application.properties" afterDir="false" />
-    </list>
+    <list default="true" id="b68e6b7d-f609-4f2e-9128-f6dd70d5f4dd" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -193,7 +182,7 @@
       <workItem from="1776293918268" duration="3072000" />
       <workItem from="1776665561556" duration="2000" />
       <workItem from="1776775495021" duration="3114000" />
-      <workItem from="1776847445207" duration="5060000" />
+      <workItem from="1776847445207" duration="5132000" />
     </task>
     <servers />
   </component>

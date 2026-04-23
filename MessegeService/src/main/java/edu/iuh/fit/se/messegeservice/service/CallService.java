@@ -4,7 +4,10 @@ import edu.iuh.fit.se.messegeservice.dto.CallDTO;
 import edu.iuh.fit.se.messegeservice.model.Call;
 import edu.iuh.fit.se.messegeservice.repository.CallRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -12,11 +15,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CallService {
 
     private final CallRepository callRepository;
+    private final CommonServiceClientFacade commonServiceClientFacade;
 
     public List<CallDTO> getCallsByConversationId(String conversationId) {
         return callRepository.findByConversationIdOrderByStartedAtDesc(conversationId).stream()
@@ -47,6 +52,17 @@ public class CallService {
     }
 
     public CallDTO initiateCall(String conversationId, String callerId, List<String> calleeIds, String type) {
+        // ── Privacy check: stranger call blocking ──
+        if (calleeIds != null && calleeIds.size() == 1) {
+            String calleeId = calleeIds.get(0);
+            boolean allowed = commonServiceClientFacade.canCall(callerId, calleeId);
+            if (!allowed) {
+                log.warn("🚫 [Privacy] Call blocked: {} → {} (callee has FRIENDS_ONLY)", callerId, calleeId);
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Cannot call: recipient only accepts calls from friends");
+            }
+        }
+
         Call call = new Call();
         call.setConversationId(conversationId);
         call.setCallerId(callerId);
