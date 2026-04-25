@@ -17,28 +17,31 @@ import java.util.List;
 public class Comment {
     @Id
     private String id;
-    
+
     @DBRef
     private Post post;
-    
-    @DBRef
-    private User author;
+
+    private String postId;
+    private String authorId;
 
     @DBRef
     private Video video;
-    
+
+    private String videoId;
+
     private String content;
-    private List<String> images; // URLs ảnh trong comment
-    
+    private List<String> images;
+
     @DBRef
-    private Comment parentComment; // null nếu là comment gốc, có giá trị nếu là reply
-    
+    private Comment parentComment;
+
+    private String parentCommentId;
+
     private int likeCount = 0;
     private int replyCount = 0;
-    
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
     private boolean isDeleted = false;
 }
-

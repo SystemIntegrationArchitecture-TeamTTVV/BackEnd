@@ -61,6 +61,7 @@ public class AIChatService {
         private final FriendRepository friendRepository;
         private final PostRepository postRepository;
         private final MessageServiceClientFacade messageServiceClientFacade;
+        private final edu.iuh.fit.se.commonservice.client.AuthServiceClient authServiceClient;
 
     public AIChatResponseDTO chat(AIChatRequestDTO request) {
         try {
@@ -302,11 +303,17 @@ public class AIChatService {
             sb.append("- Không có thông báo mới hôm nay.\n");
         } else {
             for (Notification n : notifications) {
-                String actor = n.getActor() != null ? fallback(n.getActor().getFullName(), "Ai đó") : "Ai đó";
+                String actorName = "Ai đó";
+                if (n.getActorId() != null) {
+                    try {
+                        edu.iuh.fit.se.commonservice.dto.UserDTO actor = authServiceClient.getUserById(n.getActorId());
+                        actorName = fallback(actor.getFullName() != null ? actor.getFullName() : actor.getUsername(), "Ai đó");
+                    } catch (Exception e) {}
+                }
                 String title = sanitize(fallback(n.getTitle(), "(không có tiêu đề)"), 120);
                 String content = sanitize(fallback(n.getContent(), ""), 180);
                 String time = n.getCreatedAt() != null ? n.getCreatedAt().format(DateTimeFormatter.ofPattern("HH:mm")) : "--:--";
-                sb.append("- ").append(time).append(" | ").append(actor).append(" | ").append(title);
+                sb.append("- ").append(time).append(" | ").append(actorName).append(" | ").append(title);
                 if (!content.isBlank()) {
                     sb.append(" | ").append(content);
                 }
@@ -319,9 +326,13 @@ public class AIChatService {
             sb.append("- Hôm nay chưa thấy bài đăng mới từ bạn bè.\n");
         } else {
             for (Post post : friendPosts) {
-                String friendName = (post.getAuthor() != null)
-                        ? fallback(post.getAuthor().getFullName(), "Bạn bè")
-                        : "Bạn bè";
+                String friendName = "Bạn bè";
+                if (post.getAuthorId() != null) {
+                    try {
+                        edu.iuh.fit.se.commonservice.dto.UserDTO author = authServiceClient.getUserById(post.getAuthorId());
+                        friendName = fallback(author.getFullName() != null ? author.getFullName() : author.getUsername(), "Bạn bè");
+                    } catch (Exception e) {}
+                }
                 String content = sanitize(fallback(post.getContent(), "(không có nội dung text)"), 220);
                 String activity = sanitize(fallback(post.getActivity(), ""), 80);
                 String feeling = sanitize(fallback(post.getFeeling(), ""), 80);

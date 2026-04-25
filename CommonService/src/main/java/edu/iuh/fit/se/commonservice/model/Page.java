@@ -24,9 +24,8 @@ public class Page {
     private String coverPhoto; // URL ảnh bìa
     private String avatar; // URL ảnh đại diện
     
-    @DBRef
-    private User admin; // Người quản trị trang
-    
+    private String adminId;
+
     private String category; // Danh mục trang
     private String website; // Website
     private String phoneNumber;

@@ -7,10 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import lombok.Data;
-import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.model.Comment;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.CommentRepository;
 
@@ -19,7 +19,7 @@ import edu.iuh.fit.se.commonservice.repository.CommentRepository;
 public class StatsController {
 
     @Autowired
-    private UserRepository userRepository;
+    private AuthServiceClient authServiceClient;
 
     @Autowired
     private PostRepository postRepository;
@@ -35,15 +35,23 @@ public class StatsController {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            // Query từ database
-            List<User> allUsers = userRepository.findAll();
+            // Query từ Auth Service
+            Map<String, Object> userMetrics = new HashMap<>();
+            try {
+                userMetrics = authServiceClient.userMetricsSummary();
+            } catch (Exception e) {
+                // Fallback
+                userMetrics.put("totalUsers", 0L);
+                userMetrics.put("activeUsers", 0L);
+                userMetrics.put("newUsersThisMonth", 0L);
+            }
+
             List<Post> allPosts = postRepository.findAll();
             List<Comment> allComments = commentRepository.findAll();
 
-            long totalUsers = allUsers.size();
-            long activeUsers = allUsers.stream()
-                    .filter(u -> u.getIsActive() != null && u.getIsActive())
-                    .count();
+            long totalUsers = ((Number) userMetrics.getOrDefault("totalUsers", 0L)).longValue();
+            long activeUsers = ((Number) userMetrics.getOrDefault("activeUsers", 0L)).longValue();
+            long newUsersThisMonth = ((Number) userMetrics.getOrDefault("newUsersThisMonth", 0L)).longValue();
             long totalPosts = allPosts.size();
             long totalComments = allComments.size();
             long totalViews = allPosts.stream()
@@ -55,11 +63,11 @@ public class StatsController {
             stats.put("totalPosts", totalPosts);
             stats.put("totalComments", totalComments);
             stats.put("totalViews", totalViews);
-            stats.put("newUsersThisMonth", calculateNewUsersThisMonth(allUsers));
+            stats.put("newUsersThisMonth", newUsersThisMonth);
             stats.put("engagementRate", calculateEngagementRate(totalPosts, totalComments));
 
-            // Growth statistics by month
-            Map<String, Integer> userGrowth = calculateUserGrowthByMonth(allUsers);
+            // Growth statistics mock
+            Map<String, Integer> userGrowth = new LinkedHashMap<>();
             stats.put("userGrowth", userGrowth);
 
         } catch (Exception e) {
@@ -77,23 +85,43 @@ public class StatsController {
         try {
             List<Post> allPosts = postRepository.findAll();
 
-            List<TopPostDTO> topPosts = allPosts.stream()
+            List<Post> topPostEntities = allPosts.stream()
                     .sorted((p1, p2) -> Long.compare(
                             (p2.getLikeCount() != null ? p2.getLikeCount() : 0)
                                     + (p2.getCommentCount() != null ? p2.getCommentCount() : 0),
                             (p1.getLikeCount() != null ? p1.getLikeCount() : 0)
                                     + (p1.getCommentCount() != null ? p1.getCommentCount() : 0)))
                     .limit(limit)
+                    .toList();
+
+            List<String> authorIds = topPostEntities.stream()
+                    .map(Post::getAuthorId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            
+            Map<String, UserDTO> usersMap = new HashMap<>();
+            if (!authorIds.isEmpty()) {
+                try {
+                    List<UserDTO> users = authServiceClient.batchLookup(authorIds);
+                    if (users != null) {
+                        for (UserDTO u : users) {
+                            usersMap.put(u.getId(), u);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore
+                }
+            }
+
+            List<TopPostDTO> topPosts = topPostEntities.stream()
                     .map(post -> {
                         String authorName = "Unknown";
                         String authorAvatar = "";
-                        if (post.getAuthor() != null) {
-                            authorName = post.getAuthor().getFullName() != null 
-                                    ? post.getAuthor().getFullName() 
-                                    : post.getAuthor().getUsername();
-                            authorAvatar = post.getAuthor().getAvatar() != null 
-                                    ? post.getAuthor().getAvatar() 
-                                    : "";
+                        if (post.getAuthorId() != null && usersMap.containsKey(post.getAuthorId())) {
+                            UserDTO author = usersMap.get(post.getAuthorId());
+                            authorName = author.getFullName() != null ? author.getFullName() : author.getUsername();
+                            authorAvatar = author.getAvatar() != null ? author.getAvatar() : "";
                         }
                         
                         return new TopPostDTO(
@@ -162,13 +190,11 @@ public class StatsController {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            List<User> users = userRepository.findAll();
+            Map<String, Object> userMetrics = authServiceClient.userMetricsSummary();
 
-            long totalUsers = users.size();
-            long activeUsers = users.stream()
-                    .filter(u -> u.getIsActive() != null && u.getIsActive())
-                    .count();
-            long newUsersThisMonth = calculateNewUsersThisMonth(users);
+            long totalUsers = ((Number) userMetrics.getOrDefault("totalUsers", 0L)).longValue();
+            long activeUsers = ((Number) userMetrics.getOrDefault("activeUsers", 0L)).longValue();
+            long newUsersThisMonth = ((Number) userMetrics.getOrDefault("newUsersThisMonth", 0L)).longValue();
 
             double activeUserRate = totalUsers > 0 ? (activeUsers * 100.0) / totalUsers : 0;
             double newUsersRate = totalUsers > 0 ? (newUsersThisMonth * 100.0) / totalUsers : 0;
@@ -229,50 +255,9 @@ public class StatsController {
         return ResponseEntity.ok(stats);
     }
 
-    // Helper methods
-    private long calculateNewUsersThisMonth(List<User> users) {
-        // Tính số user được tạo trong tháng này
-        LocalDateTime monthStart = LocalDateTime.now()
-                .withDayOfMonth(1)
-                .withHour(0)
-                .withMinute(0)
-                .withSecond(0)
-                .withNano(0);
-
-        return users.stream()
-                .filter(u -> u.getCreatedAt() != null && u.getCreatedAt().isAfter(monthStart))
-                .count();
-    }
-
     private double calculateEngagementRate(long totalPosts, long totalComments) {
         if (totalPosts == 0) return 0;
         return Math.round(((double) totalComments / totalPosts) * 10.0) / 10.0;
-    }
-
-    private Map<String, Integer> calculateUserGrowthByMonth(List<User> users) {
-        Map<String, Integer> growth = new LinkedHashMap<>();
-        Calendar cal = Calendar.getInstance();
-        // Build 7 months in reverse then reverse the map
-        List<String> months = new ArrayList<>();
-        List<Integer> counts = new ArrayList<>();
-        for (int i = 0; i < 7; i++) {
-            int year = cal.get(Calendar.YEAR);
-            int month = cal.get(Calendar.MONTH); // 0-based
-            String label = "T" + (month + 1);
-            int count = (int) users.stream()
-                    .filter(u -> u.getCreatedAt() != null
-                            && u.getCreatedAt().getYear() == year
-                            && u.getCreatedAt().getMonthValue() == (month + 1))
-                    .count();
-            months.add(label);
-            counts.add(count);
-            cal.add(Calendar.MONTH, -1);
-        }
-        // Reverse to chronological order
-        for (int i = months.size() - 1; i >= 0; i--) {
-            growth.put(months.get(i), counts.get(i));
-        }
-        return growth;
     }
 
     private Map<String, Integer> calculateDailyEngagement(List<Post> posts, List<Comment> comments) {

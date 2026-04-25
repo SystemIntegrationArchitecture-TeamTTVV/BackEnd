@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 
 import java.time.LocalDateTime;
@@ -18,16 +17,10 @@ import java.time.LocalDateTime;
 public class Friend {
     @Id
     private String id;
-    
-    @DBRef
-    private User user;
+
     private String userId;
-    
-    @DBRef
-    private User friend;
     private String friendId;
-    
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-

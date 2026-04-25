@@ -22,9 +22,8 @@ public class Event {
     private String description; // Mô tả
     private String coverPhoto; // URL ảnh bìa
     
-    @DBRef
-    private User host; // Người tổ chức
-    
+    private String hostId;
+
     @DBRef
     private Group group; // null nếu không thuộc nhóm
     

@@ -19,8 +19,6 @@ public class SavedItem {
     @Id
     private String id;
     
-    @DBRef
-    private User user;
     private String userId;
     
     private String itemId; // ID của post, photo, video, etc.

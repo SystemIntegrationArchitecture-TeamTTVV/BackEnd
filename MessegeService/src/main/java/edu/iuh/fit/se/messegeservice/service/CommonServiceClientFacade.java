@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.messegeservice.service;
 
+import edu.iuh.fit.se.messegeservice.client.AuthServiceClient;
 import edu.iuh.fit.se.messegeservice.client.CommonServiceClient;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
@@ -21,18 +22,19 @@ import org.springframework.stereotype.Service;
 public class CommonServiceClientFacade {
 
     private final CommonServiceClient commonServiceClient;
+    private final AuthServiceClient authServiceClient;
 
-    @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "getUserByIdFallback")
-    @RateLimiter(name = "commonService", fallbackMethod = "getUserByIdFallback")
-    @Retry(name = "commonService", fallbackMethod = "getUserByIdFallback")
-    @CircuitBreaker(name = "commonService", fallbackMethod = "getUserByIdFallback")
+    @Bulkhead(name = "authService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "getUserByIdFallback")
+    @RateLimiter(name = "authService", fallbackMethod = "getUserByIdFallback")
+    @Retry(name = "authService", fallbackMethod = "getUserByIdFallback")
+    @CircuitBreaker(name = "authService", fallbackMethod = "getUserByIdFallback")
     public UserDTO getUserById(String id) {
-        return commonServiceClient.getUserById(id);
+        return authServiceClient.getUserById(id);
     }
 
     @SuppressWarnings("unused")
     private UserDTO getUserByIdFallback(String id, Throwable throwable) {
-        log.warn("⚠️ [CommonServiceClient] Falling back for getUserById({}): {}", id, throwable.getMessage());
+        log.warn("⚠️ [AuthServiceClient] Falling back for getUserById({}): {}", id, throwable.getMessage());
         UserDTO fallback = new UserDTO();
         fallback.setId(id);
         fallback.setUsername("unknown");

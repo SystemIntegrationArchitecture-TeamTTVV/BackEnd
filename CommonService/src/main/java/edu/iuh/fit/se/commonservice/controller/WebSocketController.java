@@ -1,8 +1,8 @@
 package edu.iuh.fit.se.commonservice.controller;
 
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
-import edu.iuh.fit.se.commonservice.model.User;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.service.MessageServiceClientFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,7 @@ import java.util.Optional;
 public class WebSocketController {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final MessageServiceClientFacade messageServiceClientFacade;
 
     /**
@@ -218,16 +218,12 @@ public class WebSocketController {
     private String getUsernameById(String userId) {
         try {
             log.info("🔍 Looking up user with ID: {}", userId);
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isPresent()) {
-                User user = userOptional.get();
+            UserDTO user = authServiceClient.getUserById(userId);
+            if (user != null) {
                 log.info("✅ Found user: id={}, username={}, fullName={}", user.getId(), user.getUsername(), user.getFullName());
                 return user.getUsername();
             } else {
-                log.error("❌ No user found in database with ID: {}", userId);
-                // Try to list all users to debug
-                long totalUsers = userRepository.count();
-                log.info("📊 Total users in database: {}", totalUsers);
+                log.error("❌ No user found with ID: {}", userId);
                 return null;
             }
         } catch (Exception e) {

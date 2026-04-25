@@ -19,8 +19,6 @@ public class PageLike {
     @Id
     private String id;
     
-    @DBRef
-    private User user;
     private String userId;
     
     @DBRef

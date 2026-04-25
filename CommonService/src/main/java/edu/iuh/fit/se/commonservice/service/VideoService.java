@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service;
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.dto.VideoDTO;
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.model.Video;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import edu.iuh.fit.se.commonservice.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
 
@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 public class VideoService {
 
     private final VideoRepository videoRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final FriendService friendService;
@@ -143,7 +143,10 @@ public class VideoService {
      */
     private void notifyFriendsAboutVideo(VideoDTO video) {
         try {
-            User author = userRepository.findById(video.getAuthorId()).orElse(null);
+            UserDTO author = null;
+            try {
+                author = authServiceClient.getUserById(video.getAuthorId());
+            } catch (Exception e) {}
             if (author == null) return;
 
             List<String> friendIds = friendService.getFriendsByUserId(video.getAuthorId())
@@ -155,13 +158,13 @@ public class VideoService {
                 NotificationDTO notificationDTO = new NotificationDTO();
                 notificationDTO.setType("VIDEO");
                 notificationDTO.setActorId(video.getAuthorId());
-                notificationDTO.setActorName(author.getFullName());
+                notificationDTO.setActorName(author.getFullName() != null ? author.getFullName() : author.getUsername());
                 notificationDTO.setActorAvatar(author.getAvatar());
                 notificationDTO.setRecipientId(friendId);
                 notificationDTO.setRelatedId(video.getId());
                 notificationDTO.setRelatedType("VIDEO");
                 notificationDTO.setTitle("Video mới");
-                notificationDTO.setContent(author.getFullName() + " đã đăng video mới: " + video.getTitle());
+                notificationDTO.setContent((author.getFullName() != null ? author.getFullName() : author.getUsername()) + " đã đăng video mới: " + video.getTitle());
                 notificationDTO.setRead(false);
                 notificationDTO.setCreatedAt(LocalDateTime.now());
 
@@ -175,10 +178,15 @@ public class VideoService {
     private VideoDTO toDTO(Video video) {
         VideoDTO dto = new VideoDTO();
         dto.setId(video.getId());
-        if (video.getAuthor() != null) {
-            dto.setAuthorId(video.getAuthor().getId());
-            dto.setAuthorName(video.getAuthor().getFullName());
-            dto.setAuthorAvatar(video.getAuthor().getAvatar());
+        if (video.getAuthorId() != null) {
+            dto.setAuthorId(video.getAuthorId());
+            try {
+                UserDTO author = authServiceClient.getUserById(video.getAuthorId());
+                dto.setAuthorName(author.getFullName() != null ? author.getFullName() : author.getUsername());
+                dto.setAuthorAvatar(author.getAvatar());
+            } catch (Exception e) {
+                dto.setAuthorName("Unknown");
+            }
         }
         dto.setTitle(video.getTitle());
         dto.setDescription(video.getDescription());
@@ -210,9 +218,7 @@ public class VideoService {
     private Video toEntity(VideoDTO dto) {
         Video video = new Video();
         if (dto.getAuthorId() != null) {
-            User author = userRepository.findById(dto.getAuthorId())
-                    .orElseThrow(() -> new RuntimeException("User not found with id: " + dto.getAuthorId()));
-            video.setAuthor(author);
+            video.setAuthorId(dto.getAuthorId());
         }
         video.setTitle(dto.getTitle());
         video.setDescription(dto.getDescription());

@@ -1213,10 +1213,11 @@ public class MessageService {
                         payload.put("conversationId", conversation.getId());
                         payload.put("receiverId", receiverId);
                         payload.put("reason", "PRIVACY_FRIENDS_ONLY");
-                        SocketEventDTO blockedEvent = SocketEventDTO.builder()
-                                .type(SocketEventTypes.MESSAGE_BLOCKED)
-                                .payload(payload)
-                                .build();
+                        SocketEventDTO blockedEvent = SocketEventDTO.of(
+                                SocketEventTypes.MESSAGE_BLOCKED,
+                                userId,
+                                payload
+                        );
                         socketEmitterService.emitToUserById(userId, blockedEvent);
                     } catch (Exception e) {
                         log.error("Failed to emit MESSAGE_BLOCKED event: {}", e.getMessage());

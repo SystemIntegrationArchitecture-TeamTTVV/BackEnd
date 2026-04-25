@@ -39,5 +39,8 @@ public class UserDTO {
     private String postVisibility;
     private Boolean showEmail;
     private Boolean showPhone;
+    private String allowMessageFrom;
+    private String allowCallFrom;
+    private String allowGroupInviteFrom;
 }
 

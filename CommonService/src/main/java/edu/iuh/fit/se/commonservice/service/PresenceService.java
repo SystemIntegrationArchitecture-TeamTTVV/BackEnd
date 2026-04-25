@@ -3,8 +3,8 @@ package edu.iuh.fit.se.commonservice.service;
 import edu.iuh.fit.se.commonservice.config.socket.SocketEventTypes;
 import edu.iuh.fit.se.commonservice.dto.PresenceStatusDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
-import edu.iuh.fit.se.commonservice.model.User;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class PresenceService {
 
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
 
     private final ConcurrentHashMap<String, PresenceEntry> presenceByUsername = new ConcurrentHashMap<>();
@@ -86,15 +86,21 @@ public class PresenceService {
             return result;
         }
 
-        List<User> users = userRepository.findAllById(userIds);
-        Map<String, User> byId = new LinkedHashMap<>();
-        for (User user : users) {
-            byId.put(user.getId(), user);
+        List<UserDTO> users = new ArrayList<>();
+        try {
+            users = authServiceClient.batchLookup(userIds);
+        } catch (Exception e) {}
+        
+        Map<String, UserDTO> byId = new LinkedHashMap<>();
+        if (users != null) {
+            for (UserDTO user : users) {
+                byId.put(user.getId(), user);
+            }
         }
 
         LocalDateTime now = LocalDateTime.now();
         for (String userId : userIds) {
-            User user = byId.get(userId);
+            UserDTO user = byId.get(userId);
             String username = user != null ? user.getUsername() : null;
             PresenceEntry entry = username == null ? null : presenceByUsername.get(username);
             boolean online = entry != null && entry.connectionCount > 0;
@@ -109,12 +115,18 @@ public class PresenceService {
     }
 
     public void markOnlineByUsername(String username) {
-        User user = userRepository.findByUsername(username).orElse(null);
+        UserDTO user = null;
+        try {
+            user = authServiceClient.getUserByUsername(username);
+        } catch (Exception e) {}
         markOnline(user != null ? user.getId() : null, username);
     }
 
     public void markOfflineByUsername(String username) {
-        User user = userRepository.findByUsername(username).orElse(null);
+        UserDTO user = null;
+        try {
+            user = authServiceClient.getUserByUsername(username);
+        } catch (Exception e) {}
         markOffline(user != null ? user.getId() : null, username);
     }
 

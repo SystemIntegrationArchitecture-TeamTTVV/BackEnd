@@ -17,12 +17,7 @@ public class Notification {
     @Id
     private String id;
     
-    @DBRef
-    private User recipient; // Người nhận thông báo
     private String recipientId;
-    
-    @DBRef
-    private User actor; // Người thực hiện hành động
     private String actorId;
     
     private String type; // LIKE_POST, COMMENT_POST, FRIEND_REQUEST, FRIEND_ACCEPTED, GROUP_INVITE, EVENT_INVITE, etc.

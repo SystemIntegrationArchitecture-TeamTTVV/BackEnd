@@ -23,9 +23,8 @@ public class Group {
     private String coverPhoto; // URL ảnh bìa
     private String avatar; // URL ảnh đại diện
     
-    @DBRef
-    private User admin; // Người quản trị nhóm
-    
+    private String adminId;
+
     private String privacy = "PUBLIC"; // PUBLIC, PRIVATE, SECRET
     private String visibility = "VISIBLE"; // VISIBLE, HIDDEN
     

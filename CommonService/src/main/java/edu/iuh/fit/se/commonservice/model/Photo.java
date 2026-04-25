@@ -21,9 +21,8 @@ public class Photo {
     private String thumbnailUrl; // URL thumbnail
     private String caption; // Chú thích ảnh
     
-    @DBRef
-    private User owner;
-    
+    private String ownerId;
+
     @DBRef
     private Album album; // null nếu không thuộc album
     

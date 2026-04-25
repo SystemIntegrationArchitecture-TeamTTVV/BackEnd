@@ -21,9 +21,8 @@ public class Album {
     private String name; // Tên album
     private String description; // Mô tả album
     
-    @DBRef
-    private User owner;
-    
+    private String ownerId;
+
     private String coverPhoto; // URL ảnh bìa album
     private int photoCount = 0;
     
