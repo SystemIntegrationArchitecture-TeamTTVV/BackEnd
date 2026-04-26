@@ -34,6 +34,9 @@ EXPOSE 8081
 # Allow overriding port via PORT env var (Render sets this automatically)
 ENV PORT=8081
 
+# Activate 'docker' profile by default inside containers
+ENV SPRING_PROFILES_ACTIVE=docker
+
 # Use exec form to ensure proper signal handling
 CMD ["sh", "-c", "java -Dserver.port=${PORT} -jar app.jar"]
 

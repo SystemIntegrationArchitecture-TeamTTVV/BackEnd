@@ -69,16 +69,6 @@
             <version>1.39.0</version>
         </dependency>
 
-        <!-- Spring Cloud Config (no SQL) -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-config-server</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-config</artifactId>
-        </dependency>
-
         <!-- OpenFeign for inter-service HTTP clients -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

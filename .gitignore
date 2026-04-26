@@ -11,3 +11,4 @@
 # Cloudinary / secrets (copy from .env.example)
 **/.env
 
+.env

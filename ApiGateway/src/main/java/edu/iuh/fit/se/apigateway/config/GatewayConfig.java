@@ -28,9 +28,15 @@ public class GatewayConfig {
             "/v3/api-docs",
             "/actuator",
             "/fallback",
+            // Auth endpoints — must be public (login, register, refresh, forgot/reset password)
+            "/api/auth/",
+            "/api/users/",
             "/api/common/auth",
+            // Swagger / API docs
             "/api/common/v3/api-docs",
             "/api/message/v3/api-docs",
+            "/api/auth-svc/v3/api-docs",
+            // WebSocket
             "/api/common/ws"
     );
 

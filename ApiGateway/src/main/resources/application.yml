@@ -361,10 +361,11 @@ server:
 
 app:
   security:
-    enabled: false
+    enabled: ${APP_SECURITY_ENABLED:true}
 
+# ⚠️ PRODUCTION: set JWT_SECRET env var — do NOT use the default in production
 jwt:
-  secret: mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong
+  secret: ${JWT_SECRET:mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
 
 
 
