@@ -1,15 +1,14 @@
 package edu.iuh.fit.se.commonservice.model;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.DBRef;
-import org.springframework.data.mongodb.core.mapping.Document;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Document(collection = "videos")
 @Data
@@ -19,38 +18,34 @@ public class Video {
     @Id
     private String id;
 
-    @DBRef
-    private User author;
+    private String authorId;
 
-    private String title; // Tiêu đề video
-    private String description; // Mô tả
-    private String videoUrl; // URL video chính
-    private String thumbnailUrl; // Ảnh thumbnail
+    private String title;
+    private String description;
+    private String videoUrl;
+    private String thumbnailUrl;
+    private Long duration;
+    private String quality;
+    private Long fileSize;
 
-    // Metadata
-    private Long duration; // Thời lượng (giây)
-    private String quality; // HD, FHD, 4K
-    private Long fileSize; // Kích thước file
-
-    private String visibility = "PUBLIC"; // PUBLIC, FRIENDS, ONLY_ME
-    private Boolean allowComments = true;
-    private Boolean allowReactions = true;
-
-    // Thống kê
     private Integer viewCount = 0;
     private Integer likeCount = 0;
     private Integer commentCount = 0;
     private Integer shareCount = 0;
 
-    // Reference đến Group hoặc Page nếu đăng trong nhóm/trang
+    private String visibility = "PUBLIC";
+    private Boolean allowComments = true;
+    private Boolean allowReactions = true;
+    private List<String> tags;
+    private String category;
+
     @DBRef
     private Group group;
+    private String groupId;
+
     @DBRef
     private Page page;
-
-    // Tags và danh mục
-    private List<String> tags;
-    private String category; // Gaming, Music, Sports, etc.
+    private String pageId;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

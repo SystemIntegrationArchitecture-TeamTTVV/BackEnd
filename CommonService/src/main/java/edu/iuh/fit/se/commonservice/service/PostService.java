@@ -2,10 +2,12 @@ package edu.iuh.fit.se.commonservice.service;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -15,17 +17,17 @@ import com.mongodb.DBRef;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.model.Post;
-import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -33,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 public class PostService {
 
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
+    private final UserIdentityService userIdentityService;
     private final FriendRepository friendRepository;
     private final MongoTemplate mongoTemplate;
     private final SocketService socketService;
@@ -49,16 +51,28 @@ public class PostService {
         Set<String> friendIds = buildFriendIdSet(viewerId);
         List<Document> docs = findPostsAggregated(
                 Criteria.where("isDeleted").is(false).and("groupId").is(null));
+        List<String> authorIds = docs.stream()
+                .map(PostService::extractResolvedAuthorIdFromDoc)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        Map<String, UserDTO> users = userIdentityService.batchLookupMap(authorIds);
         return docs.stream()
-                .map(this::documentToPostDTO)
+                .map(d -> documentToPostDTO(d, users))
                 .filter(dto -> isDtoVisibleToViewer(dto, viewerId, friendIds))
                 .collect(Collectors.toList());
     }
 
     public PostDTO getPostById(String id) {
-        return postRepository.findById(id)
-                .map(this::toDTO)
-                .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
+        Document doc = mongoTemplate.findById(id, Document.class, "posts");
+        if (doc == null) {
+            throw new RuntimeException("Post not found with id: " + id);
+        }
+        String aid = extractResolvedAuthorIdFromDoc(doc);
+        Map<String, UserDTO> users = aid != null && !aid.isBlank()
+                ? userIdentityService.batchLookupMap(List.of(aid))
+                : Collections.emptyMap();
+        return documentToPostDTO(doc, users);
     }
 
     public List<PostDTO> getPostsByUserId(String userId) {
@@ -67,10 +81,25 @@ public class PostService {
 
     public List<PostDTO> getPostsByUserId(String userId, String viewerId) {
         Set<String> friendIds = buildFriendIdSet(viewerId);
-        Criteria criteria = Criteria.where("author.$id").is(new ObjectId(userId));
-        List<Document> docs = findPostsAggregated(criteria);
+        List<Criteria> authorOr = new ArrayList<>();
+        authorOr.add(Criteria.where("authorId").is(userId));
+        if (ObjectId.isValid(userId)) {
+            authorOr.add(Criteria.where("author.$id").is(new ObjectId(userId)));
+        }
+        Criteria authorMatch = new Criteria().orOperator(authorOr.toArray(new Criteria[0]));
+        Criteria full = new Criteria().andOperator(
+                Criteria.where("isDeleted").is(false),
+                authorMatch
+        );
+        List<Document> docs = findPostsAggregated(full);
+        List<String> authorIds = docs.stream()
+                .map(PostService::extractResolvedAuthorIdFromDoc)
+                .filter(s -> s != null && !s.isBlank())
+                .distinct()
+                .toList();
+        Map<String, UserDTO> users = userIdentityService.batchLookupMap(authorIds);
         return docs.stream()
-                .map(this::documentToPostDTO)
+                .map(d -> documentToPostDTO(d, users))
                 .filter(dto -> isDtoVisibleToViewer(dto, viewerId, friendIds))
                 .collect(Collectors.toList());
     }
@@ -96,21 +125,18 @@ public class PostService {
         post.setDeleted(false);
         Post saved = postRepository.save(post);
         PostDTO savedDTO = toDTO(saved);
-        
-        // Send socket event
+
         if (savedDTO.getAuthorId() != null) {
             socketService.notifyPostCreated(
-                savedDTO.getAuthorId(),
-                SocketEventDTO.postCreated(savedDTO.getAuthorId(), savedDTO)
+                    savedDTO.getAuthorId(),
+                    SocketEventDTO.postCreated(savedDTO.getAuthorId(), savedDTO)
             );
-            
-            // Notify friends about new post
             notifyFriendsAboutPost(savedDTO);
         }
-        
+
         return savedDTO;
     }
-    
+
     private void notifyFriendsAboutPost(PostDTO post) {
         try {
             String visibility = normalizeVisibility(post.getVisibility());
@@ -118,17 +144,16 @@ public class PostService {
                 return;
             }
 
-            // Get author info
-            User author = userRepository.findById(post.getAuthorId()).orElse(null);
-            if (author == null) return;
-            
-            // Get all friends
+            UserDTO author = userIdentityService.findById(post.getAuthorId()).orElse(null);
+            if (author == null) {
+                return;
+            }
+
             List<String> friendIds = friendService.getFriendsByUserId(post.getAuthorId())
                     .stream()
                     .map(friend -> friend.getFriendId())
                     .collect(Collectors.toList());
-            
-            // Create notification for each friend
+
             for (String friendId : friendIds) {
                 NotificationDTO notificationDTO = new NotificationDTO();
                 notificationDTO.setType("POST");
@@ -142,7 +167,7 @@ public class PostService {
                 notificationDTO.setContent(author.getFullName() + " đã đăng bài viết mới");
                 notificationDTO.setRead(false);
                 notificationDTO.setCreatedAt(LocalDateTime.now());
-                
+
                 notificationService.createNotification(notificationDTO);
             }
         } catch (Exception e) {
@@ -155,7 +180,7 @@ public class PostService {
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
 
         aiViolationCheckService.checkOrThrow(postDTO.getContent(), "POST");
-        
+
         post.setContent(postDTO.getContent());
         post.setImages(postDTO.getImages());
         post.setVideos(postDTO.getVideos());
@@ -166,7 +191,7 @@ public class PostService {
             post.setVisibility(normalizeVisibility(postDTO.getVisibility()));
         }
         post.setUpdatedAt(LocalDateTime.now());
-        
+
         Post updated = postRepository.save(post);
         return toDTO(updated);
     }
@@ -180,92 +205,76 @@ public class PostService {
     }
 
     public PostDTO sharePost(String postId, PostDTO shareDTO) {
-        // Get the original post to share
         Post originalPost = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
 
-        // Create new post as a share
         Post sharePost = new Post();
         if (shareDTO.getAuthorId() != null) {
-            User author = userRepository.findById(shareDTO.getAuthorId())
-                    .orElseThrow(() -> new RuntimeException("User not found with id: " + shareDTO.getAuthorId()));
-            sharePost.setAuthor(author);
+            userIdentityService.getByIdOrThrow(shareDTO.getAuthorId());
+            sharePost.setAuthorId(shareDTO.getAuthorId());
         }
-        
-        // Set share content (user's comment about the share)
-        sharePost.setContent(shareDTO.getContent());
-        
-        // Copy content from original post for display
-        // In a real implementation, you might want to store a reference to the original post
-        // For now, we'll duplicate the content
-        String sharedContent = shareDTO.getContent() != null && !shareDTO.getContent().isEmpty() 
-            ? shareDTO.getContent() + "\n\n--- Shared Post ---\n" + originalPost.getContent()
-            : "--- Shared Post ---\n" + originalPost.getContent();
 
-        // Chặn share nếu nội dung bị vi phạm (để không tăng shareCount sai).
+        String sharedContent = shareDTO.getContent() != null && !shareDTO.getContent().isEmpty()
+                ? shareDTO.getContent() + "\n\n--- Shared Post ---\n" + originalPost.getContent()
+                : "--- Shared Post ---\n" + originalPost.getContent();
+
         aiViolationCheckService.checkOrThrow(sharedContent, "POST");
 
-        // Increment share count on original post
         originalPost.setShareCount(originalPost.getShareCount() + 1);
         postRepository.save(originalPost);
 
         sharePost.setContent(sharedContent);
         sharePost.setImages(originalPost.getImages());
         sharePost.setVideos(originalPost.getVideos());
-        
-        // Set share settings
         sharePost.setVisibility(normalizeVisibility(shareDTO.getVisibility()));
         sharePost.setAllowComments(shareDTO.getAllowComments() == null ? Boolean.TRUE : shareDTO.getAllowComments());
         sharePost.setAllowSharing(shareDTO.getAllowSharing() == null ? Boolean.TRUE : shareDTO.getAllowSharing());
-        
-        // Set timestamps
         sharePost.setCreatedAt(LocalDateTime.now());
         sharePost.setUpdatedAt(LocalDateTime.now());
         sharePost.setDeleted(false);
-        
+
         Post saved = postRepository.save(sharePost);
         PostDTO savedDTO = toDTO(saved);
-        
-        // Notify original post author about share
-        if (originalPost.getAuthor() != null && shareDTO.getAuthorId() != null) {
-            String originalAuthorId = originalPost.getAuthor().getId();
-            if (!originalAuthorId.equals(shareDTO.getAuthorId())) {
-                User sharer = userRepository.findById(shareDTO.getAuthorId()).orElse(null);
-                if (sharer != null) {
-                    NotificationDTO notificationDTO = new NotificationDTO();
-                    notificationDTO.setRecipientId(originalAuthorId);
-                    notificationDTO.setActorId(shareDTO.getAuthorId());
-                    notificationDTO.setActorName(sharer.getFullName());
-                    notificationDTO.setActorAvatar(sharer.getAvatar());
-                    notificationDTO.setType("SHARE_POST");
-                    notificationDTO.setTitle("Post Shared");
-                    notificationDTO.setContent(sharer.getFullName() + " shared your post");
-                    notificationDTO.setRelatedId(postId);
-                    notificationDTO.setRelatedType("POST");
-                    
-                    notificationService.createNotification(notificationDTO);
-                }
-            }
+
+        Document origDoc = mongoTemplate.findById(postId, Document.class, "posts");
+        String originalAuthorId = origDoc != null ? extractResolvedAuthorIdFromDoc(origDoc) : originalPost.getAuthorId();
+        if (originalAuthorId != null && shareDTO.getAuthorId() != null
+                && !originalAuthorId.equals(shareDTO.getAuthorId())) {
+            userIdentityService.findById(shareDTO.getAuthorId()).ifPresent(sharer -> {
+                NotificationDTO notificationDTO = new NotificationDTO();
+                notificationDTO.setRecipientId(originalAuthorId);
+                notificationDTO.setActorId(shareDTO.getAuthorId());
+                notificationDTO.setActorName(sharer.getFullName());
+                notificationDTO.setActorAvatar(sharer.getAvatar());
+                notificationDTO.setType("SHARE_POST");
+                notificationDTO.setTitle("Post Shared");
+                notificationDTO.setContent(sharer.getFullName() + " shared your post");
+                notificationDTO.setRelatedId(postId);
+                notificationDTO.setRelatedType("POST");
+                notificationService.createNotification(notificationDTO);
+            });
         }
-        
-        // Send socket event
+
         if (savedDTO.getAuthorId() != null) {
             socketService.notifyPostCreated(
-                savedDTO.getAuthorId(),
-                SocketEventDTO.postCreated(savedDTO.getAuthorId(), savedDTO)
+                    savedDTO.getAuthorId(),
+                    SocketEventDTO.postCreated(savedDTO.getAuthorId(), savedDTO)
             );
         }
-        
+
         return savedDTO;
     }
 
     private PostDTO toDTO(Post post) {
         PostDTO dto = new PostDTO();
         dto.setId(post.getId());
-        if (post.getAuthor() != null) {
-            dto.setAuthorId(post.getAuthor().getId());
-            dto.setAuthorName(post.getAuthor().getFullName());
-            dto.setAuthorAvatar(post.getAuthor().getAvatar());
+        String aid = post.getAuthorId();
+        if (aid != null && !aid.isBlank()) {
+            dto.setAuthorId(aid);
+            userIdentityService.findById(aid).ifPresent(u -> {
+                dto.setAuthorName(u.getFullName());
+                dto.setAuthorAvatar(u.getAvatar());
+            });
         }
         dto.setContent(post.getContent());
         dto.setImages(post.getImages());
@@ -293,9 +302,8 @@ public class PostService {
     private Post toEntity(PostDTO dto) {
         Post post = new Post();
         if (dto.getAuthorId() != null) {
-            User author = userRepository.findById(dto.getAuthorId())
-                    .orElseThrow(() -> new RuntimeException("User not found with id: " + dto.getAuthorId()));
-            post.setAuthor(author);
+            userIdentityService.getByIdOrThrow(dto.getAuthorId());
+            post.setAuthorId(dto.getAuthorId());
         }
         post.setContent(dto.getContent());
         post.setImages(dto.getImages());
@@ -309,16 +317,11 @@ public class PostService {
         return post;
     }
 
-    /**
-     * Pre-load all friend IDs for the viewer in one query.
-     * Friendship may be stored one-way, so we check both directions.
-     */
     private Set<String> buildFriendIdSet(String viewerId) {
         if (viewerId == null || viewerId.isBlank()) {
             return Collections.emptySet();
         }
         Set<String> ids = new HashSet<>();
-        // Single query for both directions
         friendRepository.findByUserIdOrFriendId(viewerId, viewerId).forEach(f -> {
             if (viewerId.equals(f.getUserId())) {
                 ids.add(f.getFriendId());
@@ -329,37 +332,59 @@ public class PostService {
         return ids;
     }
 
-    // ── Aggregation: batch-resolve authors in 1 query (eliminates @DBRef N+1) ──
+    private AggregationOperation addResolvedAuthorIdStage() {
+        return context -> new Document("$addFields", new Document("_resolvedAuthorId",
+                new Document("$ifNull", List.of(
+                        "$authorId",
+                        new Document("$convert", new Document("input", "$author.$id")
+                                .append("to", "string")
+                                .append("onError", "")
+                                .append("onNull", ""))
+                ))
+        ));
+    }
 
-    /**
-     * Uses MongoDB Aggregation $lookup to batch-join posts with users collection.
-     * This replaces N+1 @DBRef resolution with a single server-side join.
-     */
     private List<Document> findPostsAggregated(Criteria matchCriteria) {
         Aggregation agg = Aggregation.newAggregation(
                 Aggregation.match(matchCriteria),
+                addResolvedAuthorIdStage(),
                 Aggregation.sort(Sort.Direction.DESC, "createdAt"),
-                Aggregation.limit(50),
-                Aggregation.lookup("users", "author.$id", "_id", "_authorData"),
-                Aggregation.unwind("_authorData", true)
+                Aggregation.limit(50)
         );
         return mongoTemplate.aggregate(agg, "posts", Document.class).getMappedResults();
     }
 
-    /**
-     * Convert a raw aggregation Document (with embedded _authorData) to PostDTO.
-     */
-    @SuppressWarnings("unchecked")
-    private PostDTO documentToPostDTO(Document doc) {
+    private static String extractResolvedAuthorIdFromDoc(Document doc) {
+        if (doc == null) {
+            return null;
+        }
+        Object v = doc.get("_resolvedAuthorId");
+        if (v != null && !v.toString().isBlank()) {
+            return v.toString();
+        }
+        String direct = doc.getString("authorId");
+        if (direct != null && !direct.isBlank()) {
+            return direct;
+        }
+        Object author = doc.get("author");
+        if (author instanceof DBRef ref && ref.getId() != null) {
+            return extractId(ref.getId());
+        }
+        return null;
+    }
+
+    private PostDTO documentToPostDTO(Document doc, Map<String, UserDTO> userMap) {
         PostDTO dto = new PostDTO();
         dto.setId(extractId(doc.get("_id")));
 
-        // Author from $lookup result
-        Document author = doc.get("_authorData", Document.class);
-        if (author != null) {
-            dto.setAuthorId(extractId(author.get("_id")));
-            dto.setAuthorName(author.getString("fullName"));
-            dto.setAuthorAvatar(author.getString("avatar"));
+        String aid = extractResolvedAuthorIdFromDoc(doc);
+        dto.setAuthorId(aid);
+        if (aid != null && userMap != null) {
+            UserDTO u = userMap.get(aid);
+            if (u != null) {
+                dto.setAuthorName(u.getFullName());
+                dto.setAuthorAvatar(u.getAvatar());
+            }
         }
 
         dto.setContent(doc.getString("content"));
@@ -374,36 +399,40 @@ public class PostService {
         dto.setLikeCount(doc.getInteger("likeCount", 0));
         dto.setCommentCount(doc.getInteger("commentCount", 0));
         dto.setShareCount(doc.getInteger("shareCount", 0));
-
-        // groupId is a plain field
         dto.setGroupId(doc.getString("groupId"));
-
-        // pageId from @DBRef page (stored as DBRef in raw Document)
         Object pageRef = doc.get("page");
         if (pageRef instanceof DBRef) {
             dto.setPageId(extractId(((DBRef) pageRef).getId()));
         }
-
         dto.setCreatedAt(toLocalDateTime(doc.get("createdAt")));
         dto.setUpdatedAt(toLocalDateTime(doc.get("updatedAt")));
         return dto;
     }
 
-    /** Visibility check on PostDTO (for aggregation results). */
     private boolean isDtoVisibleToViewer(PostDTO dto, String viewerId, Set<String> friendIds) {
         if (dto == null || dto.getAuthorId() == null) {
             return false;
         }
         String visibility = dto.getVisibility();
-        if ("PUBLIC".equals(visibility)) return true;
-        if (viewerId == null || viewerId.isBlank()) return false;
-        if (dto.getAuthorId().equals(viewerId)) return true;
-        if ("FRIENDS".equals(visibility)) return friendIds.contains(dto.getAuthorId());
+        if ("PUBLIC".equals(visibility)) {
+            return true;
+        }
+        if (viewerId == null || viewerId.isBlank()) {
+            return false;
+        }
+        if (dto.getAuthorId().equals(viewerId)) {
+            return true;
+        }
+        if ("FRIENDS".equals(visibility)) {
+            return friendIds.contains(dto.getAuthorId());
+        }
         return false;
     }
 
     private static String extractId(Object idValue) {
-        if (idValue instanceof ObjectId) return ((ObjectId) idValue).toHexString();
+        if (idValue instanceof ObjectId) {
+            return ((ObjectId) idValue).toHexString();
+        }
         return idValue != null ? idValue.toString() : null;
     }
 
@@ -411,49 +440,16 @@ public class PostService {
         if (value instanceof Date) {
             return ((Date) value).toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
         }
-        if (value instanceof LocalDateTime) return (LocalDateTime) value;
+        if (value instanceof LocalDateTime) {
+            return (LocalDateTime) value;
+        }
         return null;
-    }
-
-    private boolean isPostVisibleToViewer(Post post, String viewerId) {
-        return isPostVisibleToViewer(post, viewerId, null);
-    }
-
-    private boolean isPostVisibleToViewer(Post post, String viewerId, Set<String> preloadedFriendIds) {
-        if (post == null || post.getAuthor() == null || post.getAuthor().getId() == null) {
-            return false;
-        }
-
-        String authorId = post.getAuthor().getId();
-        String normalizedVisibility = normalizeVisibility(post.getVisibility());
-
-        if ("PUBLIC".equals(normalizedVisibility)) {
-            return true;
-        }
-
-        if (viewerId == null || viewerId.isBlank()) {
-            return false;
-        }
-
-        if (authorId.equals(viewerId)) {
-            return true;
-        }
-
-        if ("FRIENDS".equals(normalizedVisibility)) {
-            if (preloadedFriendIds != null) {
-                return preloadedFriendIds.contains(authorId);
-            }
-            return friendService.checkIfFriends(authorId, viewerId);
-        }
-
-        return false;
     }
 
     private String normalizeVisibility(String visibility) {
         if (visibility == null || visibility.isBlank()) {
             return "PUBLIC";
         }
-
         String normalized = visibility.trim().toUpperCase();
         return switch (normalized) {
             case "FRIEND", "FRIENDS" -> "FRIENDS";
@@ -463,4 +459,3 @@ public class PostService {
         };
     }
 }
-

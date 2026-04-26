@@ -4,21 +4,27 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import edu.iuh.fit.se.commonservice.model.*;
-import edu.iuh.fit.se.commonservice.repository.*;
-import org.springframework.stereotype.Service;
-
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.ReactionDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.model.Comment;
+import edu.iuh.fit.se.commonservice.model.Post;
+import edu.iuh.fit.se.commonservice.model.Reaction;
+import edu.iuh.fit.se.commonservice.model.Video;
+import edu.iuh.fit.se.commonservice.repository.CommentRepository;
+import edu.iuh.fit.se.commonservice.repository.PostRepository;
+import edu.iuh.fit.se.commonservice.repository.ReactionRepository;
+import edu.iuh.fit.se.commonservice.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class ReactionService {
 
     private final ReactionRepository reactionRepository;
-    private final UserRepository userRepository;
+    private final UserIdentityService userIdentityService;
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final SocketService socketService;
@@ -50,7 +56,6 @@ public class ReactionService {
     }
 
     public ReactionDTO createReaction(ReactionDTO reactionDTO) {
-        // Check if reaction already exists
         Reaction existingReaction = null;
         if (reactionDTO.getPostId() != null) {
             existingReaction = reactionRepository.findByUserIdAndPostId(
@@ -58,53 +63,37 @@ public class ReactionService {
         } else if (reactionDTO.getCommentId() != null) {
             existingReaction = reactionRepository.findByUserIdAndCommentId(
                     reactionDTO.getUserId(), reactionDTO.getCommentId()).orElse(null);
-        }else if (reactionDTO.getVideoId() != null) {
+        } else if (reactionDTO.getVideoId() != null) {
             existingReaction = reactionRepository.findByUserIdAndVideoId(
                     reactionDTO.getUserId(), reactionDTO.getVideoId()).orElse(null);
         }
 
         if (existingReaction != null) {
-            // Update existing reaction
             existingReaction.setType(reactionDTO.getType());
             Reaction updated = reactionRepository.save(existingReaction);
             updateReactionCounts(reactionDTO);
             ReactionDTO updatedDTO = toDTO(updated);
-            
-            // Send socket event
             sendReactionEvent(reactionDTO, updatedDTO);
-            
             return updatedDTO;
         }
 
-        // Create new reaction
         Reaction reaction = toEntity(reactionDTO);
         reaction.setCreatedAt(LocalDateTime.now());
         Reaction saved = reactionRepository.save(reaction);
         updateReactionCounts(reactionDTO);
         ReactionDTO savedDTO = toDTO(saved);
-        
-        // Send socket event
         sendReactionEvent(reactionDTO, savedDTO);
-        
         return savedDTO;
     }
-    
+
     private void sendReactionEvent(ReactionDTO reactionDTO, ReactionDTO savedDTO) {
         String recipientId = null;
-        User actor = null;
-        
-        try {
-            actor = userRepository.findById(reactionDTO.getUserId()).orElse(null);
-        } catch (Exception e) {
-            // Ignore
-        }
-        
+        UserDTO actor = userIdentityService.findById(reactionDTO.getUserId()).orElse(null);
+
         if (reactionDTO.getPostId() != null) {
             Post post = postRepository.findById(reactionDTO.getPostId()).orElse(null);
-            if (post != null && post.getAuthor() != null) {
-                recipientId = post.getAuthor().getId();
-                
-                // Create notification for post like (only if not self-like)
+            if (post != null && post.getAuthorId() != null) {
+                recipientId = post.getAuthorId();
                 if (!recipientId.equals(reactionDTO.getUserId()) && actor != null) {
                     NotificationDTO notificationDTO = new NotificationDTO();
                     notificationDTO.setRecipientId(recipientId);
@@ -116,16 +105,13 @@ public class ReactionService {
                     notificationDTO.setContent(actor.getFullName() + " liked your post");
                     notificationDTO.setRelatedId(reactionDTO.getPostId());
                     notificationDTO.setRelatedType("POST");
-                    
                     notificationService.createNotification(notificationDTO);
                 }
             }
         } else if (reactionDTO.getCommentId() != null) {
             Comment comment = commentRepository.findById(reactionDTO.getCommentId()).orElse(null);
-            if (comment != null && comment.getAuthor() != null) {
-                recipientId = comment.getAuthor().getId();
-                
-                // Create notification for comment like (only if not self-like)
+            if (comment != null && comment.getAuthorId() != null) {
+                recipientId = comment.getAuthorId();
                 if (!recipientId.equals(reactionDTO.getUserId()) && actor != null) {
                     NotificationDTO notificationDTO = new NotificationDTO();
                     notificationDTO.setRecipientId(recipientId);
@@ -137,15 +123,13 @@ public class ReactionService {
                     notificationDTO.setContent(actor.getFullName() + " liked your comment");
                     notificationDTO.setRelatedId(reactionDTO.getCommentId());
                     notificationDTO.setRelatedType("COMMENT");
-                    
                     notificationService.createNotification(notificationDTO);
                 }
             }
-        }else if (reactionDTO.getVideoId() != null) {  // ✨ THÊM MỚI
+        } else if (reactionDTO.getVideoId() != null) {
             Video video = videoRepository.findById(reactionDTO.getVideoId()).orElse(null);
-            if (video != null && video.getAuthor() != null) {
-                recipientId = video.getAuthor().getId();
-
+            if (video != null && video.getAuthorId() != null) {
+                recipientId = video.getAuthorId();
                 if (!recipientId.equals(reactionDTO.getUserId()) && actor != null) {
                     NotificationDTO notificationDTO = new NotificationDTO();
                     notificationDTO.setRecipientId(recipientId);
@@ -157,16 +141,15 @@ public class ReactionService {
                     notificationDTO.setContent(actor.getFullName() + " liked your video");
                     notificationDTO.setRelatedId(reactionDTO.getVideoId());
                     notificationDTO.setRelatedType("VIDEO");
-
                     notificationService.createNotification(notificationDTO);
                 }
             }
         }
-        
+
         if (recipientId != null && !recipientId.equals(reactionDTO.getUserId())) {
             socketService.notifyReactionAdded(
-                recipientId,
-                SocketEventDTO.reactionAdded(reactionDTO.getUserId(), savedDTO)
+                    recipientId,
+                    SocketEventDTO.reactionAdded(reactionDTO.getUserId(), savedDTO)
             );
         }
     }
@@ -174,7 +157,6 @@ public class ReactionService {
     public void deleteReaction(String id) {
         Reaction reaction = reactionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Reaction not found with id: " + id));
-        
         ReactionDTO dto = toDTO(reaction);
         reactionRepository.deleteById(id);
         decreaseReactionCounts(dto);
@@ -209,7 +191,7 @@ public class ReactionService {
                     .orElseThrow(() -> new RuntimeException("Comment not found"));
             comment.setLikeCount((int) reactionRepository.countByCommentId(dto.getCommentId()));
             commentRepository.save(comment);
-        }else if (dto.getVideoId() != null) {
+        } else if (dto.getVideoId() != null) {
             Video video = videoRepository.findById(dto.getVideoId())
                     .orElseThrow(() -> new RuntimeException("Video not found"));
             video.setLikeCount((int) reactionRepository.countByVideoId(dto.getVideoId()));
@@ -228,7 +210,7 @@ public class ReactionService {
                     .orElseThrow(() -> new RuntimeException("Comment not found"));
             comment.setLikeCount(Math.max(0, (int) reactionRepository.countByCommentId(dto.getCommentId())));
             commentRepository.save(comment);
-        }else if (dto.getVideoId() != null) {
+        } else if (dto.getVideoId() != null) {
             Video video = videoRepository.findById(dto.getVideoId())
                     .orElseThrow(() -> new RuntimeException("Video not found"));
             video.setLikeCount(Math.max(0, (int) reactionRepository.countByVideoId(dto.getVideoId())));
@@ -255,25 +237,22 @@ public class ReactionService {
         ReactionDTO dto = new ReactionDTO();
         dto.setId(reaction.getId());
         dto.setUserId(reaction.getUserId());
-        if (reaction.getUser() != null) {
-            dto.setUserName(reaction.getUser().getFullName());
-            dto.setUserAvatar(reaction.getUser().getAvatar());
-        }
+        userIdentityService.findById(reaction.getUserId()).ifPresent(u -> {
+            dto.setUserName(u.getFullName());
+            dto.setUserAvatar(u.getAvatar());
+        });
         dto.setType(reaction.getType());
         dto.setPostId(reaction.getPostId());
         dto.setCommentId(reaction.getCommentId());
+        dto.setVideoId(reaction.getVideoId());
         dto.setCreatedAt(reaction.getCreatedAt());
         return dto;
     }
 
     private Reaction toEntity(ReactionDTO dto) {
+        userIdentityService.getByIdOrThrow(dto.getUserId());
         Reaction reaction = new Reaction();
-        if (dto.getUserId() != null) {
-            User user = userRepository.findById(dto.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            reaction.setUser(user);
-            reaction.setUserId(dto.getUserId());
-        }
+        reaction.setUserId(dto.getUserId());
         reaction.setType(dto.getType());
         if (dto.getPostId() != null) {
             Post post = postRepository.findById(dto.getPostId())
@@ -296,4 +275,3 @@ public class ReactionService {
         return reaction;
     }
 }
-

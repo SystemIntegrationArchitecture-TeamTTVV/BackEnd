@@ -14,11 +14,11 @@ import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.Group;
 import edu.iuh.fit.se.commonservice.model.GroupMember;
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.GroupMemberRepository;
 import edu.iuh.fit.se.commonservice.repository.GroupRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 public class GroupService {
 
     private final GroupRepository groupRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final GroupMemberRepository groupMemberRepository;
     private final FriendRepository friendRepository;
     private final NotificationService notificationService;
@@ -67,8 +67,7 @@ public class GroupService {
         GroupMember adminMember = new GroupMember();
         adminMember.setGroup(saved);
         adminMember.setGroupId(saved.getId());
-        adminMember.setUser(saved.getAdmin());
-        adminMember.setUserId(saved.getAdmin().getId());
+        adminMember.setUserId(groupDTO.getAdminId());
 
         adminMember.setRole("ADMIN");
         adminMember.setStatus("ACTIVE");
@@ -108,9 +107,15 @@ public class GroupService {
         dto.setDescription(group.getDescription());
         dto.setCoverPhoto(group.getCoverPhoto());
         dto.setAvatar(group.getAvatar());
-        if (group.getAdmin() != null) {
-            dto.setAdminId(group.getAdmin().getId());
-            dto.setAdminName(group.getAdmin().getFullName());
+        if (group.getAdminId() != null) {
+            try {
+                UserDTO admin = authServiceClient.getUserById(group.getAdminId());
+                dto.setAdminId(admin.getId());
+                dto.setAdminName(admin.getFullName() != null ? admin.getFullName() : admin.getUsername());
+            } catch (Exception e) {
+                dto.setAdminId(group.getAdminId());
+                dto.setAdminName("Unknown");
+            }
         }
         dto.setPrivacy(group.getPrivacy());
         dto.setVisibility(group.getVisibility());
@@ -134,9 +139,7 @@ public class GroupService {
         group.setCoverPhoto(dto.getCoverPhoto());
         group.setAvatar(dto.getAvatar());
         if (dto.getAdminId() != null) {
-            User admin = userRepository.findById(dto.getAdminId())
-                    .orElseThrow(() -> new RuntimeException("Admin user not found"));
-            group.setAdmin(admin);
+            group.setAdminId(dto.getAdminId());
         }
         group.setPrivacy(dto.getPrivacy() != null ? dto.getPrivacy() : "PUBLIC");
         group.setVisibility(dto.getVisibility() != null ? dto.getVisibility() : "VISIBLE");
@@ -151,8 +154,11 @@ public class GroupService {
 
         for (String userId : userIds) {
 
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+            try {
+                authServiceClient.getUserById(userId);
+            } catch (Exception e) {
+                throw new RuntimeException("User not found");
+            }
 
             Optional<GroupMember> existing = groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
 
@@ -174,7 +180,6 @@ public class GroupService {
             GroupMember member = new GroupMember();
             member.setGroup(group);
             member.setGroupId(groupId);
-            member.setUser(user);
             member.setUserId(userId);
 
             member.setRole("MEMBER");
@@ -197,10 +202,15 @@ public class GroupService {
         NotificationDTO notification = new NotificationDTO();
         notification.setRecipientId(recipientId);
 
-        if (group.getAdmin() != null) {
-            notification.setActorId(group.getAdmin().getId());
-            notification.setActorName(group.getAdmin().getFullName());
-            notification.setActorAvatar(group.getAdmin().getAvatar());
+        if (group.getAdminId() != null) {
+            try {
+                UserDTO admin = authServiceClient.getUserById(group.getAdminId());
+                notification.setActorId(admin.getId());
+                notification.setActorName(admin.getFullName() != null ? admin.getFullName() : admin.getUsername());
+                notification.setActorAvatar(admin.getAvatar());
+            } catch (Exception e) {
+                // ignore
+            }
         }
 
         notification.setType("GROUP_INVITE");
@@ -216,13 +226,16 @@ public class GroupService {
     public long getMemberCount(String groupId) {
         return groupMemberRepository.countByGroupIdAndStatus(groupId, "ACTIVE");
     }
-    public List<User> getGroupMembers(String groupId) {
-
-        return groupMemberRepository
+    public List<UserDTO> getGroupMembers(String groupId) {
+        List<String> userIds = groupMemberRepository
                 .findByGroupIdAndStatus(groupId, "ACTIVE")
                 .stream()
-                .map(GroupMember::getUser)
-                .collect(Collectors.toList());
+                .map(GroupMember::getUserId)
+                .toList();
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        return authServiceClient.batchLookup(userIds);
     }
     public void removeMember(String groupId, String userId) {
 
@@ -256,8 +269,11 @@ public class GroupService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            authServiceClient.getUserById(userId);
+        } catch (Exception e) {
+            throw new RuntimeException("User not found");
+        }
 
         Optional<GroupMember> existing =
                 groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
@@ -294,7 +310,6 @@ public class GroupService {
             member.setGroup(group);
             member.setGroupId(groupId);
 
-            member.setUser(user);
             member.setUserId(userId);
 
             member.setRole("MEMBER");
@@ -372,17 +387,17 @@ public class GroupService {
                 .collect(Collectors.toSet());
 
         // 3. Lọc bạn bè chưa trong group
-        return userRepository.findAllById(friendIds)
-                .stream()
-                .filter(user -> !memberIds.contains(user.getId()))
-                .map(user -> {
-                    FriendInviteDTO dto = new FriendInviteDTO();
-                    dto.setId(user.getId());
-                    dto.setFullName(user.getFullName());
-                    dto.setAvatar(user.getAvatar());
-                    return dto;
-                })
-                .toList();
+        return authServiceClient.batchLookup(
+                friendIds.stream()
+                        .filter(id -> !memberIds.contains(id))
+                        .toList()
+        ).stream().map(user -> {
+            FriendInviteDTO dto = new FriendInviteDTO();
+            dto.setId(user.getId());
+            dto.setFullName(user.getFullName() != null ? user.getFullName() : user.getUsername());
+            dto.setAvatar(user.getAvatar());
+            return dto;
+        }).toList();
     }
 
     public String getUserStatus(String groupId, String userId) {

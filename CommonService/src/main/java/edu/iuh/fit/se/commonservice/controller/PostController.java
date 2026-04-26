@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import edu.iuh.fit.se.commonservice.service.PostService;
+import edu.iuh.fit.se.commonservice.service.UserIdentityService;
 import edu.iuh.fit.se.commonservice.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class PostController {
 
     private final PostService postService;
     private final JwtUtil jwtUtil;
-    private final UserRepository userRepository;
+    private final UserIdentityService userIdentityService;
 
     @GetMapping
     public ResponseEntity<List<PostDTO>> getAllPosts(@RequestParam(required = false) String viewerId) {
@@ -116,8 +116,8 @@ public class PostController {
         }
 
         String username = authentication.getName();
-        return userRepository.findByUsername(username)
-                .map(user -> user.getId())
+        return userIdentityService.findByUsername(username)
+                .map(u -> u.getId())
                 .orElse(null);
     }
 }

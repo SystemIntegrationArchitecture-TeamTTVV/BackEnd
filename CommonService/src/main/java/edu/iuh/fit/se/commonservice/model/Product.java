@@ -22,8 +22,6 @@ public class Product {
     private String title;
     private String description;
 
-    @DBRef
-    private User seller;
     private String sellerId;
 
     private BigDecimal price;

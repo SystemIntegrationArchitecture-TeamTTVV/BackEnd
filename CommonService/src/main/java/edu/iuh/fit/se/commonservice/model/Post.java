@@ -18,37 +18,33 @@ import lombok.NoArgsConstructor;
 public class Post {
     @Id
     private String id;
-    
-    @DBRef
-    private User author;
-    
-    private String content; // Nội dung bài viết
-    private List<String> images; // URLs ảnh
-    private List<String> videos; // URLs video
-    private String location; // Địa điểm
-    private String feeling; // Cảm xúc
-    private String activity; // Hoạt động
-    
-    private String visibility = "PUBLIC"; // PUBLIC, FRIENDS, ONLY_ME
+
+    /** Author user id (canonical). Legacy documents may only have DBRef "author" in Mongo. */
+    private String authorId;
+
+    private String content;
+    private List<String> images;
+    private List<String> videos;
+    private String location;
+    private String feeling;
+    private String activity;
+
+    private String visibility = "PUBLIC";
     private Boolean allowComments = true;
     private Boolean allowSharing = true;
-    
-    // Thống kê
+
     private Integer likeCount = 0;
     private Integer commentCount = 0;
     private Integer shareCount = 0;
-    
-    // Reference đến Group hoặc Page nếu đăng trong nhóm/trang
+
     @DBRef
-    private Group group; // null nếu không đăng trong nhóm
+    private Group group;
     private String groupId;
     @DBRef
-    private Page page; // null nếu không đăng trong trang
-    
+    private Page page;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt; // Soft delete
+    private LocalDateTime deletedAt;
     private boolean isDeleted = false;
-
 }
-

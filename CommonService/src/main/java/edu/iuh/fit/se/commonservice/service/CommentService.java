@@ -13,10 +13,10 @@ import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Comment;
 import edu.iuh.fit.se.commonservice.model.Post;
-import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.CommentRepository;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -25,7 +25,7 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final VideoRepository videoRepository;
@@ -85,22 +85,26 @@ public class CommentService {
     }
 
     private void notifyVideoAuthor(CommentDTO commentDTO, Video video) {
-        String videoAuthorId = video.getAuthor() != null ? video.getAuthor().getId() : null;
+        String videoAuthorId = video.getAuthorId();
         if (videoAuthorId != null && !videoAuthorId.equals(commentDTO.getUserId())) {
-            User commenter = userRepository.findById(commentDTO.getUserId()).orElse(null);
-            if (commenter != null) {
-                NotificationDTO notificationDTO = new NotificationDTO();
-                notificationDTO.setRecipientId(videoAuthorId);
-                notificationDTO.setActorId(commentDTO.getUserId());
-                notificationDTO.setActorName(commenter.getFullName());
-                notificationDTO.setActorAvatar(commenter.getAvatar());
-                notificationDTO.setType("COMMENT_VIDEO");
-                notificationDTO.setTitle("New Comment");
-                notificationDTO.setContent(commenter.getFullName() + " commented on your video");
-                notificationDTO.setRelatedId(commentDTO.getVideoId());
-                notificationDTO.setRelatedType("VIDEO");
-
-                notificationService.createNotification(notificationDTO);
+            try {
+                UserDTO commenter = authServiceClient.getUserById(commentDTO.getUserId());
+                if (commenter != null) {
+                    NotificationDTO notificationDTO = new NotificationDTO();
+                    notificationDTO.setRecipientId(videoAuthorId);
+                    notificationDTO.setActorId(commentDTO.getUserId());
+                    notificationDTO.setActorName(commenter.getFullName());
+                    notificationDTO.setActorAvatar(commenter.getAvatar());
+                    notificationDTO.setType("COMMENT_VIDEO");
+                    notificationDTO.setTitle("New Comment");
+                    notificationDTO.setContent(commenter.getFullName() + " commented on your video");
+                    notificationDTO.setRelatedId(commentDTO.getVideoId());
+                    notificationDTO.setRelatedType("VIDEO");
+                    
+                    notificationService.createNotification(notificationDTO);
+                }
+            } catch (Exception e) {
+                // Ignore if user not found
             }
         }
     }
@@ -138,10 +142,16 @@ public class CommentService {
         if (comment.getPost() != null) {
             dto.setPostId(comment.getPost().getId());
         }
-        if (comment.getAuthor() != null) {
-            dto.setUserId(comment.getAuthor().getId());
-            dto.setUserName(comment.getAuthor().getFullName());
-            dto.setUserAvatar(comment.getAuthor().getAvatar());
+        if (comment.getAuthorId() != null) {
+            try {
+                UserDTO user = authServiceClient.getUserById(comment.getAuthorId());
+                dto.setUserId(user.getId());
+                dto.setUserName(user.getFullName());
+                dto.setUserAvatar(user.getAvatar());
+            } catch (Exception e) {
+                dto.setUserId(comment.getAuthorId());
+                dto.setUserName("Unknown User");
+            }
         }
         dto.setContent(comment.getContent());
         dto.setImages(comment.getImages());
@@ -163,9 +173,7 @@ public class CommentService {
             comment.setPost(post);
         }
         if (dto.getUserId() != null) {
-            User user = userRepository.findById(dto.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            comment.setAuthor(user);
+            comment.setAuthorId(dto.getUserId());
         }
         comment.setContent(dto.getContent());
         comment.setImages(dto.getImages());

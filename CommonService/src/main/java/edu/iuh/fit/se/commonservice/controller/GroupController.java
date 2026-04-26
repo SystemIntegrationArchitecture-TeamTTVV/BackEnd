@@ -2,7 +2,8 @@ package edu.iuh.fit.se.commonservice.controller;
 
 import edu.iuh.fit.se.commonservice.dto.FriendInviteDTO;
 import edu.iuh.fit.se.commonservice.dto.GroupDTO;
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.service.GroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import java.util.List;
 public class GroupController {
 
     private final GroupService groupService;
+    private final AuthServiceClient authServiceClient;
 
     @GetMapping
     public ResponseEntity<List<GroupDTO>> getAllGroups() {
@@ -61,7 +63,7 @@ public class GroupController {
         groupService.addMembers(groupId, userIds);
     }
     @GetMapping("/{groupId}/members")
-    public List<User> getMembers(@PathVariable String groupId) {
+    public List<UserDTO> getMembers(@PathVariable String groupId) {
         return groupService.getGroupMembers(groupId);
     }
     @DeleteMapping("/{groupId}/members/{userId}")
@@ -134,17 +136,34 @@ public class GroupController {
     public record PendingMemberDTO(String userId, String fullName, String avatar, String status) {}
     @GetMapping("/{groupId}/pending-members")
     public ResponseEntity<List<PendingMemberDTO>> getPendingMembers(@PathVariable String groupId) {
-        List<PendingMemberDTO> pending = groupService.getPendingMembers(groupId)
-                .stream()
-                .map(m -> new PendingMemberDTO(
+        List<edu.iuh.fit.se.commonservice.model.GroupMember> pending = groupService.getPendingMembers(groupId);
+        List<String> userIds = pending.stream().map(edu.iuh.fit.se.commonservice.model.GroupMember::getUserId).toList();
+        
+        java.util.Map<String, UserDTO> usersMap = new java.util.HashMap<>();
+        if (!userIds.isEmpty()) {
+            try {
+                List<UserDTO> users = authServiceClient.batchLookup(userIds);
+                if (users != null) {
+                    for (UserDTO u : users) {
+                        usersMap.put(u.getId(), u);
+                    }
+                }
+            } catch (Exception e) {}
+        }
+        
+        List<PendingMemberDTO> dtos = pending.stream()
+                .map(m -> {
+                    UserDTO u = usersMap.get(m.getUserId());
+                    return new PendingMemberDTO(
                         m.getUserId(),
-                        m.getUser().getFullName(),
-                        m.getUser().getAvatar(),
+                        u != null ? (u.getFullName() != null ? u.getFullName() : u.getUsername()) : "Unknown",
+                        u != null ? u.getAvatar() : "",
                         m.getStatus()
-                ))
+                    );
+                })
                 .toList();
 
-        return ResponseEntity.ok(pending);
+        return ResponseEntity.ok(dtos);
     }
     /**
      * Toggle trạng thái privacy của group:

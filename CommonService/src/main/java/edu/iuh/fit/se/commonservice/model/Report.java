@@ -17,8 +17,6 @@ public class Report {
     @Id
     private String id;
 
-    @DBRef
-    private User reporter;
     private String reporterId;
 
     private String targetId;   // ID của post, comment, user, group, page, event

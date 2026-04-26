@@ -1,7 +1,7 @@
 package edu.iuh.fit.se.commonservice.config;
 
-import edu.iuh.fit.se.commonservice.model.User;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.service.MessageServiceClientFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
 
     private static final String ROOM_PREFIX = "/topic/rooms.";
 
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final MessageServiceClientFacade messageServiceClientFacade;
 
     @Override
@@ -54,12 +54,16 @@ public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
             throw new ResponseStatusException(FORBIDDEN, "Invalid room destination");
         }
 
-        Optional<User> userOptional = userRepository.findByUsername(username);
-        if (userOptional.isEmpty()) {
+        UserDTO user = null;
+        try {
+            user = authServiceClient.getUserByUsername(username);
+        } catch (Exception e) {}
+        
+        if (user == null) {
             throw new ResponseStatusException(FORBIDDEN, "User not found for room subscription");
         }
 
-        String userId = userOptional.get().getId();
+        String userId = user.getId();
         if (!isConversationParticipant(conversationId, userId)) {
             log.warn("Blocked unauthorized room subscription: username={}, userId={}, room={}", username, userId, conversationId);
             throw new ResponseStatusException(FORBIDDEN, "Not a participant of this room");

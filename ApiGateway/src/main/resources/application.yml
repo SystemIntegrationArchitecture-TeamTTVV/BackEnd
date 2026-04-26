@@ -8,7 +8,7 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          enabled: false
       routes:
         # ─── Swagger ───────────────────────────────────────────────────────────
         - id: common-service-api-docs
@@ -25,35 +25,65 @@ spring:
           filters:
             - RewritePath=/api/message/v3/api-docs, /api-docs
 
-        # ─── CommonService ─────────────────────────────────────────────────────
+        - id: auth-service-api-docs
+          uri: ${AUTH_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/auth-svc/v3/api-docs
+          filters:
+            - RewritePath=/api/auth-svc/v3/api-docs, /api-docs
+
+        # ─── AuthService (identity & authentication) ───────────────────────────
+        - id: auth-service-auth
+          uri: ${AUTH_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: authService
+                fallbackUri: forward:/fallback/auth
+
+        - id: auth-service-users
+          uri: ${AUTH_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: authService
+                fallbackUri: forward:/fallback/auth
+
+        # Legacy compat: /api/common/auth/** → AuthService
         - id: common-service-auth
-          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          uri: ${AUTH_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/common/auth/**
           filters:
             - RewritePath=/api/common/auth(/.*)?, /api/auth$1
             - name: CircuitBreaker
               args:
-                name: commonService
-                fallbackUri: forward:/fallback/common
+                name: authService
+                fallbackUri: forward:/fallback/auth
 
-        - id: common-service-websocket
-          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
-          predicates:
-            - Path=/api/common/ws/**
-          filters:
-            - RewritePath=/api/common/ws(/.*)?, /ws$1
-
+        # Legacy compat: /api/common/users/** → AuthService
         - id: common-service-users
-          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          uri: ${AUTH_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/common/users/**
           filters:
             - RewritePath=/api/common/users(/.*)?, /api/users$1
             - name: CircuitBreaker
               args:
-                name: commonService
-                fallbackUri: forward:/fallback/common
+                name: authService
+                fallbackUri: forward:/fallback/auth
+
+        # ─── CommonService ─────────────────────────────────────────────────────
+        - id: common-service-websocket
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/common/ws/**
+          filters:
+            - RewritePath=/api/common/ws(/.*)?, /ws$1
 
         - id: common-service-posts
           uri: ${COMMON_SERVICE_URL:http://localhost:8081}
@@ -336,12 +366,7 @@ app:
 jwt:
   secret: mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    prefer-ip-address: true
+
 
 resilience4j:
   timelimiter:
@@ -350,6 +375,9 @@ resilience4j:
         timeoutDuration: 30s
         cancelRunningFuture: true
       messageService:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
+      authService:
         timeoutDuration: 30s
         cancelRunningFuture: true
   circuitbreaker:
@@ -363,6 +391,14 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 10
         automaticTransitionFromOpenToHalfOpenEnabled: true
       messageService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 95
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 10
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      authService:
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 50
         minimumNumberOfCalls: 20
@@ -395,8 +431,10 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
     urls:
+      - name: Auth Service
+        url: /api/auth-svc/v3/api-docs
       - name: Common Service
         url: /api/common/v3/api-docs
       - name: Message Service
         url: /api/message/v3/api-docs
-    urls-primary-name: Common Service
+    urls-primary-name: Auth Service

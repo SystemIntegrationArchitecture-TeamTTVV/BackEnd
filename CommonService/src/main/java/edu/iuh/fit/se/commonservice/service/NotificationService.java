@@ -3,9 +3,9 @@ package edu.iuh.fit.se.commonservice.service;
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Notification;
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.NotificationRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
 
     public List<NotificationDTO> getNotificationsByRecipientId(String recipientId) {
@@ -53,12 +53,15 @@ public class NotificationService {
         // Send socket event to recipient using username, not userId
         if (savedDTO.getRecipientId() != null) {
             // Fetch recipient user to get username
-            userRepository.findById(savedDTO.getRecipientId()).ifPresent(recipient -> {
-                socketService.sendNotification(
-                    recipient.getUsername(), // Use username, not userId
-                    SocketEventDTO.notification(savedDTO.getRecipientId(), savedDTO)
-                );
-            });
+            try {
+                UserDTO recipient = authServiceClient.getUserById(savedDTO.getRecipientId());
+                if (recipient != null && recipient.getUsername() != null) {
+                    socketService.sendNotification(
+                        recipient.getUsername(), // Use username, not userId
+                        SocketEventDTO.notification(savedDTO.getRecipientId(), savedDTO)
+                    );
+                }
+            } catch (Exception e) {}
         }
         
         return savedDTO;
@@ -98,13 +101,23 @@ public class NotificationService {
         NotificationDTO dto = new NotificationDTO();
         dto.setId(notification.getId());
         dto.setRecipientId(notification.getRecipientId());
-        if (notification.getRecipient() != null) {
-            dto.setRecipientName(notification.getRecipient().getFullName());
+        if (notification.getRecipientId() != null) {
+            try {
+                UserDTO recipient = authServiceClient.getUserById(notification.getRecipientId());
+                dto.setRecipientName(recipient.getFullName() != null ? recipient.getFullName() : recipient.getUsername());
+            } catch (Exception e) {
+                dto.setRecipientName("Unknown");
+            }
         }
         dto.setActorId(notification.getActorId());
-        if (notification.getActor() != null) {
-            dto.setActorName(notification.getActor().getFullName());
-            dto.setActorAvatar(notification.getActor().getAvatar());
+        if (notification.getActorId() != null) {
+            try {
+                UserDTO actor = authServiceClient.getUserById(notification.getActorId());
+                dto.setActorName(actor.getFullName() != null ? actor.getFullName() : actor.getUsername());
+                dto.setActorAvatar(actor.getAvatar());
+            } catch (Exception e) {
+                dto.setActorName("Unknown");
+            }
         }
         dto.setType(notification.getType());
         dto.setTitle(notification.getTitle());
@@ -120,15 +133,9 @@ public class NotificationService {
     private Notification toEntity(NotificationDTO dto) {
         Notification notification = new Notification();
         if (dto.getRecipientId() != null) {
-            User recipient = userRepository.findById(dto.getRecipientId())
-                    .orElseThrow(() -> new RuntimeException("Recipient not found"));
-            notification.setRecipient(recipient);
             notification.setRecipientId(dto.getRecipientId());
         }
         if (dto.getActorId() != null) {
-            User actor = userRepository.findById(dto.getActorId())
-                    .orElseThrow(() -> new RuntimeException("Actor not found"));
-            notification.setActor(actor);
             notification.setActorId(dto.getActorId());
         }
         notification.setType(dto.getType());

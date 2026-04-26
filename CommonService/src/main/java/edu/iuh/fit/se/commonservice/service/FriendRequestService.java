@@ -5,10 +5,10 @@ import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.FriendRequest;
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.FriendRequestRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class FriendRequestService {
 
     private final FriendRequestRepository friendRequestRepository;
     private final FriendRepository friendRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
     private final NotificationService notificationService;
 
@@ -101,8 +101,12 @@ public class FriendRequestService {
         FriendRequestDTO savedDTO = toDTO(saved);
         
         // Send notification to receiver via socket
-        User sender = userRepository.findById(savedDTO.getSenderId())
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        UserDTO sender;
+        try {
+            sender = authServiceClient.getUserById(savedDTO.getSenderId());
+        } catch (Exception e) {
+            throw new RuntimeException("Sender not found");
+        }
         
         NotificationDTO notification = new NotificationDTO();
         notification.setRecipientId(savedDTO.getReceiverId());
@@ -111,7 +115,7 @@ public class FriendRequestService {
         notification.setActorAvatar(savedDTO.getSenderAvatar());
         notification.setType("FRIEND_REQUEST");
         notification.setTitle("Friend Request");
-        notification.setContent(sender.getFullName() + " sent you a friend request");
+        notification.setContent((sender.getFullName() != null ? sender.getFullName() : sender.getUsername()) + " sent you a friend request");
         notification.setRelatedId(savedDTO.getId());
         notification.setRelatedType("FRIEND_REQUEST");
         notification.setCreatedAt(LocalDateTime.now());
@@ -141,16 +145,18 @@ public class FriendRequestService {
         friendRequestRepository.save(friendRequest);
 
         // Create friendship (bidirectional)
-        User sender = userRepository.findById(friendRequest.getSenderId())
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
-        User receiver = userRepository.findById(friendRequest.getReceiverId())
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+        UserDTO sender;
+        UserDTO receiver;
+        try {
+            sender = authServiceClient.getUserById(friendRequest.getSenderId());
+            receiver = authServiceClient.getUserById(friendRequest.getReceiverId());
+        } catch (Exception e) {
+            throw new RuntimeException("User not found");
+        }
 
         // Create friend relationship from sender to receiver
         Friend friend1 = new Friend();
-        friend1.setUser(sender);
         friend1.setUserId(sender.getId());
-        friend1.setFriend(receiver);
         friend1.setFriendId(receiver.getId());
         friend1.setCreatedAt(LocalDateTime.now());
         friend1.setUpdatedAt(LocalDateTime.now());
@@ -158,9 +164,7 @@ public class FriendRequestService {
 
         // Create friend relationship from receiver to sender
         Friend friend2 = new Friend();
-        friend2.setUser(receiver);
         friend2.setUserId(receiver.getId());
-        friend2.setFriend(sender);
         friend2.setFriendId(sender.getId());
         friend2.setCreatedAt(LocalDateTime.now());
         friend2.setUpdatedAt(LocalDateTime.now());
@@ -176,7 +180,7 @@ public class FriendRequestService {
         notification.setActorAvatar(friendRequestDTO.getReceiverAvatar());
         notification.setType("FRIEND_ACCEPTED");
         notification.setTitle("Friend Request Accepted");
-        notification.setContent(receiver.getFullName() + " accepted your friend request");
+        notification.setContent((receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername()) + " accepted your friend request");
         notification.setRelatedId(friendRequestDTO.getId());
         notification.setRelatedType("FRIEND_REQUEST");
         notification.setCreatedAt(LocalDateTime.now());
@@ -217,10 +221,14 @@ public class FriendRequestService {
         // Save info before deleting
         String senderId = friendRequest.getSenderId();
         String receiverId = friendRequest.getReceiverId();
-        User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        UserDTO receiver;
+        UserDTO sender;
+        try {
+            receiver = authServiceClient.getUserById(receiverId);
+            sender = authServiceClient.getUserById(senderId);
+        } catch (Exception e) {
+            throw new RuntimeException("User not found");
+        }
         
         friendRequestRepository.delete(friendRequest);
         log.info("🗑️ Rejected (deleted) friend request: id={}", id);
@@ -229,11 +237,11 @@ public class FriendRequestService {
         NotificationDTO notification = new NotificationDTO();
         notification.setRecipientId(senderId);
         notification.setActorId(receiverId);
-        notification.setActorName(receiver.getFullName());
+        notification.setActorName(receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername());
         notification.setActorAvatar(receiver.getAvatar());
         notification.setType("FRIEND_REJECTED");
         notification.setTitle("Friend Request Rejected");
-        notification.setContent(receiver.getFullName() + " đã từ chối lời mời kết bạn của bạn");
+        notification.setContent((receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername()) + " đã từ chối lời mời kết bạn của bạn");
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
         
@@ -256,10 +264,14 @@ public class FriendRequestService {
         
         String senderId = friendRequest.getSenderId();
         String receiverId = friendRequest.getReceiverId();
-        User senderUser = userRepository.findById(senderId)
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
-        User receiverUser = userRepository.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+        UserDTO senderUser;
+        UserDTO receiverUser;
+        try {
+            senderUser = authServiceClient.getUserById(senderId);
+            receiverUser = authServiceClient.getUserById(receiverId);
+        } catch (Exception e) {
+            throw new RuntimeException("User not found");
+        }
         
         friendRequestRepository.delete(friendRequest);
         log.info("🗑️ Cancelled (deleted) friend request: id={}", id);
@@ -268,11 +280,11 @@ public class FriendRequestService {
         NotificationDTO notification = new NotificationDTO();
         notification.setRecipientId(receiverId);
         notification.setActorId(senderId);
-        notification.setActorName(senderUser.getFullName());
+        notification.setActorName(senderUser.getFullName() != null ? senderUser.getFullName() : senderUser.getUsername());
         notification.setActorAvatar(senderUser.getAvatar());
         notification.setType("FRIEND_CANCELLED");
         notification.setTitle("Friend Request Cancelled");
-        notification.setContent(senderUser.getFullName() + " đã thu hồi lời mời kết bạn");
+        notification.setContent((senderUser.getFullName() != null ? senderUser.getFullName() : senderUser.getUsername()) + " đã thu hồi lời mời kết bạn");
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
         
@@ -322,19 +334,23 @@ public class FriendRequestService {
         log.info("✅ Unfriended: user1={}, user2={}", userId1, userId2);
         
         // Send socket notification to user2 (the other user)
-        User user1 = userRepository.findById(userId1)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        User user2 = userRepository.findById(userId2)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserDTO user1;
+        UserDTO user2;
+        try {
+            user1 = authServiceClient.getUserById(userId1);
+            user2 = authServiceClient.getUserById(userId2);
+        } catch (Exception e) {
+            throw new RuntimeException("User not found");
+        }
         
         NotificationDTO notification = new NotificationDTO();
         notification.setRecipientId(userId2);
         notification.setActorId(userId1);
-        notification.setActorName(user1.getFullName());
+        notification.setActorName(user1.getFullName() != null ? user1.getFullName() : user1.getUsername());
         notification.setActorAvatar(user1.getAvatar());
         notification.setType("FRIEND_REMOVED");
         notification.setTitle("Friend Removed");
-        notification.setContent(user1.getFullName() + " đã xóa bạn khỏi danh sách bạn bè");
+        notification.setContent((user1.getFullName() != null ? user1.getFullName() : user1.getUsername()) + " đã xóa bạn khỏi danh sách bạn bè");
         notification.setCreatedAt(LocalDateTime.now());
         notification.setRead(false);
         
@@ -353,14 +369,24 @@ public class FriendRequestService {
         FriendRequestDTO dto = new FriendRequestDTO();
         dto.setId(friendRequest.getId());
         dto.setSenderId(friendRequest.getSenderId());
-        if (friendRequest.getSender() != null) {
-            dto.setSenderName(friendRequest.getSender().getFullName());
-            dto.setSenderAvatar(friendRequest.getSender().getAvatar());
+        if (friendRequest.getSenderId() != null) {
+            try {
+                UserDTO sender = authServiceClient.getUserById(friendRequest.getSenderId());
+                dto.setSenderName(sender.getFullName() != null ? sender.getFullName() : sender.getUsername());
+                dto.setSenderAvatar(sender.getAvatar());
+            } catch (Exception e) {
+                dto.setSenderName("Unknown");
+            }
         }
         dto.setReceiverId(friendRequest.getReceiverId());
-        if (friendRequest.getReceiver() != null) {
-            dto.setReceiverName(friendRequest.getReceiver().getFullName());
-            dto.setReceiverAvatar(friendRequest.getReceiver().getAvatar());
+        if (friendRequest.getReceiverId() != null) {
+            try {
+                UserDTO receiver = authServiceClient.getUserById(friendRequest.getReceiverId());
+                dto.setReceiverName(receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername());
+                dto.setReceiverAvatar(receiver.getAvatar());
+            } catch (Exception e) {
+                dto.setReceiverName("Unknown");
+            }
         }
         dto.setStatus(friendRequest.getStatus());
         dto.setCreatedAt(friendRequest.getCreatedAt());
@@ -371,15 +397,9 @@ public class FriendRequestService {
     private FriendRequest toEntity(FriendRequestDTO dto) {
         FriendRequest friendRequest = new FriendRequest();
         if (dto.getSenderId() != null) {
-            User sender = userRepository.findById(dto.getSenderId())
-                    .orElseThrow(() -> new RuntimeException("Sender not found"));
-            friendRequest.setSender(sender);
             friendRequest.setSenderId(dto.getSenderId());
         }
         if (dto.getReceiverId() != null) {
-            User receiver = userRepository.findById(dto.getReceiverId())
-                    .orElseThrow(() -> new RuntimeException("Receiver not found"));
-            friendRequest.setReceiver(receiver);
             friendRequest.setReceiverId(dto.getReceiverId());
         }
         return friendRequest;

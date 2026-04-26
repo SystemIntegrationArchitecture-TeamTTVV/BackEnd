@@ -12,10 +12,9 @@ import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.model.Group;
 import edu.iuh.fit.se.commonservice.model.GroupMember;
-import edu.iuh.fit.se.commonservice.model.Post; // <- đổi từ PostGroup
-import edu.iuh.fit.se.commonservice.model.User;
-
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.model.Post;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 
 import lombok.RequiredArgsConstructor;
 
@@ -24,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class PostGroupService {
 
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final GroupMemberService groupMemberService;
@@ -98,7 +97,10 @@ public class PostGroupService {
 
         if (post.getGroupId() == null) return;
 
-        User author = userRepository.findById(post.getAuthorId()).orElse(null);
+        UserDTO author = null;
+        try {
+            author = authServiceClient.getUserById(post.getAuthorId());
+        } catch (Exception e) {}
         if (author == null) return;
 
         List<String> memberIds = groupMemberService.getMembers(post.getGroupId())
@@ -115,12 +117,12 @@ public class PostGroupService {
             noti.setRecipientId(memberId);
 
             noti.setActorId(post.getAuthorId());
-            noti.setActorName(author.getFullName());
+            noti.setActorName(author.getFullName() != null ? author.getFullName() : author.getUsername());
             noti.setActorAvatar(author.getAvatar());
 
             noti.setType("GROUP_POST");
             noti.setTitle("Bài viết mới");
-            noti.setContent(author.getFullName() + " vừa đăng bài trong nhóm");
+            noti.setContent((author.getFullName() != null ? author.getFullName() : author.getUsername()) + " vừa đăng bài trong nhóm");
 
             noti.setRelatedId(post.getId());
             noti.setRelatedType("POST");
@@ -177,10 +179,15 @@ public class PostGroupService {
 
         dto.setId(post.getId());
 
-        if (post.getAuthor() != null) {
-            dto.setAuthorId(post.getAuthor().getId());
-            dto.setAuthorName(post.getAuthor().getFullName());
-            dto.setAuthorAvatar(post.getAuthor().getAvatar());
+        if (post.getAuthorId() != null) {
+            dto.setAuthorId(post.getAuthorId());
+            try {
+                UserDTO author = authServiceClient.getUserById(post.getAuthorId());
+                dto.setAuthorName(author.getFullName() != null ? author.getFullName() : author.getUsername());
+                dto.setAuthorAvatar(author.getAvatar());
+            } catch (Exception e) {
+                dto.setAuthorName("Unknown");
+            }
         }
 
         dto.setContent(post.getContent());
@@ -228,9 +235,7 @@ public class PostGroupService {
 
         // 🔥 AUTHOR
         if (dto.getAuthorId() != null) {
-            User author = userRepository.findById(dto.getAuthorId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            post.setAuthor(author);
+            post.setAuthorId(dto.getAuthorId());
         }
 
         // 🔥 GROUP

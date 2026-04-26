@@ -5,9 +5,9 @@ import edu.iuh.fit.se.commonservice.dto.ProductDto;
 import edu.iuh.fit.se.commonservice.dto.SimpleUserDto;
 import edu.iuh.fit.se.commonservice.dto.UpdateProductRequest;
 import edu.iuh.fit.se.commonservice.model.Product;
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.ProductRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
 import edu.iuh.fit.se.commonservice.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,11 +25,14 @@ import java.util.stream.Collectors;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
 
     @Override
     public ProductDto createProduct(CreateProductRequest request, String sellerId) {
-        User seller = userRepository.findById(sellerId).orElse(null);
+        UserDTO seller = null;
+        try {
+            seller = authServiceClient.getUserById(sellerId);
+        } catch (Exception e) {}
         Product p = new Product();
         p.setTitle(request.getTitle());
         p.setDescription(request.getDescription());
@@ -41,7 +44,6 @@ public class ProductServiceImpl implements ProductService {
         p.setImages(request.getImages());
         p.setTags(request.getTags());
         p.setCategory(request.getCategory());
-        p.setSeller(seller);
         p.setSellerId(sellerId);
         p.setCreatedAt(LocalDateTime.now());
         p.setUpdatedAt(LocalDateTime.now());
@@ -148,12 +150,20 @@ public class ProductServiceImpl implements ProductService {
         dto.setId(p.getId());
         dto.setTitle(p.getTitle());
         dto.setDescription(p.getDescription());
-        if (p.getSeller() != null) {
-            SimpleUserDto su = new SimpleUserDto();
-            su.setId(p.getSeller().getId());
-            su.setFullName(p.getSeller().getFullName());
-            su.setAvatar(p.getSeller().getAvatar());
-            dto.setSeller(su);
+        if (p.getSellerId() != null) {
+            try {
+                UserDTO seller = authServiceClient.getUserById(p.getSellerId());
+                SimpleUserDto su = new SimpleUserDto();
+                su.setId(seller.getId());
+                su.setFullName(seller.getFullName() != null ? seller.getFullName() : seller.getUsername());
+                su.setAvatar(seller.getAvatar());
+                dto.setSeller(su);
+            } catch (Exception e) {
+                SimpleUserDto su = new SimpleUserDto();
+                su.setId(p.getSellerId());
+                su.setFullName("Unknown");
+                dto.setSeller(su);
+            }
         }
         dto.setPrice(p.getPrice());
         dto.setCurrency(p.getCurrency());

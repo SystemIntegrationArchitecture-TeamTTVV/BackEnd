@@ -26,5 +26,13 @@ public class FallbackController {
                 "message", "MessegeService is temporarily unavailable. Please try again later."
         ));
     }
+
+    @RequestMapping(path = "/fallback/auth", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> authFallback() {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "service", "AuthService",
+                "message", "AuthService is temporarily unavailable. Please try again later."
+        ));
+    }
 }
 

@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service;
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.StoryDTO;
 import edu.iuh.fit.se.commonservice.model.Story;
-import edu.iuh.fit.se.commonservice.model.User;
 import edu.iuh.fit.se.commonservice.repository.StoryRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 public class StoryService {
 
     private final StoryRepository storyRepository;
-    private final UserRepository userRepository;
+    private final AuthServiceClient authServiceClient;
     private final NotificationService notificationService;
     private final FriendService friendService;
 
@@ -70,7 +70,7 @@ public class StoryService {
         story.setExpiresAt(LocalDateTime.now().plusHours(24));
         
         System.out.println("📝 [StoryService] Creating story: type=" + story.getType() + 
-                           ", author=" + (story.getAuthor() != null ? story.getAuthor().getFullName() : "null") +
+                           ", authorId=" + story.getAuthorId() +
                            ", active=" + story.getActive() + 
                            ", expiresAt=" + story.getExpiresAt());
         
@@ -87,8 +87,10 @@ public class StoryService {
     
     private void notifyFriendsAboutStory(StoryDTO story) {
         try {
-            // Get author info
-            User author = userRepository.findById(story.getAuthorId()).orElse(null);
+            UserDTO author = null;
+            try {
+                author = authServiceClient.getUserById(story.getAuthorId());
+            } catch (Exception e) {}
             if (author == null) return;
             
             // Get all friends
@@ -102,13 +104,13 @@ public class StoryService {
                 NotificationDTO notificationDTO = new NotificationDTO();
                 notificationDTO.setType("STORY");
                 notificationDTO.setActorId(story.getAuthorId());
-                notificationDTO.setActorName(author.getFullName());
+                notificationDTO.setActorName(author.getFullName() != null ? author.getFullName() : author.getUsername());
                 notificationDTO.setActorAvatar(author.getAvatar());
                 notificationDTO.setRecipientId(friendId);
                 notificationDTO.setRelatedId(story.getId());
                 notificationDTO.setRelatedType("STORY");
                 notificationDTO.setTitle("Story mới");
-                notificationDTO.setContent(author.getFullName() + " đã đăng story mới");
+                notificationDTO.setContent((author.getFullName() != null ? author.getFullName() : author.getUsername()) + " đã đăng story mới");
                 notificationDTO.setRead(false);
                 notificationDTO.setCreatedAt(LocalDateTime.now());
                 
@@ -153,10 +155,15 @@ public class StoryService {
     private StoryDTO toDTO(Story story) {
         StoryDTO dto = new StoryDTO();
         dto.setId(story.getId());
-        if (story.getAuthor() != null) {
-            dto.setAuthorId(story.getAuthor().getId());
-            dto.setAuthorName(story.getAuthor().getFullName());
-            dto.setAuthorAvatar(story.getAuthor().getAvatar());
+        if (story.getAuthorId() != null) {
+            dto.setAuthorId(story.getAuthorId());
+            try {
+                UserDTO author = authServiceClient.getUserById(story.getAuthorId());
+                dto.setAuthorName(author.getFullName() != null ? author.getFullName() : author.getUsername());
+                dto.setAuthorAvatar(author.getAvatar());
+            } catch (Exception e) {
+                dto.setAuthorName("Unknown");
+            }
         }
         dto.setType(story.getType());
         dto.setMediaUrl(story.getMediaUrl());
@@ -175,9 +182,7 @@ public class StoryService {
     private Story toEntity(StoryDTO dto) {
         Story story = new Story();
         if (dto.getAuthorId() != null) {
-            User author = userRepository.findById(dto.getAuthorId())
-                    .orElseThrow(() -> new RuntimeException("Author not found"));
-            story.setAuthor(author);
+            story.setAuthorId(dto.getAuthorId());
         }
         story.setType(dto.getType() != null ? dto.getType() : "IMAGE");
         story.setMediaUrl(dto.getMediaUrl());

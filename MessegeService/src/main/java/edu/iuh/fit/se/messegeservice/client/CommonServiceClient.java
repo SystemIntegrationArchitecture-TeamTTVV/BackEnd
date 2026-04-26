@@ -13,12 +13,10 @@ import org.springframework.web.bind.annotation.RequestParam;
  * OpenFeign client for calling CommonService from MessegeService.
  */
 @FeignClient(
-        name = "CommonService"
+        name = "commonService",
+        url = "${common.service.url:http://localhost:8081}"
 )
 public interface CommonServiceClient {
-
-    @GetMapping("/api/users/{id}")
-    UserDTO getUserById(@PathVariable("id") String id);
 
     @PostMapping("/api/socket/emit/user/{username}")
     void emitToUser(@PathVariable("username") String username, @RequestBody SocketEventDTO event);

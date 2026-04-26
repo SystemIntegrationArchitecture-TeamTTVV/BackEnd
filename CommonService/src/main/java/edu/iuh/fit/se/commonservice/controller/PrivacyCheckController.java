@@ -1,8 +1,8 @@
 package edu.iuh.fit.se.commonservice.controller;
 
-import edu.iuh.fit.se.commonservice.model.User;
+import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
-import edu.iuh.fit.se.commonservice.repository.UserRepository;
+import edu.iuh.fit.se.commonservice.service.UserIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -13,27 +13,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * REST endpoints để MessegeService kiểm tra privacy settings trước khi thực hiện hành động.
- * <p>
- * Được gọi qua Feign client từ MessegeService.
- * </p>
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/common/privacy")
 @RequiredArgsConstructor
 public class PrivacyCheckController {
 
-    private final UserRepository userRepository;
+    private final UserIdentityService userIdentityService;
     private final FriendRepository friendRepository;
 
-    /**
-     * Kiểm tra user có cho phép người khác nhắn tin không.
-     * @param senderId người muốn gửi tin nhắn
-     * @param receiverId người nhận tin nhắn
-     * @return { allowed: true/false, reason: "..." }
-     */
     @GetMapping("/can-message")
     public ResponseEntity<Map<String, Object>> canMessage(
             @RequestParam String senderId,
@@ -42,9 +30,6 @@ public class PrivacyCheckController {
         return checkPrivacy(senderId, receiverId, "allowMessageFrom", "nhắn tin");
     }
 
-    /**
-     * Kiểm tra user có cho phép người khác gọi điện không.
-     */
     @GetMapping("/can-call")
     public ResponseEntity<Map<String, Object>> canCall(
             @RequestParam String callerId,
@@ -53,9 +38,6 @@ public class PrivacyCheckController {
         return checkPrivacy(callerId, receiverId, "allowCallFrom", "gọi điện");
     }
 
-    /**
-     * Kiểm tra user có cho phép người khác mời vào nhóm không.
-     */
     @GetMapping("/can-invite-group")
     public ResponseEntity<Map<String, Object>> canInviteGroup(
             @RequestParam String inviterId,
@@ -71,7 +53,7 @@ public class PrivacyCheckController {
             return ResponseEntity.ok(Map.of("allowed", true));
         }
 
-        User target = userRepository.findById(targetId).orElse(null);
+        UserDTO target = userIdentityService.findById(targetId).orElse(null);
         if (target == null) {
             return ResponseEntity.ok(Map.of("allowed", true));
         }
@@ -81,7 +63,6 @@ public class PrivacyCheckController {
             return ResponseEntity.ok(Map.of("allowed", true));
         }
 
-        // Check friendship
         boolean friends = friendRepository.areFriends(actorId, targetId);
         if (friends) {
             return ResponseEntity.ok(Map.of("allowed", true));
@@ -92,7 +73,7 @@ public class PrivacyCheckController {
         return ResponseEntity.ok(Map.of("allowed", false, "reason", reason));
     }
 
-    private String getPrivacySetting(User user, String field) {
+    private String getPrivacySetting(UserDTO user, String field) {
         return switch (field) {
             case "allowMessageFrom" -> user.getAllowMessageFrom() != null ? user.getAllowMessageFrom() : "EVERYONE";
             case "allowCallFrom" -> user.getAllowCallFrom() != null ? user.getAllowCallFrom() : "EVERYONE";
