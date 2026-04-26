@@ -29,28 +29,33 @@ public class UserAccountService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
 
+    @Transactional(readOnly = true)
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll().stream().map(userMapper::toDto).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public UserDTO getUserById(String id) {
         return userRepository.findById(id)
                 .map(userMapper::toDto)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
+    @Transactional(readOnly = true)
     public UserDTO getUserByUsername(String username) {
         return userRepository.findByUsername(username)
                 .map(userMapper::toDto)
                 .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
     }
 
+    @Transactional(readOnly = true)
     public UserDTO getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(userMapper::toDto)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
     }
 
+    @Transactional(readOnly = true)
     public List<UserDTO> searchUsers(String query) {
         List<UserEntity> byName = userRepository.findByFullNameContainingIgnoreCase(query);
         List<UserEntity> byUsername = userRepository.findByUsernameContainingIgnoreCase(query);
@@ -78,6 +83,7 @@ public class UserAccountService {
         );
     }
 
+    @Transactional(readOnly = true)
     public List<UserDTO> batchLookup(List<String> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();

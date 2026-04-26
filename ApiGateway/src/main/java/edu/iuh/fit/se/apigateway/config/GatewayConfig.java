@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import edu.iuh.fit.se.apigateway.security.JwtTokenVerifier;
 import reactor.core.publisher.Mono;
 
@@ -34,10 +35,12 @@ public class GatewayConfig {
             "/api/common/auth",
             // Swagger / API docs
             "/api/common/v3/api-docs",
+            "/api/social/v3/api-docs",
             "/api/message/v3/api-docs",
             "/api/auth-svc/v3/api-docs",
             // WebSocket
-            "/api/common/ws"
+            "/api/common/ws",
+            "/api/social/ws"
     );
 
     @Bean
@@ -72,11 +75,12 @@ public class GatewayConfig {
                 String role = claims.get("role", String.class);
                 String userId = claims.get("userId", String.class);
 
-                exchange.getRequest().mutate()
+                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                         .header("X-User-Id", userId != null ? userId : "")
                         .header("X-Username", username != null ? username : "")
-                        .header("X-Role", role != null ? role : "");
-                return chain.filter(exchange);
+                        .header("X-Role", role != null ? role : "")
+                        .build();
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
             } catch (Exception e) {
                 return unauthorized(exchange, "Invalid token");
             }

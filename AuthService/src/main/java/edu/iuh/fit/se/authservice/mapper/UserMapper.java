@@ -4,6 +4,8 @@ import edu.iuh.fit.se.authservice.dto.UserDTO;
 import edu.iuh.fit.se.authservice.entity.UserEntity;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+
 @Component
 public class UserMapper {
 
@@ -32,7 +34,7 @@ public class UserMapper {
         dto.setIsActive(user.getActive());
         dto.setIsVerified(user.getVerified());
         dto.setRole(user.getRole() != null ? user.getRole().getName() : "USER");
-        dto.setInterests(user.getInterests());
+        dto.setInterests(user.getInterests() != null ? new ArrayList<>(user.getInterests()) : new ArrayList<>());
         dto.setCreatedAt(user.getCreatedAt());
         dto.setUpdatedAt(user.getUpdatedAt());
         dto.setProfileVisibility(user.getProfileVisibility());
