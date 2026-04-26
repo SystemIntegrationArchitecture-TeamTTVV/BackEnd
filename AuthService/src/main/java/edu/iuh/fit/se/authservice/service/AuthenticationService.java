@@ -80,7 +80,8 @@ public class AuthenticationService {
         }
 
         RoleEntity defaultRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new IllegalStateException("Default role USER not seeded"));
+                .or(() -> roleRepository.findByName("ROLE_USER"))
+                .orElseThrow(() -> new IllegalStateException("Default role USER/ROLE_USER not seeded"));
 
         UserEntity user = UserEntity.builder()
                 .email(userDTO.getEmail())

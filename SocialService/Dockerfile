@@ -1,4 +1,4 @@
-## Multi-stage Dockerfile for CommonService (Spring Boot, Java 21)
+## Multi-stage Dockerfile for SocialService (Spring Boot, Java 21)
 
 # ====== BUILD STAGE ======
 FROM maven:3.9-eclipse-temurin-21 AS build
@@ -26,7 +26,7 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Copy the built jar from the build stage
-COPY --from=build /app/target/CommonService-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/SocialService-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose default port used in application.properties
 EXPOSE 8081

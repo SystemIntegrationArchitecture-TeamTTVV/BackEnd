@@ -31,6 +31,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
 
+    private String toAuthority(String role) {
+        if (role == null || role.isBlank()) {
+            return "ROLE_USER";
+        }
+        String normalized = role.trim().toUpperCase();
+        return normalized.startsWith("ROLE_") ? normalized : "ROLE_" + normalized;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -45,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String gatewayRole = request.getHeader("X-Role");
 
         if (gatewayUsername != null && !gatewayUsername.isBlank()) {
-            String authority = "ROLE_" + (gatewayRole != null && !gatewayRole.isBlank() ? gatewayRole : "USER");
+            String authority = toAuthority(gatewayRole);
             logger.debug("Gateway auth: username=" + gatewayUsername + ", authority=" + authority);
 
             UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -76,7 +84,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (username != null) {
                 if (jwtUtil.validateToken(jwt, username)) {
-                    String authority = "ROLE_" + role;
+                    String authority = toAuthority(role);
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             username,
                             null,

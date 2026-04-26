@@ -18,6 +18,13 @@ spring:
           filters:
             - RewritePath=/api/common/v3/api-docs, /api-docs
 
+        - id: social-service-api-docs
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/social/v3/api-docs
+          filters:
+            - RewritePath=/api/social/v3/api-docs, /api-docs
+
         - id: message-service-api-docs
           uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
@@ -78,6 +85,26 @@ spring:
                 fallbackUri: forward:/fallback/auth
 
         # ─── CommonService ─────────────────────────────────────────────────────
+        # New prefix: /api/social/** (preferred)
+        - id: social-service-websocket
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/social/ws/**
+          filters:
+            - RewritePath=/api/social/ws(/.*)?, /ws$1
+
+        - id: social-service-all
+          uri: ${COMMON_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/social/**
+          filters:
+            - RewritePath=/api/social(/.*)?, /api$1
+            - name: CircuitBreaker
+              args:
+                name: commonService
+                fallbackUri: forward:/fallback/common
+
+        # Legacy prefix: /api/common/** (kept for backward compatibility)
         - id: common-service-websocket
           uri: ${COMMON_SERVICE_URL:http://localhost:8081}
           predicates:
@@ -263,7 +290,7 @@ spring:
           predicates:
             - Path=/api/common/**
           filters:
-            - StripPrefix=2
+            - RewritePath=/api/common(/.*)?, /api$1
             - name: CircuitBreaker
               args:
                 name: commonService
@@ -434,7 +461,9 @@ springdoc:
     urls:
       - name: Auth Service
         url: /api/auth-svc/v3/api-docs
-      - name: Common Service
+      - name: Social Service
+        url: /api/social/v3/api-docs
+      - name: Common Service (Legacy)
         url: /api/common/v3/api-docs
       - name: Message Service
         url: /api/message/v3/api-docs

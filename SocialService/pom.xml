@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>edu.iuh.fit.se</groupId>
-    <artifactId>CommonService</artifactId>
+    <artifactId>SocialService</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>CommonService</name>
-    <description>CommonService</description>
+    <name>SocialService</name>
+    <description>SocialService</description>
     <url/>
     <licenses>
         <license/>
