@@ -1,0 +1,132 @@
+# TTVV Microservices — Application Services
+# Chạy từ thư mục BE/:  docker compose -f docker-compose.services.yml up -d --build
+# Hoặc từ root (KIenTruc/):  docker compose up -d  (nếu đã include trong root compose)
+#
+# Yêu cầu: infra stack (Kafka, Redis) phải đang chạy → network ttvv-infra_infra phải tồn tại.
+# Nếu chưa:  cd .. && docker compose up -d  (start infra trước)
+
+networks:
+  # Kết nối vào network infra đã tạo bởi ops/docker-compose.infra.yml
+  infra:
+    external: true
+    name: ttvv-infra_infra
+
+services:
+  # ─── API Gateway ──────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      PORT: 8088
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
+    depends_on:
+      - auth-service
+      - common-service
+      - message-service
+    networks:
+      - infra
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── Auth Service (PostgreSQL — Supabase remote) ──────────────────────
+  auth-service:
+    build:
+      context: ./AuthService
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      PORT: 8083
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
+      # ⚠️ Override these env vars for production
+      DB_URL: ${DB_URL:-jdbc:postgresql://aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0}
+      DB_USER: ${DB_USER:-postgres.pogzbnvnzuhmmadhkryl}
+      DB_PASSWORD: ${DB_PASSWORD:-VoSJaMsFmV2PSx3j}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-false}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - infra
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── Common Service (MongoDB — Atlas remote) ─────────────────────────
+  common-service:
+    build:
+      context: ./CommonService
+      dockerfile: Dockerfile
+    container_name: common-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
+      # MongoDB Atlas — override with MONGODB_URI env var
+      MONGODB_URI: ${MONGODB_URI:-}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      APP_TOKEN_STORE_ENABLED: ${APP_TOKEN_STORE_ENABLED:-true}
+      # Kafka
+      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-false}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # AI keys
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_VIOLATION_API_KEY: ${GEMINI_VIOLATION_API_KEY:-}
+    networks:
+      - infra
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── Message Service (MongoDB — Atlas remote) ────────────────────────
+  message-service:
+    build:
+      context: ./MessegeService
+      dockerfile: Dockerfile
+    container_name: message-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
+      # MongoDB Atlas — override with MONGODB_URI env var
+      MONGODB_URI: ${MONGODB_URI:-}
+      # Kafka
+      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-false}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - infra
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

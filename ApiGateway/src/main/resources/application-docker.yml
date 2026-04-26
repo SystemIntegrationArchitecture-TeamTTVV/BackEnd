@@ -1,0 +1,8 @@
+# ─── Docker profile ─────────────────────────────────────────────────────
+# Activated when SPRING_PROFILES_ACTIVE=docker (set in Dockerfile / docker-compose)
+# Overrides service URLs from localhost → Docker DNS container names.
+
+# Service Discovery via Docker DNS
+COMMON_SERVICE_URL: http://common-service:8081
+MESSAGE_SERVICE_URL: http://message-service:8082
+AUTH_SERVICE_URL: http://auth-service:8083
