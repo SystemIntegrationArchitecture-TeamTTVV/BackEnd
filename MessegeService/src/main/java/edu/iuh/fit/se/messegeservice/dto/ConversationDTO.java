@@ -41,6 +41,7 @@ public class ConversationDTO {
     private String lastMessageSenderId;
     private String lastMessageSenderName;
     private LocalDateTime lastMessageAt;
+    private Boolean isDisbanded;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -61,6 +62,10 @@ public class ConversationDTO {
     @JsonIgnore
     public boolean isGroup() {
         return Boolean.TRUE.equals(isGroup);
+    }
+
+    public boolean isDisbanded() {
+        return Boolean.TRUE.equals(isDisbanded);
     }
 
     // Giữ tương thích với code đang gọi setGroup(...)

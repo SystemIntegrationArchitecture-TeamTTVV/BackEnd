@@ -143,6 +143,11 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.leaveGroup(id, request));
     }
 
+    @PostMapping("/{id}/disband")
+    public ResponseEntity<ConversationDTO> disbandGroup(@PathVariable String id, @RequestParam String requesterId) {
+        return ResponseEntity.ok(conversationService.disbandGroup(id, requesterId));
+    }
+
     @PostMapping("/{id}/join-requests")
     public ResponseEntity<ConversationDTO> requestToJoin(@PathVariable String id, @RequestParam String requesterId) {
         return ResponseEntity.ok(conversationService.requestToJoin(id, requesterId));

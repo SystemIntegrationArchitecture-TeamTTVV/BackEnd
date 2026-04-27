@@ -1304,6 +1304,11 @@ public class MessageService {
     }
 
     private void ensureCanSend(Conversation conversation, String userId) {
+        // Check if group is disbanded
+        if (conversation.isDisbanded()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This group has been disbanded");
+        }
+
         // Check if user is banned from this group
         if (conversation.getBannedUserIds() != null && conversation.getBannedUserIds().contains(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are banned from this conversation");

@@ -553,6 +553,47 @@ public class ConversationService {
         return toDTO(saved);
     }
 
+    public ConversationDTO disbandGroup(String conversationId, String requesterId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Cannot disband a direct conversation");
+        }
+
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        if (conversation.getOwnerId() == null || !conversation.getOwnerId().equals(requesterId)) {
+            throw new IllegalArgumentException("Only the owner can disband the group");
+        }
+
+        messageRepository.deleteByConversationId(conversationId);
+
+        conversation.setDisbanded(true);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+
+        try {
+            Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("conversationId", saved.getId());
+            payload.put("isDisbanded", true);
+            SocketEventDTO event = new SocketEventDTO();
+            event.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+            event.setUserId(requesterId);
+            event.setData(payload);
+            event.setTimestamp(java.time.LocalDateTime.now());
+            for (String participantId : saved.getParticipantIds()) {
+                socketEmitterService.emitToUserById(participantId, event);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to emit event after disbanding: {}", e.getMessage());
+        }
+
+        return toDTO(saved);
+    }
+
     public ConversationDTO leaveGroup(String conversationId, LeaveGroupRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
@@ -1557,6 +1598,7 @@ public class ConversationService {
         dto.setLastMessageSenderId(conversation.getLastMessageSenderId());
         dto.setLastMessageSenderName(conversation.getLastMessageSenderName());
         dto.setLastMessageAt(conversation.getLastMessageAt());
+        dto.setIsDisbanded(conversation.isDisbanded());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setUpdatedAt(conversation.getUpdatedAt());
         return dto;
@@ -1655,6 +1697,7 @@ public class ConversationService {
         dto.setLastMessageSenderId(conversation.getLastMessageSenderId());
         dto.setLastMessageSenderName(conversation.getLastMessageSenderName());
         dto.setLastMessageAt(conversation.getLastMessageAt());
+        dto.setIsDisbanded(conversation.isDisbanded());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setUpdatedAt(conversation.getUpdatedAt());
         return dto;
@@ -1688,3 +1731,4 @@ public class ConversationService {
         return conversation;
     }
 }
+

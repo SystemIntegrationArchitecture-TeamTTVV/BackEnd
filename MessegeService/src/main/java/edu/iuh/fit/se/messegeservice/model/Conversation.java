@@ -88,7 +88,8 @@ public class Conversation {
     private String lastMessageSenderName;
     private LocalDateTime lastMessageAt;
 
+    private boolean isDisbanded = false;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-
