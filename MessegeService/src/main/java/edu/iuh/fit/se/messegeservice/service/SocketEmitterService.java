@@ -5,41 +5,111 @@ import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
- * Service to emit socket events via CommonService
- * This service calls CommonService REST API to trigger socket events
+ * Service to emit socket events via Redis Pub/Sub.
+ * Previously used Feign HTTP calls to CommonService (slow, synchronous).
+ * Now publishes to Redis channels — SocialService subscribes and emits via WebSocket.
  */
 @Slf4j
 @Service
 public class SocketEmitterService {
+    private static final long USERNAME_CACHE_TTL_MS = 60_000;
 
+    private static final class CacheEntry {
+        private final String username;
+        private final long expiresAt;
+
+        private CacheEntry(String username, long expiresAt) {
+            this.username = username;
+            this.expiresAt = expiresAt;
+        }
+
+        private boolean isExpired(long now) {
+            return now >= expiresAt;
+        }
+    }
+
+    private final RedisSocketPublisher redisSocketPublisher;
     private final CommonServiceClientFacade commonServiceClientFacade;
+    private final ConcurrentHashMap<String, CacheEntry> usernameCache = new ConcurrentHashMap<>();
 
-    public SocketEmitterService(CommonServiceClientFacade commonServiceClientFacade) {
+    public SocketEmitterService(RedisSocketPublisher redisSocketPublisher,
+                                CommonServiceClientFacade commonServiceClientFacade) {
+        this.redisSocketPublisher = redisSocketPublisher;
         this.commonServiceClientFacade = commonServiceClientFacade;
     }
 
     /**
-     * Get username from userId by calling CommonService
-     * @param userId The user ID
-     * @return The username, or userId as fallback
+     * Get username from userId (cached locally for 60s)
      */
     private String getUsernameFromUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return userId;
+        }
+
+        long now = System.currentTimeMillis();
+        CacheEntry cached = usernameCache.get(userId);
+        if (cached != null && !cached.isExpired(now)) {
+            return cached.username;
+        }
+
         try {
             UserDTO user = commonServiceClientFacade.getUserById(userId);
-            return user != null && user.getUsername() != null ? user.getUsername() : userId;
+            if (user != null && user.getUsername() != null && !user.getUsername().isBlank()) {
+                usernameCache.put(userId, new CacheEntry(user.getUsername(), now + USERNAME_CACHE_TTL_MS));
+                return user.getUsername();
+            }
+            return userId;
         } catch (Exception e) {
             log.warn("⚠️ Failed to fetch username for userId {}, using userId as fallback: {}", userId, e.getMessage());
-            // Fallback: use userId as username (for development, or if CommonService is down)
             return userId;
         }
     }
 
     /**
-     * Emit socket event to specific user by userId
-     * This method resolves userId → username before emitting
-     * @param userId The recipient user ID
-     * @param event The socket event
+     * Batch pre-cache userId → username mappings to avoid sequential Feign calls.
+     * Only fetches IDs not already in cache.
+     */
+    public void preCacheUsernames(java.util.List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        java.util.List<String> uncachedIds = userIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .filter(id -> {
+                    CacheEntry cached = usernameCache.get(id);
+                    return cached == null || cached.isExpired(now);
+                })
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+
+        if (uncachedIds.isEmpty()) {
+            return;
+        }
+
+        try {
+            java.util.List<UserDTO> users = commonServiceClientFacade.batchLookup(uncachedIds);
+            long cacheNow = System.currentTimeMillis();
+            if (users != null) {
+                for (UserDTO user : users) {
+                    if (user != null && user.getId() != null && user.getUsername() != null && !user.getUsername().isBlank()) {
+                        usernameCache.put(user.getId(), new CacheEntry(user.getUsername(), cacheNow + USERNAME_CACHE_TTL_MS));
+                    }
+                }
+            }
+            log.debug("⚡ Pre-cached {} usernames from batch lookup", users != null ? users.size() : 0);
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to batch pre-cache usernames: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Emit socket event to specific user by userId.
+     * Resolves userId → username, then publishes via Redis Pub/Sub.
      */
     public void emitToUserById(String userId, SocketEventDTO event) {
         String username = getUsernameFromUserId(userId);
@@ -47,60 +117,51 @@ public class SocketEmitterService {
     }
 
     /**
-     * Emit socket event to specific user by username
-     * @param username The recipient username (not userId)
-     * @param event The socket event
+     * Emit socket event to specific user by username via Redis Pub/Sub.
+     * ⚡ Fire-and-forget — does NOT block the caller.
      */
     public void emitToUser(String username, SocketEventDTO event) {
         try {
-            log.info("🚀 Emitting {} event to user {}", event.getType(), username);
-            commonServiceClientFacade.emitToUser(username, event);
-            log.info("✅ Socket event emitted successfully to user {}", username);
+            log.info("⚡ Publishing {} event to user {} via Redis", event.getType(), username);
+            redisSocketPublisher.publishToUser(username, event);
         } catch (Exception e) {
-            log.error("❌ Failed to emit socket event to user {}: {}", username, e.getMessage());
-            // Don't throw - socket emission is not critical, message is already saved
+            log.error("❌ Failed to publish socket event to user {}: {}", username, e.getMessage());
         }
     }
 
     /**
-     * Emit socket event to all users
-     * @param event The socket event
+     * Emit socket event to all users via Redis Pub/Sub.
      */
     public void emitToAll(SocketEventDTO event) {
         try {
-            log.info("🚀 Emitting {} event to all users", event.getType());
-            commonServiceClientFacade.emitToAll(event);
-            log.info("✅ Socket event emitted successfully to all users");
+            log.info("⚡ Publishing {} event to all users via Redis", event.getType());
+            redisSocketPublisher.publishToAll(event);
         } catch (Exception e) {
-            log.error("❌ Failed to emit socket event to all users: {}", e.getMessage());
+            log.error("❌ Failed to publish socket event to all users: {}", e.getMessage());
         }
     }
 
     /**
-     * Emit socket event to specific topic
-     * @param topic The topic name
-     * @param event The socket event
+     * Emit socket event to specific topic via Redis Pub/Sub.
      */
     public void emitToTopic(String topic, SocketEventDTO event) {
         try {
-            log.info("🚀 Emitting {} event to topic {}", event.getType(), topic);
-            commonServiceClientFacade.emitToTopic(topic, event);
-            log.info("✅ Socket event emitted successfully to topic {}", topic);
+            log.info("⚡ Publishing {} event to topic {} via Redis", event.getType(), topic);
+            redisSocketPublisher.publishToTopic(topic, event);
         } catch (Exception e) {
-            log.error("❌ Failed to emit socket event to topic {}: {}", topic, e.getMessage());
+            log.error("❌ Failed to publish socket event to topic {}: {}", topic, e.getMessage());
         }
     }
 
     /**
-     * Emit socket event to a conversation room channel.
+     * Emit socket event to a conversation room via Redis Pub/Sub.
      */
     public void emitToRoom(String roomId, SocketEventDTO event) {
         try {
-            log.info("🚀 Emitting {} event to room {}", event.getType(), roomId);
-            commonServiceClientFacade.emitToRoom(roomId, event);
-            log.info("✅ Socket event emitted successfully to room {}", roomId);
+            log.info("⚡ Publishing {} event to room {} via Redis", event.getType(), roomId);
+            redisSocketPublisher.publishToRoom(roomId, event);
         } catch (Exception e) {
-            log.error("❌ Failed to emit socket event to room {}: {}", roomId, e.getMessage());
+            log.error("❌ Failed to publish socket event to room {}: {}", roomId, e.getMessage());
         }
     }
 }

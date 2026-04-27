@@ -10,6 +10,7 @@ import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -24,12 +25,27 @@ public class CommonServiceClientFacade {
     private final CommonServiceClient commonServiceClient;
     private final AuthServiceClient authServiceClient;
 
+    @Cacheable(value = "msg-user-cache", key = "#id", unless = "#result == null || #result.username == 'unknown'")
     @Bulkhead(name = "authService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "getUserByIdFallback")
     @RateLimiter(name = "authService", fallbackMethod = "getUserByIdFallback")
     @Retry(name = "authService", fallbackMethod = "getUserByIdFallback")
     @CircuitBreaker(name = "authService", fallbackMethod = "getUserByIdFallback")
     public UserDTO getUserById(String id) {
         return authServiceClient.getUserById(id);
+    }
+
+    @Bulkhead(name = "authService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "batchLookupFallback")
+    @RateLimiter(name = "authService", fallbackMethod = "batchLookupFallback")
+    @Retry(name = "authService", fallbackMethod = "batchLookupFallback")
+    @CircuitBreaker(name = "authService", fallbackMethod = "batchLookupFallback")
+    public java.util.List<UserDTO> batchLookup(java.util.List<String> ids) {
+        return authServiceClient.batchLookup(ids);
+    }
+
+    @SuppressWarnings("unused")
+    private java.util.List<UserDTO> batchLookupFallback(java.util.List<String> ids, Throwable throwable) {
+        log.warn("⚠️ [AuthServiceClient] Falling back for batchLookup: {}", throwable.getMessage());
+        return java.util.List.of();
     }
 
     @SuppressWarnings("unused")
@@ -45,7 +61,6 @@ public class CommonServiceClientFacade {
 
     @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToUserFallback")
     @RateLimiter(name = "commonService", fallbackMethod = "emitToUserFallback")
-    @Retry(name = "commonService", fallbackMethod = "emitToUserFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToUserFallback")
     public void emitToUser(String username, SocketEventDTO event) {
         commonServiceClient.emitToUser(username, event);
@@ -59,7 +74,6 @@ public class CommonServiceClientFacade {
 
     @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToAllFallback")
     @RateLimiter(name = "commonService", fallbackMethod = "emitToAllFallback")
-    @Retry(name = "commonService", fallbackMethod = "emitToAllFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToAllFallback")
     public void emitToAll(SocketEventDTO event) {
         commonServiceClient.emitToAll(event);
@@ -73,7 +87,6 @@ public class CommonServiceClientFacade {
 
     @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToTopicFallback")
     @RateLimiter(name = "commonService", fallbackMethod = "emitToTopicFallback")
-    @Retry(name = "commonService", fallbackMethod = "emitToTopicFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToTopicFallback")
     public void emitToTopic(String topic, SocketEventDTO event) {
         commonServiceClient.emitToTopic(topic, event);
@@ -87,7 +100,6 @@ public class CommonServiceClientFacade {
 
     @Bulkhead(name = "commonService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "emitToRoomFallback")
     @RateLimiter(name = "commonService", fallbackMethod = "emitToRoomFallback")
-    @Retry(name = "commonService", fallbackMethod = "emitToRoomFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "emitToRoomFallback")
     public void emitToRoom(String roomId, SocketEventDTO event) {
         commonServiceClient.emitToRoom(roomId, event);

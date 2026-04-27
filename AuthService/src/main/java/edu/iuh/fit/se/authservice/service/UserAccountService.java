@@ -7,6 +7,8 @@ import edu.iuh.fit.se.authservice.mapper.UserMapper;
 import edu.iuh.fit.se.authservice.repository.RoleRepository;
 import edu.iuh.fit.se.authservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class UserAccountService {
         return userRepository.findAll().stream().map(userMapper::toDto).collect(Collectors.toList());
     }
 
+    @Cacheable(value = "users", key = "#id")
     @Transactional(readOnly = true)
     public UserDTO getUserById(String id) {
         return userRepository.findById(id)
@@ -41,6 +44,7 @@ public class UserAccountService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
+    @Cacheable(value = "users", key = "'username:' + #username")
     @Transactional(readOnly = true)
     public UserDTO getUserByUsername(String username) {
         return userRepository.findByUsername(username)
@@ -102,6 +106,7 @@ public class UserAccountService {
         return userMapper.toDto(saved);
     }
 
+    @CacheEvict(value = "users", key = "#id")
     @Transactional
     public UserDTO updateUser(String id, UserDTO userDTO) {
         UserEntity user = userRepository.findById(id)
@@ -181,6 +186,7 @@ public class UserAccountService {
         return userMapper.toDto(userRepository.save(user));
     }
 
+    @CacheEvict(value = "users", key = "#id")
     public void deleteUser(String id) {
         userRepository.deleteById(id);
     }
@@ -205,6 +211,7 @@ public class UserAccountService {
         return userMapper.toDto(userRepository.save(user));
     }
 
+    @CacheEvict(value = "users", key = "#id")
     @Transactional
     public void deactivateUser(String id) {
         UserEntity user = userRepository.findById(id)

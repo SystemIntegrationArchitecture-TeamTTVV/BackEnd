@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final RoomSubscriptionAuthInterceptor roomSubscriptionAuthInterceptor;
+    private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+    private final StompHandshakeHandler stompHandshakeHandler;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -29,12 +31,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Register WebSocket endpoint
-        // CORS is handled by API Gateway, so we allow all origins here
-        // Gateway will set proper CORS headers
+        // Register WebSocket endpoint with auth interceptor and custom handshake handler
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*") // Allow all origins - Gateway handles CORS
-                .withSockJS(); // Enable SockJS fallback options
+                .setHandshakeHandler(stompHandshakeHandler)
+                .addInterceptors(webSocketAuthInterceptor)
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
 
     @Override

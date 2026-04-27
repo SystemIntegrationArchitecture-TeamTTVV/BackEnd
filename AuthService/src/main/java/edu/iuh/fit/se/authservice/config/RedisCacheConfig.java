@@ -1,4 +1,4 @@
-package edu.iuh.fit.se.commonservice.config;
+package edu.iuh.fit.se.authservice.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -19,14 +18,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Redis configuration for SocialService:
- * 1. RedisMessageListenerContainer for Pub/Sub socket event subscription
- * 2. RedisCacheManager for caching user identity lookups
+ * Redis cache configuration for AuthService.
  * Uses JavaTimeModule to handle LocalDateTime serialization.
  */
 @Configuration
 @EnableCaching
-public class CachingConfig {
+public class RedisCacheConfig {
 
     private GenericJackson2JsonRedisSerializer jsonRedisSerializer() {
         ObjectMapper mapper = new ObjectMapper();
@@ -40,24 +37,17 @@ public class CachingConfig {
     }
 
     @Bean
-    public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
-        return container;
-    }
-
-    @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         GenericJackson2JsonRedisSerializer serializer = jsonRedisSerializer();
 
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(3))
+                .entryTtl(Duration.ofMinutes(5))
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer))
                 .disableCachingNullValues();
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put("user-identity", defaultConfig.entryTtl(Duration.ofMinutes(3)));
+        cacheConfigs.put("users", defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

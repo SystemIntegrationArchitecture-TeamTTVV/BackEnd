@@ -87,9 +87,12 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/api/upload/**").permitAll() // Allow upload without role check
                 .requestMatchers("/api/files/**").permitAll() // Allow public access to uploaded files
+                .requestMatchers("/api/socket/**").permitAll() // Internal cross-service socket emit endpoints
                 // WebSocket endpoints - allow all including SockJS info requests
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/ws").permitAll()
+                .requestMatchers("/ws/info/**").permitAll()
+                .requestMatchers("/ws/info").permitAll()
                 
                 // Admin-only endpoints - require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

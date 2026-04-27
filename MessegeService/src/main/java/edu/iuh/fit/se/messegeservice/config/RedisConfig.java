@@ -1,4 +1,4 @@
-package edu.iuh.fit.se.commonservice.config;
+package edu.iuh.fit.se.messegeservice.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -19,14 +19,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Redis configuration for SocialService:
- * 1. RedisMessageListenerContainer for Pub/Sub socket event subscription
- * 2. RedisCacheManager for caching user identity lookups
+ * Redis configuration for MessegeService:
+ * 1. RedisTemplate for Pub/Sub socket events
+ * 2. RedisCacheManager for caching user lookups
  * Uses JavaTimeModule to handle LocalDateTime serialization.
  */
 @Configuration
 @EnableCaching
-public class CachingConfig {
+public class RedisConfig {
 
     private GenericJackson2JsonRedisSerializer jsonRedisSerializer() {
         ObjectMapper mapper = new ObjectMapper();
@@ -40,10 +40,19 @@ public class CachingConfig {
     }
 
     @Bean
-    public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
-        return container;
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+        GenericJackson2JsonRedisSerializer serializer = jsonRedisSerializer();
+
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        // Use StringRedisSerializer for Pub/Sub: RedisSocketPublisher already
+        // serializes to JSON manually, so we must NOT double-serialize with type info.
+        template.setValueSerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(serializer);
+        template.afterPropertiesSet();
+        return template;
     }
 
     @Bean
@@ -57,7 +66,7 @@ public class CachingConfig {
                 .disableCachingNullValues();
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put("user-identity", defaultConfig.entryTtl(Duration.ofMinutes(3)));
+        cacheConfigs.put("msg-user-cache", defaultConfig.entryTtl(Duration.ofMinutes(3)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

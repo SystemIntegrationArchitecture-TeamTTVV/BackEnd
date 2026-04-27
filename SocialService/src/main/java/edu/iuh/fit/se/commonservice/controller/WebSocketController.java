@@ -13,16 +13,32 @@ import org.springframework.stereotype.Controller;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
 // CORS is handled by API Gateway, no need for @CrossOrigin here
 public class WebSocketController {
+    private static final long USERNAME_CACHE_TTL_MS = 60_000;
+
+    private static final class CacheEntry {
+        private final String username;
+        private final long expiresAt;
+
+        private CacheEntry(String username, long expiresAt) {
+            this.username = username;
+            this.expiresAt = expiresAt;
+        }
+
+        private boolean isExpired(long now) {
+            return now >= expiresAt;
+        }
+    }
 
     private final SimpMessagingTemplate messagingTemplate;
     private final AuthServiceClient authServiceClient;
     private final MessageServiceClientFacade messageServiceClientFacade;
+    private final ConcurrentHashMap<String, CacheEntry> usernameCache = new ConcurrentHashMap<>();
 
     /**
      * Handle client connection and subscribe to user-specific channel
@@ -216,18 +232,28 @@ public class WebSocketController {
      * Spring WebSocket's convertAndSendToUser() uses username (principal name), not userId
      */
     private String getUsernameById(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+
+        long now = System.currentTimeMillis();
+        CacheEntry cached = usernameCache.get(userId);
+        if (cached != null && !cached.isExpired(now)) {
+            return cached.username;
+        }
+
         try {
-            log.info("🔍 Looking up user with ID: {}", userId);
+            log.debug("Looking up user with ID: {}", userId);
             UserDTO user = authServiceClient.getUserById(userId);
-            if (user != null) {
-                log.info("✅ Found user: id={}, username={}, fullName={}", user.getId(), user.getUsername(), user.getFullName());
+            if (user != null && user.getUsername() != null && !user.getUsername().isBlank()) {
+                usernameCache.put(userId, new CacheEntry(user.getUsername(), now + USERNAME_CACHE_TTL_MS));
                 return user.getUsername();
             } else {
-                log.error("❌ No user found with ID: {}", userId);
+                log.warn("No user found with ID: {}", userId);
                 return null;
             }
         } catch (Exception e) {
-            log.error("❌ Error finding user by ID: {}", userId, e);
+            log.warn("Error finding user by ID {}: {}", userId, e.getMessage());
             return null;
         }
     }
