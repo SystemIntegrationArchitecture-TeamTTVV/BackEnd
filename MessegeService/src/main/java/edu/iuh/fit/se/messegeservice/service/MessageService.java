@@ -294,9 +294,7 @@ public class MessageService {
         log.info("✅ Message saved with id: {}", saved.getId());
         
         // Update conversation last message
-        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, saved);
         conversationRepository.save(conversation);
         
         MessageDTO savedDTO = toDTO(saved);
@@ -514,9 +512,7 @@ public class MessageService {
         Message saved = messageRepository.save(poll);
         unhideSoftDeletedConversationForParticipants(conversation);
 
-        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, saved);
         conversationRepository.save(conversation);
 
         MessageDTO savedDTO = toDTO(saved);
@@ -662,9 +658,7 @@ public class MessageService {
         Message saved = messageRepository.save(appointment);
         unhideSoftDeletedConversationForParticipants(conversation);
 
-        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, saved);
         conversationRepository.save(conversation);
 
         MessageDTO savedDTO = toDTO(saved);
@@ -980,9 +974,7 @@ public class MessageService {
         Message saved = messageRepository.save(forwarded);
         unhideSoftDeletedConversationForParticipants(targetConversation);
 
-        targetConversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        targetConversation.setLastMessageAt(saved.getCreatedAt());
-        targetConversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(targetConversation, saved);
         conversationRepository.save(targetConversation);
         emitConversationMetaUpdated(targetConversation);
 
@@ -1179,11 +1171,9 @@ public class MessageService {
         );
 
         if (!latest.isEmpty()) {
-            conversation.setLastMessagePreview(buildLastMessagePreview(latest.get(0)));
-            conversation.setLastMessageAt(latest.get(0).getCreatedAt());
+            updateConversationLastMessage(conversation, latest.get(0));
         } else {
-            conversation.setLastMessagePreview("");
-            conversation.setLastMessageAt(null);
+            updateConversationLastMessage(conversation, null);
         }
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -1214,6 +1204,9 @@ public class MessageService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("conversationId", conversation.getId());
         payload.put("lastMessagePreview", conversation.getLastMessagePreview());
+        payload.put("lastMessageType", conversation.getLastMessageType());
+        payload.put("lastMessageSenderId", conversation.getLastMessageSenderId());
+        payload.put("lastMessageSenderName", conversation.getLastMessageSenderName());
         payload.put(
                 "lastMessageAt",
                 conversation.getLastMessageAt() != null ? conversation.getLastMessageAt().toString() : null
@@ -1423,9 +1416,7 @@ public class MessageService {
         Message savedSystemMessage = messageRepository.save(systemMessage);
         unhideSoftDeletedConversationForParticipants(conversation);
 
-        conversation.setLastMessagePreview(buildLastMessagePreview(savedSystemMessage));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, savedSystemMessage);
         conversationRepository.save(conversation);
 
         emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage));
@@ -1558,6 +1549,23 @@ public class MessageService {
         cloned.setData(source.getData());
         cloned.setTimestamp(source.getTimestamp());
         return cloned;
+    }
+
+    private void updateConversationLastMessage(Conversation conversation, Message message) {
+        if (message == null) {
+            conversation.setLastMessagePreview("");
+            conversation.setLastMessageType(null);
+            conversation.setLastMessageSenderId(null);
+            conversation.setLastMessageSenderName(null);
+            conversation.setLastMessageAt(null);
+        } else {
+            conversation.setLastMessagePreview(buildLastMessagePreview(message));
+            conversation.setLastMessageType(message.getMessageType());
+            conversation.setLastMessageSenderId(message.getSenderId());
+            conversation.setLastMessageSenderName(message.getSenderName());
+            conversation.setLastMessageAt(message.getCreatedAt() != null ? message.getCreatedAt() : LocalDateTime.now());
+        }
+        conversation.setUpdatedAt(LocalDateTime.now());
     }
 }
 

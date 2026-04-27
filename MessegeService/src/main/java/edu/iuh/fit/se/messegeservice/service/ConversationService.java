@@ -1507,6 +1507,9 @@ public class ConversationService {
         dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
 
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
+        dto.setLastMessageType(conversation.getLastMessageType());
+        dto.setLastMessageSenderId(conversation.getLastMessageSenderId());
+        dto.setLastMessageSenderName(conversation.getLastMessageSenderName());
         dto.setLastMessageAt(conversation.getLastMessageAt());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setUpdatedAt(conversation.getUpdatedAt());
@@ -1590,6 +1593,9 @@ public class ConversationService {
         dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
 
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
+        dto.setLastMessageType(conversation.getLastMessageType());
+        dto.setLastMessageSenderId(conversation.getLastMessageSenderId());
+        dto.setLastMessageSenderName(conversation.getLastMessageSenderName());
         dto.setLastMessageAt(conversation.getLastMessageAt());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setUpdatedAt(conversation.getUpdatedAt());

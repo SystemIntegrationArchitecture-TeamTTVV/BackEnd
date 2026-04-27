@@ -37,6 +37,9 @@ public class ConversationDTO {
     private Boolean hiddenRequiresPin;
     private LocalDateTime clearBeforeAt;
     private String lastMessagePreview;
+    private String lastMessageType;
+    private String lastMessageSenderId;
+    private String lastMessageSenderName;
     private LocalDateTime lastMessageAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

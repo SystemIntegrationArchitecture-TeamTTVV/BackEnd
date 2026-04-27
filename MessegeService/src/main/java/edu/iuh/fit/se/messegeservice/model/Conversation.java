@@ -73,6 +73,9 @@ public class Conversation {
     private boolean aiAssistantEnabled = false;
 
     private String lastMessagePreview;
+    private String lastMessageType;
+    private String lastMessageSenderId;
+    private String lastMessageSenderName;
     private LocalDateTime lastMessageAt;
 
     private LocalDateTime createdAt;
