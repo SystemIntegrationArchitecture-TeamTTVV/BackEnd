@@ -65,7 +65,11 @@ public class Message {
     private String pollQuestion;
     private boolean pollMultipleChoice = false;
     private boolean pollClosed = false;
+    private boolean pollCanAddOptions = false;
+    private boolean pollHideResultsBeforeVote = false;
+    private boolean pollHideVoters = false;
     private List<PollOption> pollOptions;
+    private LocalDateTime pollDeadline;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

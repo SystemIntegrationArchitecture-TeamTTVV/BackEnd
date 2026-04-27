@@ -457,7 +457,11 @@ public class MessageService {
             String userId,
             String question,
             List<String> options,
-            boolean multipleChoice
+            boolean multipleChoice,
+            boolean canAddOptions,
+            boolean hideResultsBeforeVote,
+            boolean hideVoters,
+            java.time.LocalDateTime deadline
     ) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
@@ -489,6 +493,10 @@ public class MessageService {
         poll.setPollQuestion(question.trim());
         poll.setPollMultipleChoice(multipleChoice);
         poll.setPollClosed(false);
+        poll.setPollCanAddOptions(canAddOptions);
+        poll.setPollHideResultsBeforeVote(hideResultsBeforeVote);
+        poll.setPollHideVoters(hideVoters);
+        poll.setPollDeadline(deadline);
         poll.setPollOptions(
                 java.util.stream.IntStream.range(0, normalizedOptions.size())
                         .mapToObj(i -> new PollOption("opt-" + (i + 1), normalizedOptions.get(i), new ArrayList<>()))
@@ -541,6 +549,9 @@ public class MessageService {
         }
         if (poll.isPollClosed()) {
             throw new IllegalStateException("Poll has been closed");
+        }
+        if (poll.getPollDeadline() != null && LocalDateTime.now().isAfter(poll.getPollDeadline())) {
+            throw new IllegalStateException("Poll deadline has passed");
         }
 
         Conversation conversation = conversationRepository.findById(poll.getConversationId())
@@ -1136,7 +1147,11 @@ public class MessageService {
         dto.setPollQuestion(message.getPollQuestion());
         dto.setPollMultipleChoice(message.isPollMultipleChoice());
         dto.setPollClosed(message.isPollClosed());
+        dto.setPollCanAddOptions(message.isPollCanAddOptions());
+        dto.setPollHideResultsBeforeVote(message.isPollHideResultsBeforeVote());
+        dto.setPollHideVoters(message.isPollHideVoters());
         dto.setPollOptions(message.getPollOptions());
+        dto.setPollDeadline(message.getPollDeadline());
         dto.setMentionUserIds(message.getMentionUserIds());
         dto.setSeenByUserIds(message.getSeenByUserIds());
         dto.setDeliveredToUserIds(message.getDeliveredToUserIds());

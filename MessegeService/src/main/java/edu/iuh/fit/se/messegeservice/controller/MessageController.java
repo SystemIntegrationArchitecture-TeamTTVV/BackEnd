@@ -185,7 +185,11 @@ public class MessageController {
                         request.getUserId(),
                         request.getQuestion(),
                         request.getOptions(),
-                        request.isMultipleChoice()
+                        request.isMultipleChoice(),
+                        request.isCanAddOptions(),
+                        request.isHideResultsBeforeVote(),
+                        request.isHideVoters(),
+                        request.getDeadline()
                 ));
     }
 
