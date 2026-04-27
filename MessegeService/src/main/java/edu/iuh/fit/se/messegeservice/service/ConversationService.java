@@ -402,6 +402,7 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversation.setLastMessageAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
+
         return toDTO(saved);
     }
 
@@ -931,6 +932,17 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversation.setLastMessageAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
+
+        // Notify all members so they see the new group in their chat list in real-time.
+        String ownerDisplayName = resolveUserDisplayName(conversationDTO.getOwnerId());
+        String groupDisplayName = saved.getGroupName() != null ? saved.getGroupName() : "New Group Chat";
+        emitGroupSystemEvent(
+            saved,
+            conversationDTO.getOwnerId(),
+            SocketEventTypes.MEMBERS_ADDED,
+            ownerDisplayName + " da tao nhom \"" + groupDisplayName + "\""
+        );
+
         return toDTO(saved);
     }
 
