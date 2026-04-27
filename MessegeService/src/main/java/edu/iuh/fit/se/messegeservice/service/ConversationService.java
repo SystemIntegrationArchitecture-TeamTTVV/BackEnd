@@ -59,7 +59,9 @@ public class ConversationService {
     private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
+        long t0 = System.currentTimeMillis();
         List<HiddenConversation> visibilityRows = hiddenConversationRepository.findByUserId(userId);
+        long t1 = System.currentTimeMillis();
         Set<String> hiddenConversationIds = visibilityRows.stream()
             .filter(HiddenConversation::isHidden)
                 .map(HiddenConversation::getConversationId)
@@ -72,13 +74,17 @@ public class ConversationService {
                 .stream()
                 .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
                 .collect(Collectors.toList());
+        long t2 = System.currentTimeMillis();
 
         // ── Batch-prefetch all participant info in ONE call ──
         Map<String, UserDTO> userCache = batchPrefetchUsers(conversations);
+        long t3 = System.currentTimeMillis();
 
-        return conversations.stream()
+        List<Conversation> modifiedConversations = new ArrayList<>();
+
+        List<ConversationDTO> result = conversations.stream()
                 .map(conversation -> {
-                    ConversationDTO dto = toDTOWithCache(conversation, userCache);
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache, modifiedConversations);
                     HiddenConversation visibility = visibilityByConversationId.get(conversation.getId());
                     LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
                     // Recompute preview only for conversations that were user-cleared.
@@ -92,6 +98,14 @@ public class ConversationService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+        long t4 = System.currentTimeMillis();
+
+        if (!modifiedConversations.isEmpty()) {
+            conversationRepository.saveAll(modifiedConversations);
+        }
+        log.info("[PERF] getConversationsByUserId total: {}ms (visibility: {}ms, fetchConvs: {}ms, prefetchUsers: {}ms, toDTO: {}ms, count: {})",
+                (t4 - t0), (t1 - t0), (t2 - t1), (t3 - t2), (t4 - t3), result.size());
+        return result;
     }
 
     public List<ConversationDTO> getHiddenConversationsByUserId(String userId) {
@@ -107,10 +121,16 @@ public class ConversationService {
         java.util.Map<String, HiddenConversation> hiddenByConvId = hiddenRows.stream()
             .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
 
-        return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
+        List<Conversation> conversations = conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
                 .filter(c -> hiddenConvIds.contains(c.getId()))
+                .collect(Collectors.toList());
+
+        Map<String, UserDTO> userCache = batchPrefetchUsers(conversations);
+
+        List<Conversation> modifiedConversations = new ArrayList<>();
+        List<ConversationDTO> result = conversations.stream()
                 .map(conversation -> {
-                    ConversationDTO dto = toDTO(conversation);
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache, modifiedConversations);
                     HiddenConversation hc = hiddenByConvId.get(conversation.getId());
                     dto.setHiddenForCurrentUser(true);
                     dto.setHiddenRequiresPin(hc != null && hc.isRequirePinUnlock());
@@ -118,6 +138,11 @@ public class ConversationService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        if (!modifiedConversations.isEmpty()) {
+            conversationRepository.saveAll(modifiedConversations);
+        }
+        return result;
     }
 
     public List<ConversationDTO> searchGroupConversations(String userId, String keyword) {
@@ -371,7 +396,15 @@ public class ConversationService {
 
     public ConversationDTO getConversationById(String id) {
         return conversationRepository.findById(id)
-                .map(this::toDTO)
+                .map(conversation -> {
+                    java.util.Map<String, UserDTO> userCache = batchPrefetchUsers(java.util.Collections.singletonList(conversation));
+                    List<Conversation> modified = new ArrayList<>();
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache, modified);
+                    if (!modified.isEmpty()) {
+                        conversationRepository.saveAll(modified);
+                    }
+                    return dto;
+                })
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
     }
 
@@ -1444,7 +1477,7 @@ public class ConversationService {
     /**
      * Same as toDTO but uses a pre-fetched user cache instead of calling getUserById per participant.
      */
-    private ConversationDTO toDTOWithCache(Conversation conversation, Map<String, UserDTO> userCache) {
+    private ConversationDTO toDTOWithCache(Conversation conversation, Map<String, UserDTO> userCache, List<Conversation> modifiedConversations) {
         ConversationDTO dto = new ConversationDTO();
         dto.setId(conversation.getId());
         dto.setParticipantIds(conversation.getParticipantIds());
@@ -1459,6 +1492,8 @@ public class ConversationService {
             participantNames = new ArrayList<>(participantNames.subList(0, participantIds.size()));
         if (participantAvatars.size() > participantIds.size())
             participantAvatars = new ArrayList<>(participantAvatars.subList(0, participantIds.size()));
+
+        boolean modified = false;
 
         for (int i = 0; i < participantIds.size(); i++) {
             String existingName = participantNames.get(i);
@@ -1475,12 +1510,23 @@ public class ConversationService {
                             ? user.getFullName()
                             : user.getUsername();
                     participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                    modified = true;
                 }
                 if (existingAvatar == null) {
                     participantAvatars.set(i, user.getAvatar());
+                    modified = true;
                 }
             } else if (existingName == null || existingName.isBlank()) {
                 participantNames.set(i, "Unknown User");
+                modified = true;
+            }
+        }
+
+        if (modified) {
+            conversation.setParticipantNames(new ArrayList<>(participantNames));
+            conversation.setParticipantAvatars(new ArrayList<>(participantAvatars));
+            if (modifiedConversations != null) {
+                modifiedConversations.add(conversation);
             }
         }
 
@@ -1539,6 +1585,8 @@ public class ConversationService {
             participantAvatars = new ArrayList<>(participantAvatars.subList(0, participantIds.size()));
         }
 
+        boolean modified = false;
+
         for (int i = 0; i < participantIds.size(); i++) {
             String existingName = participantNames.get(i);
             String existingAvatar = participantAvatars.get(i);
@@ -1555,18 +1603,28 @@ public class ConversationService {
                                 ? user.getFullName()
                                 : user.getUsername();
                         participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                        modified = true;
                     }
                     if (existingAvatar == null) {
                         participantAvatars.set(i, user.getAvatar());
+                        modified = true;
                     }
                 } else if (existingName == null || existingName.isBlank()) {
                     participantNames.set(i, "Unknown User");
+                    modified = true;
                 }
             } catch (Exception e) {
                 if (existingName == null || existingName.isBlank()) {
                     participantNames.set(i, "Unknown User");
+                    modified = true;
                 }
             }
+        }
+
+        if (modified) {
+            conversation.setParticipantNames(new ArrayList<>(participantNames));
+            conversation.setParticipantAvatars(new ArrayList<>(participantAvatars));
+            conversationRepository.save(conversation);
         }
 
         dto.setParticipantNames(participantNames);
