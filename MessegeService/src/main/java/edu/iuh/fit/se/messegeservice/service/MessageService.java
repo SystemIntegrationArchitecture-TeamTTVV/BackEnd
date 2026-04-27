@@ -368,6 +368,13 @@ public class MessageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + message.getConversationId()));
         ensureParticipant(conversation, userId);
 
+        if (!message.isPinned()) {
+            long pinnedCount = messageRepository.countByConversationIdAndPinnedTrue(conversation.getId());
+            if (pinnedCount >= 5) {
+                throw new IllegalStateException("Bạn chỉ được ghim tối đa 5 tin nhắn trong mỗi cuộc hội thoại");
+            }
+        }
+
         message.setPinned(!message.isPinned());
         message.setUpdatedAt(LocalDateTime.now());
         Message updated = messageRepository.save(message);

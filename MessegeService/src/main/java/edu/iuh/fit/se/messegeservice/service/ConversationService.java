@@ -1155,6 +1155,10 @@ public class ConversationService {
         Conversation conversation = getConversationEntity(conversationId);
         ensureParticipant(conversation, userId);
 
+        if (conversation.isAiAssistantEnabled()) {
+            throw new IllegalArgumentException("AI Assistant is always pinned on top");
+        }
+
         List<String> pinned = conversation.getPinnedByUserIds();
         if (pinned == null) {
             pinned = new ArrayList<>();
@@ -1162,6 +1166,10 @@ public class ConversationService {
         if (pinned.contains(userId)) {
             pinned.remove(userId);
         } else {
+            long currentPinnedCount = conversationRepository.countByPinnedByUserIds(userId);
+            if (currentPinnedCount >= 5) {
+                throw new IllegalStateException("Bạn chỉ được ghim tối đa 5 cuộc hội thoại");
+            }
             pinned.add(userId);
         }
         conversation.setPinnedByUserIds(pinned);
