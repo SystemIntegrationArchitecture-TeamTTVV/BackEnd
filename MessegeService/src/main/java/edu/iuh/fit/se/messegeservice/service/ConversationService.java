@@ -738,11 +738,14 @@ public class ConversationService {
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot add members to a direct conversation");
         }
-        if (conversation.isOnlyAdminsCanAddMembers()) {
-            ensureManager(conversation, request.getRequesterId());
-        } else {
-            ensureParticipant(conversation, request.getRequesterId());
-        }
+
+        // Any member of the group can invite friends.
+        // If onlyAdminsCanAddMembers is ON, only managers may add directly —
+        // but regular members can still invite (invitees go to pending if approvalsRequired is ON).
+        boolean isManager = (conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getRequesterId()))
+                || (conversation.getAdminIds() != null && conversation.getAdminIds().contains(request.getRequesterId()));
+
+        ensureParticipant(conversation, request.getRequesterId());
 
         Set<String> newMembers = sanitizeIds(request.getParticipantIds());
         if (newMembers.isEmpty()) {
@@ -767,14 +770,59 @@ public class ConversationService {
                     "Tất cả người dùng đã chặn lời mời nhóm từ người lạ");
         }
 
-        Set<String> participants = new HashSet<>(conversation.getParticipantIds());
-        participants.addAll(newMembers);
+        // Remove already-existing participants (no-op for them)
+        Set<String> existing = new HashSet<>(conversation.getParticipantIds());
+        newMembers.removeAll(existing);
+        if (newMembers.isEmpty()) {
+            return toDTO(conversation); // everyone already in group
+        }
 
-        if (participants.size() < 3) {
+        // Non-managers: if approvals required OR onlyAdminsCanAddMembers → put in pending queue
+        boolean routeToPending = !isManager && (conversation.isApprovalsRequired() || conversation.isOnlyAdminsCanAddMembers());
+
+        if (routeToPending) {
+            List<String> pending = conversation.getPendingJoinIds();
+            if (pending == null) pending = new ArrayList<>();
+            for (String memberId : newMembers) {
+                if (!pending.contains(memberId)) {
+                    pending.add(memberId);
+                }
+            }
+            conversation.setPendingJoinIds(pending);
+            conversation.setUpdatedAt(LocalDateTime.now());
+            Conversation saved = conversationRepository.save(conversation);
+
+            // Notify admins/owner of new pending requests
+            try {
+                SocketEventDTO event = new SocketEventDTO();
+                event.setType(SocketEventTypes.JOIN_REQUEST_CREATED);
+                event.setUserId(request.getRequesterId());
+                java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("conversationId", saved.getId());
+                payload.put("requesterId", request.getRequesterId());
+                payload.put("pendingIds", new ArrayList<>(newMembers));
+                event.setData(payload);
+                event.setTimestamp(java.time.LocalDateTime.now());
+                java.util.Set<String> targets = new java.util.HashSet<>();
+                if (saved.getOwnerId() != null) targets.add(saved.getOwnerId());
+                if (saved.getAdminIds() != null) targets.addAll(saved.getAdminIds());
+                for (String targetId : targets) {
+                    socketEmitterService.emitToUserById(targetId, event);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to emit JOIN_REQUEST_CREATED after member invite: {}", e.getMessage());
+            }
+
+            return toDTO(saved);
+        }
+
+        // Manager path (or no restrictions): add directly
+        existing.addAll(newMembers);
+        if (existing.size() < 3) {
             throw new IllegalStateException("Group must have at least 3 members");
         }
 
-        conversation.setParticipantIds(new ArrayList<>(participants));
+        conversation.setParticipantIds(new ArrayList<>(existing));
         conversation.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
 

@@ -153,7 +153,7 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.getPendingJoinRequests(id, requesterId));
     }
 
-    @PatchMapping("/{id}/join-requests")
+    @PutMapping("/{id}/join-requests")
     public ResponseEntity<ConversationDTO> handleJoinRequest(@PathVariable String id, @RequestBody JoinRequestUpdateRequest request) {
         return ResponseEntity.ok(conversationService.handleJoinRequest(id, request));
     }
