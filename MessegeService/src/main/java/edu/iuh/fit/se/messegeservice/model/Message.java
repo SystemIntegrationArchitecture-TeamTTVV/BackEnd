@@ -71,6 +71,11 @@ public class Message {
     private List<PollOption> pollOptions;
     private LocalDateTime pollDeadline;
 
+    private String appointmentTitle;
+    private LocalDateTime appointmentTime;
+    private String appointmentLocation;
+    private List<String> appointmentParticipants;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

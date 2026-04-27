@@ -42,6 +42,7 @@ public class MessageService {
     private static final String TYPE_TEXT = "TEXT";
     private static final String TYPE_SYSTEM = "SYSTEM";
     private static final String TYPE_POLL = "POLL";
+    private static final String TYPE_APPOINTMENT = "APPOINTMENT";
     private static final long DEFAULT_RECALL_WINDOW_SECONDS = 120L;
 
     private final MessageRepository messageRepository;
@@ -615,6 +616,107 @@ public class MessageService {
         return dto;
     }
 
+    public MessageDTO createAppointment(
+            String conversationId,
+            String userId,
+            String title,
+            LocalDateTime time,
+            String location,
+            String description
+    ) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+        ensureParticipant(conversation, userId);
+        ensureCanSend(conversation, userId);
+
+        if (title == null || title.trim().isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        if (time == null) {
+            throw new IllegalArgumentException("time is required");
+        }
+
+        Message appointment = new Message();
+        appointment.setConversation(conversation);
+        appointment.setConversationId(conversation.getId());
+        appointment.setSenderId(userId);
+        appointment.setSenderName(resolveParticipantDisplayName(conversation, userId));
+        appointment.setMessageType(TYPE_APPOINTMENT);
+        appointment.setContent(description != null ? description.trim() : "");
+        appointment.setAppointmentTitle(title.trim());
+        appointment.setAppointmentTime(time);
+        appointment.setAppointmentLocation(location != null ? location.trim() : null);
+        appointment.setAppointmentParticipants(new ArrayList<>(List.of(userId)));
+        
+        appointment.setSeenByUserIds(new ArrayList<>(List.of(userId)));
+        appointment.setHiddenForUserIds(new ArrayList<>());
+        appointment.setDeleted(false);
+        appointment.setEdited(false);
+        appointment.setCreatedAt(LocalDateTime.now());
+        appointment.setUpdatedAt(LocalDateTime.now());
+
+        Message saved = messageRepository.save(appointment);
+        unhideSoftDeletedConversationForParticipants(conversation);
+
+        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
+        conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+
+        MessageDTO savedDTO = toDTO(saved);
+        emitMessageReceivedToConversation(conversation, savedDTO);
+
+        String actorName = resolveParticipantDisplayName(conversation, userId);
+        createAndEmitSystemMessage(conversation, userId, SocketEventTypes.APPOINTMENT_CREATED, actorName + " da len lich hen");
+
+        return savedDTO;
+    }
+
+    public MessageDTO joinAppointment(String messageId, String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        Message appointment = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
+        if (!TYPE_APPOINTMENT.equalsIgnoreCase(appointment.getMessageType())) {
+            throw new IllegalArgumentException("Message is not an appointment");
+        }
+
+        Conversation conversation = conversationRepository.findById(appointment.getConversationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + appointment.getConversationId()));
+        ensureParticipant(conversation, userId);
+
+        List<String> participants = appointment.getAppointmentParticipants();
+        if (participants == null) {
+            participants = new ArrayList<>();
+        }
+        
+        if (participants.contains(userId)) {
+            participants.remove(userId);
+        } else {
+            participants.add(userId);
+        }
+        
+        appointment.setAppointmentParticipants(participants.stream().distinct().collect(Collectors.toList()));
+        appointment.setUpdatedAt(LocalDateTime.now());
+
+        Message updated = messageRepository.save(appointment);
+        MessageDTO dto = toDTO(updated);
+
+        emitEventToConversationParticipants(
+                conversation,
+                SocketEventTypes.APPOINTMENT_UPDATED,
+                Map.of(
+                        "conversationId", conversation.getId(),
+                        "message", dto
+                ),
+                null
+        );
+
+        return dto;
+    }
+
     public void emitTypingEvent(String conversationId, String userId, boolean typing) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
@@ -1152,6 +1254,10 @@ public class MessageService {
         dto.setPollHideVoters(message.isPollHideVoters());
         dto.setPollOptions(message.getPollOptions());
         dto.setPollDeadline(message.getPollDeadline());
+        dto.setAppointmentTitle(message.getAppointmentTitle());
+        dto.setAppointmentTime(message.getAppointmentTime());
+        dto.setAppointmentLocation(message.getAppointmentLocation());
+        dto.setAppointmentParticipants(message.getAppointmentParticipants());
         dto.setMentionUserIds(message.getMentionUserIds());
         dto.setSeenByUserIds(message.getSeenByUserIds());
         dto.setDeliveredToUserIds(message.getDeliveredToUserIds());
@@ -1186,6 +1292,10 @@ public class MessageService {
         message.setPollMultipleChoice(Boolean.TRUE.equals(dto.getPollMultipleChoice()));
         message.setPollClosed(Boolean.TRUE.equals(dto.getPollClosed()));
         message.setPollOptions(dto.getPollOptions());
+        message.setAppointmentTitle(dto.getAppointmentTitle());
+        message.setAppointmentTime(dto.getAppointmentTime());
+        message.setAppointmentLocation(dto.getAppointmentLocation());
+        message.setAppointmentParticipants(dto.getAppointmentParticipants());
         message.setMentionUserIds(dto.getMentionUserIds());
         message.setSeenByUserIds(dto.getSeenByUserIds());
         message.setDeliveredToUserIds(dto.getDeliveredToUserIds());

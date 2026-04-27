@@ -49,6 +49,10 @@ public final class SocketEventTypes {
     public static final String POLL_CREATED = "POLL_CREATED";
     public static final String POLL_UPDATED = "POLL_UPDATED";
 
+    // ── Appointment Events ──────────────────────────────────────────────────
+    public static final String APPOINTMENT_CREATED = "APPOINTMENT_CREATED";
+    public static final String APPOINTMENT_UPDATED = "APPOINTMENT_UPDATED";
+
     // ── Reminder Events ─────────────────────────────────────────────────────
     public static final String REMINDER_TRIGGERED = "REMINDER_TRIGGERED";
 
