@@ -779,15 +779,7 @@ public class MessageService {
             Map<String, String> payload = new HashMap<>();
             payload.put("conversationId", message.getConversationId());
             payload.put("messageId", id);
-            for (String participantId : conversation.getParticipantIds()) {
-                try {
-                    socketEmitterService.emitToUserById(
-                            participantId,
-                            SocketEventDTO.messageDeleted(participantId, payload));
-                } catch (Exception e) {
-                    log.warn("Failed to emit MESSAGE_DELETED to {}: {}", participantId, e.getMessage());
-                }
-            }
+            emitEventToConversationParticipants(conversation, SocketEventTypes.MESSAGE_DELETED, payload, null);
         }
     }
 
@@ -1256,15 +1248,19 @@ public class MessageService {
             return;
         }
 
-        // Pre-cache usernames from conversation data to avoid Feign calls
-        preCacheUsernamesFromConversation(conversation);
-
         SocketEventDTO roomEvent = SocketEventDTO.of(SocketEventTypes.MESSAGE_RECEIVED, null, messageDTO);
+
+        // 1. Room emit — instant, no username resolution needed
         socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
 
-        // Emit to individual users asynchronously to avoid blocking the API response
+        // 2. Per-user emit for notification badges (async, reads username from Redis Hash)
+        //    Sender excluded — they already have optimistic UI state
+        String senderId = messageDTO.getSenderId();
         Thread.startVirtualThread(() -> {
             for (String participantId : conversation.getParticipantIds()) {
+                if (senderId != null && senderId.equals(participantId)) {
+                    continue;
+                }
                 try {
                     socketEmitterService.emitToUserById(
                             participantId,
@@ -1384,13 +1380,12 @@ public class MessageService {
             return;
         }
 
-        // Pre-cache usernames from conversation data to avoid Feign calls
-        preCacheUsernamesFromConversation(conversation);
-
         SocketEventDTO roomEvent = SocketEventDTO.of(type, null, payload);
+
+        // 1. Room emit — instant, no username resolution needed
         socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
 
-        // Emit to individual users asynchronously
+        // 2. Per-user emit for notification badges (async, reads username from Redis Hash)
         Thread.startVirtualThread(() -> {
             for (String participantId : conversation.getParticipantIds()) {
                 if (excludeUserId != null && excludeUserId.equals(participantId)) {

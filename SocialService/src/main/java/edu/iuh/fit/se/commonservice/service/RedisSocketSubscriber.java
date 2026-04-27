@@ -67,7 +67,7 @@ public class RedisSocketSubscriber {
                 String username = node.get("target").asText();
                 SocketEventDTO event = objectMapper.treeToValue(node.get("event"), SocketEventDTO.class);
 
-                log.debug("⚡ Redis → WebSocket: emit to user {}, type={}", username, event.getType());
+                log.info("⚡ Redis → WebSocket: emit to user {}, type={}", username, event.getType());
                 messagingTemplate.convertAndSendToUser(
                         username, SocketDestinations.QUEUE_NOTIFICATIONS, event);
             } catch (Exception e) {
@@ -84,7 +84,7 @@ public class RedisSocketSubscriber {
                 String roomId = node.get("target").asText();
                 SocketEventDTO event = objectMapper.treeToValue(node.get("event"), SocketEventDTO.class);
 
-                log.debug("⚡ Redis → WebSocket: emit to room {}, type={}", roomId, event.getType());
+                log.info("⚡ Redis → WebSocket: emit to room {}, type={}", roomId, event.getType());
                 messagingTemplate.convertAndSend(
                         SocketDestinations.roomDestination(roomId), event);
             } catch (Exception e) {

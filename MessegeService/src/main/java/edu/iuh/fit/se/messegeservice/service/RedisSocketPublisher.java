@@ -50,7 +50,7 @@ public class RedisSocketPublisher {
             message.put("event", event);
             String json = objectMapper.writeValueAsString(message);
             redisTemplate.convertAndSend(CHANNEL_USER, json);
-            log.debug("⚡ Redis published to user {}: type={}", username, event.getType());
+            log.info("⚡ Redis published to user {}: type={}", username, event.getType());
         } catch (JsonProcessingException e) {
             log.error("❌ Failed to serialize socket event for user {}: {}", username, e.getMessage());
         } catch (Exception e) {
@@ -68,7 +68,7 @@ public class RedisSocketPublisher {
             message.put("event", event);
             String json = objectMapper.writeValueAsString(message);
             redisTemplate.convertAndSend(CHANNEL_ROOM, json);
-            log.debug("⚡ Redis published to room {}: type={}", roomId, event.getType());
+            log.info("⚡ Redis published to room {}: type={}", roomId, event.getType());
         } catch (JsonProcessingException e) {
             log.error("❌ Failed to serialize socket event for room {}: {}", roomId, e.getMessage());
         } catch (Exception e) {

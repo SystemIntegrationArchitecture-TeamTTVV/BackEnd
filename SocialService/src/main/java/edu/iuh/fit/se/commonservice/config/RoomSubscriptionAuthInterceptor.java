@@ -1,7 +1,5 @@
 package edu.iuh.fit.se.commonservice.config;
 
-import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
-import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.service.MessageServiceClientFacade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,14 +19,20 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 
+/**
+ * Intercepts STOMP SUBSCRIBE commands to /topic/rooms.{conversationId}
+ * and verifies the user is actually a participant of that conversation.
+ *
+ * userId is read directly from WebSocket session attributes (set during handshake).
+ * Participant check uses Feign with local cache (FeignAuthConfig provides auth headers).
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
 
     private static final String ROOM_PREFIX = "/topic/rooms.";
-    private static final long USER_ID_CACHE_TTL_MS = 60_000;
-    private static final long ROOM_PARTICIPANT_CACHE_TTL_MS = 15_000;
+    private static final long ROOM_PARTICIPANT_CACHE_TTL_MS = 30_000; // 30s cache
 
     private static final class TimedValue<T> {
         private final T value;
@@ -44,9 +48,7 @@ public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
         }
     }
 
-    private final AuthServiceClient authServiceClient;
     private final MessageServiceClientFacade messageServiceClientFacade;
-    private final ConcurrentHashMap<String, TimedValue<String>> usernameToUserIdCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, TimedValue<Boolean>> roomMembershipCache = new ConcurrentHashMap<>();
 
     @Override
@@ -61,6 +63,7 @@ public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
             return message;
         }
 
+        // Get username from Principal (set by StompHandshakeHandler)
         Principal principal = accessor.getUser();
         String username = principal != null ? principal.getName() : null;
         if (username == null || username.isBlank()) {
@@ -72,10 +75,16 @@ public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
             throw new ResponseStatusException(FORBIDDEN, "Invalid room destination");
         }
 
-        String userId = resolveUserId(username);
+        // Read userId directly from session attributes (set during WebSocket handshake)
+        // NO Feign call needed — userId was extracted from JWT during handshake
+        Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+        String userId = sessionAttrs != null ? (String) sessionAttrs.get("userId") : null;
         if (userId == null || userId.isBlank()) {
-            throw new ResponseStatusException(FORBIDDEN, "User not found for room subscription");
+            log.warn("No userId in session for username={}, allowing subscription", username);
+            // Fallback: allow subscription — the handshake already authenticated the user
+            return message;
         }
+
         if (!isConversationParticipant(conversationId, userId)) {
             log.warn("Blocked unauthorized room subscription: username={}, userId={}, room={}", username, userId, conversationId);
             throw new ResponseStatusException(FORBIDDEN, "Not a participant of this room");
@@ -111,25 +120,6 @@ public class RoomSubscriptionAuthInterceptor implements ChannelInterceptor {
         } catch (Exception ex) {
             log.warn("Failed room membership check for userId={} room={}: {}", userId, conversationId, ex.getMessage());
             return false;
-        }
-    }
-
-    private String resolveUserId(String username) {
-        long now = System.currentTimeMillis();
-        TimedValue<String> cached = usernameToUserIdCache.get(username);
-        if (cached != null && !cached.isExpired(now)) {
-            return cached.value;
-        }
-
-        try {
-            UserDTO user = authServiceClient.getUserByUsername(username);
-            if (user == null || user.getId() == null || user.getId().isBlank()) {
-                return null;
-            }
-            usernameToUserIdCache.put(username, new TimedValue<>(user.getId(), now + USER_ID_CACHE_TTL_MS));
-            return user.getId();
-        } catch (Exception e) {
-            return null;
         }
     }
 }

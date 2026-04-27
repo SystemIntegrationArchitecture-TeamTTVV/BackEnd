@@ -3,19 +3,21 @@ package edu.iuh.fit.se.messegeservice.service;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.dto.UserDTO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service to emit socket events via Redis Pub/Sub.
- * Previously used Feign HTTP calls to CommonService (slow, synchronous).
- * Now publishes to Redis channels — SocialService subscribes and emits via WebSocket.
+ * Resolves userId → username via Redis Hash (populated by SocialService on WebSocket connect).
+ * Falls back to Feign only on Redis miss (cold start).
  */
 @Slf4j
 @Service
 public class SocketEmitterService {
-    private static final long USERNAME_CACHE_TTL_MS = 60_000;
+    private static final long USERNAME_CACHE_TTL_MS = 5 * 60_000; // 5 min local cache
+    private static final String USER_USERNAME_MAP_KEY = "user:username:map";
 
     private static final class CacheEntry {
         private final String username;
@@ -33,16 +35,20 @@ public class SocketEmitterService {
 
     private final RedisSocketPublisher redisSocketPublisher;
     private final CommonServiceClientFacade commonServiceClientFacade;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ConcurrentHashMap<String, CacheEntry> usernameCache = new ConcurrentHashMap<>();
 
     public SocketEmitterService(RedisSocketPublisher redisSocketPublisher,
-                                CommonServiceClientFacade commonServiceClientFacade) {
+                                CommonServiceClientFacade commonServiceClientFacade,
+                                RedisTemplate<String, Object> redisTemplate) {
         this.redisSocketPublisher = redisSocketPublisher;
         this.commonServiceClientFacade = commonServiceClientFacade;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
-     * Get username from userId (cached locally for 60s)
+     * Get username from userId.
+     * Priority: 1) Local cache → 2) Redis Hash → 3) Feign (fallback)
      */
     private String getUsernameFromUserId(String userId) {
         if (userId == null || userId.isBlank()) {
@@ -50,15 +56,37 @@ public class SocketEmitterService {
         }
 
         long now = System.currentTimeMillis();
+
+        // 1. Check local in-memory cache
         CacheEntry cached = usernameCache.get(userId);
         if (cached != null && !cached.isExpired(now)) {
             return cached.username;
         }
 
+        // 2. Check Redis Hash (populated by SocialService on WebSocket handshake)
+        try {
+            Object redisValue = redisTemplate.opsForHash().get(USER_USERNAME_MAP_KEY, userId);
+            if (redisValue != null) {
+                String username = redisValue.toString();
+                if (!username.isBlank()) {
+                    usernameCache.put(userId, new CacheEntry(username, now + USERNAME_CACHE_TTL_MS));
+                    log.debug("⚡ Username from Redis Hash: {} → {}", userId, username);
+                    return username;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Redis Hash lookup failed for {}: {}", userId, e.getMessage());
+        }
+
+        // 3. Fallback: Feign call to AuthService (slow, only for cold start)
         try {
             UserDTO user = commonServiceClientFacade.getUserById(userId);
             if (user != null && user.getUsername() != null && !user.getUsername().isBlank()) {
                 usernameCache.put(userId, new CacheEntry(user.getUsername(), now + USERNAME_CACHE_TTL_MS));
+                // Also populate Redis Hash to prevent future Feign calls from other instances
+                try {
+                    redisTemplate.opsForHash().put(USER_USERNAME_MAP_KEY, userId, user.getUsername());
+                } catch (Exception ignored) {}
                 return user.getUsername();
             }
             return userId;
