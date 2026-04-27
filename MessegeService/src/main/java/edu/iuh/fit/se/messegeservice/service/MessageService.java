@@ -1256,19 +1256,25 @@ public class MessageService {
             return;
         }
 
+        // Pre-cache usernames from conversation data to avoid Feign calls
+        preCacheUsernamesFromConversation(conversation);
+
         SocketEventDTO roomEvent = SocketEventDTO.of(SocketEventTypes.MESSAGE_RECEIVED, null, messageDTO);
         socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
 
-        for (String participantId : conversation.getParticipantIds()) {
-            try {
-                socketEmitterService.emitToUserById(
-                        participantId,
-                        cloneForRecipient(roomEvent, participantId)
-                );
-            } catch (Exception e) {
-                log.warn("Failed to emit MESSAGE_RECEIVED to {}: {}", participantId, e.getMessage());
+        // Emit to individual users asynchronously to avoid blocking the API response
+        Thread.startVirtualThread(() -> {
+            for (String participantId : conversation.getParticipantIds()) {
+                try {
+                    socketEmitterService.emitToUserById(
+                            participantId,
+                            cloneForRecipient(roomEvent, participantId)
+                    );
+                } catch (Exception e) {
+                    log.warn("Failed to emit MESSAGE_RECEIVED to {}: {}", participantId, e.getMessage());
+                }
             }
-        }
+        });
     }
 
     private Message createAndEmitSystemMessage(Conversation conversation, String actorUserId, String action, String content) {
@@ -1378,19 +1384,44 @@ public class MessageService {
             return;
         }
 
+        // Pre-cache usernames from conversation data to avoid Feign calls
+        preCacheUsernamesFromConversation(conversation);
+
         SocketEventDTO roomEvent = SocketEventDTO.of(type, null, payload);
         socketEmitterService.emitToRoom(conversation.getId(), roomEvent);
 
-        for (String participantId : conversation.getParticipantIds()) {
-            if (excludeUserId != null && excludeUserId.equals(participantId)) {
-                continue;
+        // Emit to individual users asynchronously
+        Thread.startVirtualThread(() -> {
+            for (String participantId : conversation.getParticipantIds()) {
+                if (excludeUserId != null && excludeUserId.equals(participantId)) {
+                    continue;
+                }
+                try {
+                    socketEmitterService.emitToUserById(participantId, cloneForRecipient(roomEvent, participantId));
+                } catch (Exception e) {
+                    log.warn("Failed to emit {} to {}: {}", type, participantId, e.getMessage());
+                }
             }
-            try {
-                socketEmitterService.emitToUserById(participantId, cloneForRecipient(roomEvent, participantId));
-            } catch (Exception e) {
-                log.warn("Failed to emit {} to {}: {}", type, participantId, e.getMessage());
-            }
+        });
+    }
+
+    /**
+     * Pre-cache userId → username mappings from the conversation's participant data
+     * so that emitToUserById() won't need to make blocking Feign calls.
+     */
+    private void preCacheUsernamesFromConversation(Conversation conversation) {
+        // Conversation stores participantIds and participantNames in parallel lists.
+        // We can use this to warm the SocketEmitterService's username cache.
+        if (conversation.getParticipantIds() == null || conversation.getParticipantNames() == null) {
+            return;
         }
+        List<String> ids = conversation.getParticipantIds();
+        List<String> names = conversation.getParticipantNames();
+        // The names are display names (e.g. "Trần Văn Minh"), not usernames.
+        // We can't use them as STOMP usernames. The SocketEmitterService needs
+        // the actual username (login name) which must come from AuthService.
+        // However, we can batch-prefetch the usernames here to warm the cache.
+        socketEmitterService.preCacheUsernames(ids);
     }
 
     private SocketEventDTO cloneForRecipient(SocketEventDTO source, String recipientUserId) {

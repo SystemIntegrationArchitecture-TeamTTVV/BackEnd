@@ -38,7 +38,7 @@ public class GatewayConfig {
             "/api/social/v3/api-docs",
             "/api/message/v3/api-docs",
             "/api/auth-svc/v3/api-docs",
-            // WebSocket
+            // WebSocket — also handled in isWsPath block with JWT extraction
             "/api/common/ws",
             "/api/social/ws"
     );
@@ -57,6 +57,33 @@ public class GatewayConfig {
             }
 
             String path = exchange.getRequest().getURI().getPath();
+            log.info("🔒 Gateway filter: path={}", path);
+
+            // For WebSocket paths: try to extract JWT from query param and inject
+            // identity headers, but don't block if token is missing.
+            boolean isWsPath = path.startsWith("/api/common/ws") || path.startsWith("/api/social/ws");
+            if (isWsPath) {
+                log.info("🔌 WS path detected: {}", path);
+                String queryToken = exchange.getRequest().getQueryParams().getFirst("token");
+                if (queryToken != null && !queryToken.isBlank()) {
+                    try {
+                        var wsClaims = jwtTokenVerifier.parseAndValidate(queryToken);
+                        log.info("✅ WS JWT valid: user={}", wsClaims.getSubject());
+                        ServerHttpRequest wsRequest = exchange.getRequest().mutate()
+                                .header("X-User-Id", wsClaims.get("userId", String.class))
+                                .header("X-Username", wsClaims.getSubject())
+                                .header("X-Role", wsClaims.get("role", String.class))
+                                .build();
+                        return chain.filter(exchange.mutate().request(wsRequest).build());
+                    } catch (Exception e) {
+                        log.warn("⚠️ WS JWT parse failed for path {}: {}", path, e.getMessage());
+                    }
+                } else {
+                    log.warn("⚠️ WS path but no token query param: {}", path);
+                }
+                return chain.filter(exchange);
+            }
+
             for (String prefix : PUBLIC_PATH_PREFIXES) {
                 if (path.startsWith(prefix)) {
                     return chain.filter(exchange);
@@ -91,15 +118,19 @@ public class GatewayConfig {
     @Order(-1)
     public GlobalFilter requestLoggingFilter() {
         return (exchange, chain) -> {
+            if (!log.isDebugEnabled()) {
+                return chain.filter(exchange);
+            }
+
             String path = exchange.getRequest().getURI().getPath();
             String method = exchange.getRequest().getMethod().toString();
-            log.info("🌐 Gateway Request: {} {}", method, path);
+            log.debug("Gateway Request: {} {}", method, path);
             
             return chain.filter(exchange).then(Mono.fromRunnable(() -> {
                 int statusCode = exchange.getResponse().getStatusCode() != null 
                     ? exchange.getResponse().getStatusCode().value() 
                     : 0;
-                log.info("✅ Gateway Response: {} {} - Status: {}", method, path, statusCode);
+                log.debug("Gateway Response: {} {} - Status: {}", method, path, statusCode);
             }));
         };
     }

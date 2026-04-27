@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -24,6 +25,7 @@ public class UserIdentityService {
     private final AuthServiceClient authServiceClient;
     private final MongoTemplate mongoTemplate;
 
+    @Cacheable(value = "user-identity", key = "#id", unless = "#result == null || !#result.isPresent()")
     public Optional<UserDTO> findById(String id) {
         if (id == null || id.isBlank()) {
             return Optional.empty();
@@ -43,6 +45,7 @@ public class UserIdentityService {
         return findById(id).orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
+    @Cacheable(value = "user-identity", key = "'username:' + #username", unless = "#result == null || !#result.isPresent()")
     public Optional<UserDTO> findByUsername(String username) {
         if (username == null || username.isBlank()) {
             return Optional.empty();

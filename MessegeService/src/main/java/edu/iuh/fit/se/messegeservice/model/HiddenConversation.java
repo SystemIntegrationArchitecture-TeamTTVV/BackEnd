@@ -8,7 +8,14 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+
 @Document(collection = "hidden_conversations")
+@CompoundIndexes({
+    @CompoundIndex(name = "user_conv_idx", def = "{'userId': 1, 'conversationId': 1}", unique = true),
+    @CompoundIndex(name = "conv_hidden_idx", def = "{'conversationId': 1, 'hidden': 1, 'requirePinUnlock': 1}")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

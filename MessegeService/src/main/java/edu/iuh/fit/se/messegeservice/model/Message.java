@@ -10,7 +10,14 @@ import org.springframework.data.mongodb.core.mapping.DBRef;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+
 @Document(collection = "messages")
+@CompoundIndexes({
+    @CompoundIndex(name = "conv_created_idx", def = "{'conversationId': 1, 'createdAt': -1}"),
+    @CompoundIndex(name = "conv_deleted_created_idx", def = "{'conversationId': 1, 'isDeleted': 1, 'createdAt': -1}")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

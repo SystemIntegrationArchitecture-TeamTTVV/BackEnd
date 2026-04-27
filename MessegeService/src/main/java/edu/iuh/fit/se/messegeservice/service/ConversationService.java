@@ -67,16 +67,28 @@ public class ConversationService {
         java.util.Map<String, HiddenConversation> visibilityByConversationId = visibilityRows.stream()
             .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
 
-        return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
+        List<Conversation> conversations = conversationRepository
+                .findByParticipantIdsContainingOrderByLastMessageAtDesc(userId)
+                .stream()
                 .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
+                .collect(Collectors.toList());
+
+        // ── Batch-prefetch all participant info in ONE call ──
+        Map<String, UserDTO> userCache = batchPrefetchUsers(conversations);
+
+        return conversations.stream()
                 .map(conversation -> {
-                    ConversationDTO dto = toDTO(conversation);
-                HiddenConversation visibility = visibilityByConversationId.get(conversation.getId());
-                LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
-                applyUserVisibleLastMessage(dto, userId, clearCutoff);
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache);
+                    HiddenConversation visibility = visibilityByConversationId.get(conversation.getId());
+                    LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
+                    // Recompute preview only for conversations that were user-cleared.
+                    // For normal conversations, use persisted lastMessage fields to keep listing fast.
+                    if (clearCutoff != null) {
+                        applyUserVisibleLastMessage(dto, userId, clearCutoff);
+                    }
                     dto.setHiddenForCurrentUser(false);
-                dto.setHiddenRequiresPin(false);
-                dto.setClearBeforeAt(clearCutoff);
+                    dto.setHiddenRequiresPin(false);
+                    dto.setClearBeforeAt(clearCutoff);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -132,7 +144,9 @@ public class ConversationService {
                     ConversationDTO dto = toDTO(conversation);
                     HiddenConversation visibility = hiddenByConversationId.get(conversation.getId());
                     LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
-                    applyUserVisibleLastMessage(dto, userId, clearCutoff);
+                    if (clearCutoff != null) {
+                        applyUserVisibleLastMessage(dto, userId, clearCutoff);
+                    }
                     if (visibility != null) {
                         dto.setHiddenForCurrentUser(visibility.isHidden());
                         dto.setHiddenRequiresPin(visibility.isRequirePinUnlock());
@@ -320,8 +334,13 @@ public class ConversationService {
                 HiddenConversation visibility = hiddenConversationRepository
                         .findByUserIdAndConversationId(userId1, conv.getId())
                         .orElse(null);
-                if (visibility != null && visibility.isHidden() && !visibility.isRequirePinUnlock()) {
+                // User explicitly starts this direct chat again -> always restore visibility for requester.
+                // This prevents opening a blank/hidden thread from "New message" flow.
+                if (visibility != null && visibility.isHidden()) {
                     visibility.setHidden(false);
+                    visibility.setRequirePinUnlock(false);
+                    visibility.setPinHash(null);
+                    visibility.setClearBeforeAt(null);
                     visibility.setLastAccessAt(LocalDateTime.now());
                     visibility.setUpdatedAt(LocalDateTime.now());
                     hiddenConversationRepository.save(visibility);
@@ -1282,32 +1301,172 @@ public class ConversationService {
         return "";
     }
 
+    /**
+     * Collect all participant IDs that need user-info resolution across all conversations,
+     * then fetch them in a SINGLE batch HTTP call. Returns a userId → UserDTO map.
+     */
+    private Map<String, UserDTO> batchPrefetchUsers(List<Conversation> conversations) {
+        Set<String> missingIds = new java.util.LinkedHashSet<>();
+        for (Conversation conv : conversations) {
+            List<String> ids = conv.getParticipantIds();
+            List<String> names = conv.getParticipantNames();
+            List<String> avatars = conv.getParticipantAvatars();
+            if (ids == null) continue;
+            for (int i = 0; i < ids.size(); i++) {
+                String existingName = (names != null && i < names.size()) ? names.get(i) : null;
+                String existingAvatar = (avatars != null && i < avatars.size()) ? avatars.get(i) : null;
+                if (existingName == null || existingName.isBlank() || existingAvatar == null) {
+                    missingIds.add(ids.get(i));
+                }
+            }
+        }
+
+        if (missingIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        try {
+            List<UserDTO> users = commonServiceClientFacade.batchLookup(new ArrayList<>(missingIds));
+            Map<String, UserDTO> map = new java.util.HashMap<>();
+            if (users != null) {
+                for (UserDTO u : users) {
+                    if (u != null && u.getId() != null) {
+                        map.put(u.getId(), u);
+                    }
+                }
+            }
+            return map;
+        } catch (Exception e) {
+            log.warn("⚠️ Batch user prefetch failed: {}", e.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    /**
+     * Same as toDTO but uses a pre-fetched user cache instead of calling getUserById per participant.
+     */
+    private ConversationDTO toDTOWithCache(Conversation conversation, Map<String, UserDTO> userCache) {
+        ConversationDTO dto = new ConversationDTO();
+        dto.setId(conversation.getId());
+        dto.setParticipantIds(conversation.getParticipantIds());
+
+        List<String> participantIds = conversation.getParticipantIds() != null ? conversation.getParticipantIds() : List.of();
+        List<String> participantNames = new ArrayList<>(conversation.getParticipantNames() != null ? conversation.getParticipantNames() : List.of());
+        List<String> participantAvatars = new ArrayList<>(conversation.getParticipantAvatars() != null ? conversation.getParticipantAvatars() : List.of());
+
+        while (participantNames.size() < participantIds.size()) participantNames.add(null);
+        while (participantAvatars.size() < participantIds.size()) participantAvatars.add(null);
+        if (participantNames.size() > participantIds.size())
+            participantNames = new ArrayList<>(participantNames.subList(0, participantIds.size()));
+        if (participantAvatars.size() > participantIds.size())
+            participantAvatars = new ArrayList<>(participantAvatars.subList(0, participantIds.size()));
+
+        for (int i = 0; i < participantIds.size(); i++) {
+            String existingName = participantNames.get(i);
+            String existingAvatar = participantAvatars.get(i);
+            if (existingName != null && !existingName.isBlank() && existingAvatar != null) {
+                continue;
+            }
+
+            String participantId = participantIds.get(i);
+            UserDTO user = userCache.get(participantId);
+            if (user != null) {
+                if (existingName == null || existingName.isBlank()) {
+                    String resolvedName = user.getFullName() != null && !user.getFullName().isBlank()
+                            ? user.getFullName()
+                            : user.getUsername();
+                    participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                }
+                if (existingAvatar == null) {
+                    participantAvatars.set(i, user.getAvatar());
+                }
+            } else if (existingName == null || existingName.isBlank()) {
+                participantNames.set(i, "Unknown User");
+            }
+        }
+
+        dto.setParticipantNames(participantNames);
+        dto.setParticipantAvatars(participantAvatars);
+        dto.setGroup(conversation.isGroup());
+        dto.setGroupName(conversation.getGroupName());
+        dto.setGroupAvatar(conversation.getGroupAvatar());
+        dto.setDescription(conversation.getDescription());
+        dto.setOnlyAdminsCanSend(conversation.isOnlyAdminsCanSend());
+        dto.setOnlyAdminsCanAddMembers(conversation.isOnlyAdminsCanAddMembers());
+        dto.setOwnerId(conversation.getOwnerId());
+        dto.setAdminIds(conversation.getAdminIds());
+        dto.setApprovalsRequired(conversation.isApprovalsRequired());
+        dto.setPendingJoinIds(conversation.getPendingJoinIds());
+
+        dto.setMutedByUserIds(conversation.getMutedByUserIds());
+        dto.setPinnedByUserIds(conversation.getPinnedByUserIds());
+        dto.setBannedUserIds(conversation.getBannedUserIds());
+        dto.setNicknames(conversation.getNicknames());
+        dto.setInviteLinkToken(conversation.getInviteLinkToken());
+        dto.setBlockedByUserIds(conversation.getBlockedByUserIds());
+        dto.setBackgroundUrl(conversation.getBackgroundUrl());
+        dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
+
+        dto.setLastMessagePreview(conversation.getLastMessagePreview());
+        dto.setLastMessageAt(conversation.getLastMessageAt());
+        dto.setCreatedAt(conversation.getCreatedAt());
+        dto.setUpdatedAt(conversation.getUpdatedAt());
+        return dto;
+    }
+
     private ConversationDTO toDTO(Conversation conversation) {
         ConversationDTO dto = new ConversationDTO();
         dto.setId(conversation.getId());
         dto.setParticipantIds(conversation.getParticipantIds());
-        
-        // 🔥 Populate participant names and avatars from CommonService
-        List<String> participantNames = new ArrayList<>();
-        List<String> participantAvatars = new ArrayList<>();
-        
-        for (String participantId : conversation.getParticipantIds()) {
+
+        List<String> participantIds = conversation.getParticipantIds() != null ? conversation.getParticipantIds() : List.of();
+        List<String> participantNames = new ArrayList<>(conversation.getParticipantNames() != null ? conversation.getParticipantNames() : List.of());
+        List<String> participantAvatars = new ArrayList<>(conversation.getParticipantAvatars() != null ? conversation.getParticipantAvatars() : List.of());
+
+        // Keep list sizes aligned with participantIds. Fetch user info only for missing slots.
+        while (participantNames.size() < participantIds.size()) {
+            participantNames.add(null);
+        }
+        while (participantAvatars.size() < participantIds.size()) {
+            participantAvatars.add(null);
+        }
+        if (participantNames.size() > participantIds.size()) {
+            participantNames = new ArrayList<>(participantNames.subList(0, participantIds.size()));
+        }
+        if (participantAvatars.size() > participantIds.size()) {
+            participantAvatars = new ArrayList<>(participantAvatars.subList(0, participantIds.size()));
+        }
+
+        for (int i = 0; i < participantIds.size(); i++) {
+            String existingName = participantNames.get(i);
+            String existingAvatar = participantAvatars.get(i);
+            if (existingName != null && !existingName.isBlank() && existingAvatar != null) {
+                continue;
+            }
+
+            String participantId = participantIds.get(i);
             try {
                 UserDTO user = commonServiceClientFacade.getUserById(participantId);
                 if (user != null) {
-                    participantNames.add(user.getFullName() != null ? user.getFullName() : user.getUsername());
-                    participantAvatars.add(user.getAvatar());
-                } else {
-                    participantNames.add("Unknown User");
-                    participantAvatars.add(null);
+                    if (existingName == null || existingName.isBlank()) {
+                        String resolvedName = user.getFullName() != null && !user.getFullName().isBlank()
+                                ? user.getFullName()
+                                : user.getUsername();
+                        participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                    }
+                    if (existingAvatar == null) {
+                        participantAvatars.set(i, user.getAvatar());
+                    }
+                } else if (existingName == null || existingName.isBlank()) {
+                    participantNames.set(i, "Unknown User");
                 }
             } catch (Exception e) {
-                log.warn("⚠️ Failed to fetch user info for {}: {}", participantId, e.getMessage());
-                participantNames.add("Unknown User");
-                participantAvatars.add(null);
+                if (existingName == null || existingName.isBlank()) {
+                    participantNames.set(i, "Unknown User");
+                }
             }
         }
-        
+
         dto.setParticipantNames(participantNames);
         dto.setParticipantAvatars(participantAvatars);
         dto.setGroup(conversation.isGroup());

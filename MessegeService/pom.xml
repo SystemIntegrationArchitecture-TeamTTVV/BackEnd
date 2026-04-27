@@ -75,10 +75,14 @@
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
 
+        <!-- Redis for Pub/Sub socket emission + caching -->
         <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+
+        <!-- REMOVED spring-cloud-starter-loadbalancer: caused ~10s delay per Feign call
+             because no service discovery (Eureka/Consul) is configured. Direct URLs are used. -->
 
         <dependency>
             <groupId>org.springframework.kafka</groupId>

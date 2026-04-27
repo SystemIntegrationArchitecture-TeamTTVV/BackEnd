@@ -364,7 +364,7 @@ spring:
                 fallbackUri: forward:/fallback/message
 
       httpclient:
-        connect-timeout: 10000
+        connect-timeout: 2000
         response-timeout: 30s
 
       # ─── Global CORS ───────────────────────────────────────────────────────
@@ -448,7 +448,7 @@ management:
 # Logging
 logging:
   level:
-    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
     org.springframework.web: INFO
 
 # Swagger
