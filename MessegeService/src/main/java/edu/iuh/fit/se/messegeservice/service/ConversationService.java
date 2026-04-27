@@ -494,6 +494,27 @@ public class ConversationService {
                                 ? " da bat che do chi admin duoc them thanh vien"
                                 : " da tat che do chi admin duoc them thanh vien"));
             }
+
+            // Emit CONVERSATION_META_UPDATED with new field values so all clients
+            // patch their state in realtime without needing to call loadConversations()
+            try {
+                Map<String, Object> metaPayload = new java.util.HashMap<>();
+                metaPayload.put("conversationId", saved.getId());
+                metaPayload.put("onlyAdminsCanSend", saved.isOnlyAdminsCanSend());
+                metaPayload.put("approvalsRequired", saved.isApprovalsRequired());
+                metaPayload.put("groupName", saved.getGroupName());
+                metaPayload.put("groupAvatar", saved.getGroupAvatar());
+                SocketEventDTO metaEvent = new SocketEventDTO();
+                metaEvent.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+                metaEvent.setUserId(request.getRequesterId());
+                metaEvent.setData(metaPayload);
+                metaEvent.setTimestamp(java.time.LocalDateTime.now());
+                for (String participantId : saved.getParticipantIds()) {
+                    socketEmitterService.emitToUserById(participantId, metaEvent);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to emit CONVERSATION_META_UPDATED after meta update: {}", e.getMessage());
+            }
         }
 
         return toDTO(saved);
@@ -878,6 +899,24 @@ public class ConversationService {
         if (!demoted.isEmpty()) {
             emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.ADMINS_UPDATED,
                     actorName + " da go admin: " + demoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
+        }
+
+        // Broadcast updated adminIds + ownerId to all participants so clients update in realtime
+        try {
+            Map<String, Object> metaPayload = new java.util.HashMap<>();
+            metaPayload.put("conversationId", saved.getId());
+            metaPayload.put("ownerId", saved.getOwnerId());
+            metaPayload.put("adminIds", saved.getAdminIds() != null ? saved.getAdminIds() : new ArrayList<>());
+            SocketEventDTO metaEvent = new SocketEventDTO();
+            metaEvent.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+            metaEvent.setUserId(request.getRequesterId());
+            metaEvent.setData(metaPayload);
+            metaEvent.setTimestamp(java.time.LocalDateTime.now());
+            for (String participantId : saved.getParticipantIds()) {
+                socketEmitterService.emitToUserById(participantId, metaEvent);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to emit CONVERSATION_META_UPDATED after role update: {}", e.getMessage());
         }
 
         return toDTO(saved);

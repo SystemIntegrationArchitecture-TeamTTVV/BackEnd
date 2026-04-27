@@ -21,6 +21,7 @@ public class ConversationDTO {
     private String ownerId;
     private List<String> adminIds;
     // Dùng wrapper Boolean để tránh lỗi khi client gửi null cho field boolean
+    @JsonProperty("approvalsRequired")
     private Boolean approvalsRequired;
     private List<String> pendingJoinIds;
     @JsonProperty("isGroup")
@@ -28,7 +29,9 @@ public class ConversationDTO {
     private String groupName;
     private String groupAvatar;
     private String description;
+    @JsonProperty("onlyAdminsCanSend")
     private Boolean onlyAdminsCanSend;
+    @JsonProperty("onlyAdminsCanAddMembers")
     private Boolean onlyAdminsCanAddMembers;
     private Boolean hiddenForCurrentUser;
     private Boolean hiddenRequiresPin;
