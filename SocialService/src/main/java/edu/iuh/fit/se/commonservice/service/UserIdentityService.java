@@ -25,36 +25,44 @@ public class UserIdentityService {
     private final AuthServiceClient authServiceClient;
     private final MongoTemplate mongoTemplate;
 
-    @Cacheable(value = "user-identity", key = "#id", unless = "#result == null || !#result.isPresent()")
     public Optional<UserDTO> findById(String id) {
+        return Optional.ofNullable(findCachedById(id));
+    }
+
+    @Cacheable(value = "user-identity", key = "#id", unless = "#result == null")
+    public UserDTO findCachedById(String id) {
         if (id == null || id.isBlank()) {
-            return Optional.empty();
+            return null;
         }
         try {
-            return Optional.of(authServiceClient.getUserById(id));
+            return authServiceClient.getUserById(id);
         } catch (FeignException.NotFound e) {
             log.debug("User {} not found in AuthService, trying MongoDB fallback", id);
         } catch (FeignException e) {
             log.warn("AuthService getUserById failed for {}: {}", id, e.getMessage());
         }
         // Fallback: query MongoDB 'users' collection for legacy ObjectId-based users
-        return findInMongoFallback(id);
+        return findInMongoFallback(id).orElse(null);
     }
 
     public UserDTO getByIdOrThrow(String id) {
         return findById(id).orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
-    @Cacheable(value = "user-identity", key = "'username:' + #username", unless = "#result == null || !#result.isPresent()")
     public Optional<UserDTO> findByUsername(String username) {
+        return Optional.ofNullable(findCachedByUsername(username));
+    }
+
+    @Cacheable(value = "user-identity", key = "'username:' + #username", unless = "#result == null")
+    public UserDTO findCachedByUsername(String username) {
         if (username == null || username.isBlank()) {
-            return Optional.empty();
+            return null;
         }
         try {
-            return Optional.of(authServiceClient.getUserByUsername(username));
+            return authServiceClient.getUserByUsername(username);
         } catch (FeignException e) {
             log.warn("AuthService getUserByUsername failed: {}", e.getMessage());
-            return Optional.empty();
+            return null;
         }
     }
 

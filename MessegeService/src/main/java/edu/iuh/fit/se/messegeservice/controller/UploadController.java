@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import edu.iuh.fit.se.messegeservice.service.CloudinaryStorageService;
+import edu.iuh.fit.se.messegeservice.service.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class UploadController {
 
+    private final S3StorageService s3StorageService;
     private final CloudinaryStorageService cloudinaryStorageService;
 
     @Value("${app.upload.dir:uploads}")
@@ -40,6 +42,18 @@ public class UploadController {
                 Map<String, Object> error = new HashMap<>();
                 error.put("error", "File is empty");
                 return ResponseEntity.badRequest().body(error);
+            }
+
+            if (s3StorageService.isEnabled()) {
+                String secureUrl = s3StorageService.upload(file, "ttvv/message-uploads");
+                Map<String, Object> response = new HashMap<>();
+                response.put("url", secureUrl);
+                response.put("fileName", file.getOriginalFilename());
+                response.put("fileSize", file.getSize());
+                response.put("fileType", file.getContentType());
+                response.put("path", secureUrl);
+                log.info("File uploaded to S3: {}", file.getOriginalFilename());
+                return ResponseEntity.ok(response);
             }
 
             if (cloudinaryStorageService.isEnabled()) {

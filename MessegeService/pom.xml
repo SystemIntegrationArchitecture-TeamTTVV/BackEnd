@@ -69,6 +69,18 @@
             <version>1.39.0</version>
         </dependency>
 
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.20.160</version>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>2.20.160</version>
+        </dependency>
+
         <!-- OpenFeign for inter-service HTTP clients -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

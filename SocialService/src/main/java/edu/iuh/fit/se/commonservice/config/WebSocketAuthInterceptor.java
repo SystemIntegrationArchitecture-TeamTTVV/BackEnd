@@ -3,6 +3,7 @@ package edu.iuh.fit.se.commonservice.config;
 import edu.iuh.fit.se.commonservice.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -23,16 +24,24 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WebSocketAuthInterceptor implements HandshakeInterceptor {
 
+    private static final String USER_USERNAME_MAP_KEY = "user:username:map";
+
     private final JwtUtil jwtUtil;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
         // 1. Try Gateway-forwarded header
         String username = request.getHeaders().getFirst("X-Username");
+        String userId = request.getHeaders().getFirst("X-UserId");
         if (username != null && !username.isBlank()) {
             attributes.put("username", username);
-            log.debug("WS handshake: username={} (from gateway header)", username);
+            if (userId != null && !userId.isBlank()) {
+                attributes.put("userId", userId);
+                cacheUsernameMapping(userId, username);
+            }
+            log.debug("WS handshake: username={}, userId={} (from gateway header)", username, userId);
             return true;
         }
 
@@ -46,6 +55,16 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
                         username = jwtUtil.extractUsername(token);
                         if (username != null && jwtUtil.validateToken(token, username)) {
                             attributes.put("username", username);
+                            // Extract userId from JWT and cache the mapping
+                            try {
+                                String tokenUserId = jwtUtil.extractClaim(token, claims -> claims.get("userId", String.class));
+                                if (tokenUserId != null && !tokenUserId.isBlank()) {
+                                    attributes.put("userId", tokenUserId);
+                                    cacheUsernameMapping(tokenUserId, username);
+                                }
+                            } catch (Exception ignored) {
+                                // Non-critical: mapping will be resolved via fallback
+                            }
                             log.debug("WS handshake: username={} (from token param)", username);
                             return true;
                         }
@@ -64,5 +83,18 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
         // no-op
+    }
+
+    /**
+     * Cache userId → username mapping in Redis Hash for cross-service lookup.
+     * MessageService reads this to resolve usernames without Feign HTTP calls.
+     */
+    private void cacheUsernameMapping(String userId, String username) {
+        try {
+            stringRedisTemplate.opsForHash().put(USER_USERNAME_MAP_KEY, userId, username);
+            log.debug("⚡ Cached userId→username mapping: {} → {}", userId, username);
+        } catch (Exception e) {
+            log.warn("Failed to cache username mapping for {}: {}", userId, e.getMessage());
+        }
     }
 }
