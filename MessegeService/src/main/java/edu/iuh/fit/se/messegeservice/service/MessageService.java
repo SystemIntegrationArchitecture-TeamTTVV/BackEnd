@@ -462,6 +462,7 @@ public class MessageService {
             boolean canAddOptions,
             boolean hideResultsBeforeVote,
             boolean hideVoters,
+            String actorNameParam,
             java.time.LocalDateTime deadline
     ) {
         Conversation conversation = conversationRepository.findById(conversationId)
@@ -532,7 +533,9 @@ public class MessageService {
             }).start();
         }
 
-        String actorName = resolveParticipantDisplayName(conversation, userId);
+        String actorName = (actorNameParam != null && !actorNameParam.isBlank()) 
+                ? actorNameParam 
+                : resolveParticipantDisplayName(conversation, userId);
         createAndEmitSystemMessage(conversation, userId, SocketEventTypes.POLL_CREATED, actorName + " da tao binh chon");
 
         return savedDTO;
@@ -622,7 +625,8 @@ public class MessageService {
             String title,
             LocalDateTime time,
             String location,
-            String description
+            String description,
+            String actorNameParam
     ) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
@@ -666,7 +670,9 @@ public class MessageService {
         MessageDTO savedDTO = toDTO(saved);
         emitMessageReceivedToConversation(conversation, savedDTO);
 
-        String actorName = resolveParticipantDisplayName(conversation, userId);
+        String actorName = (actorNameParam != null && !actorNameParam.isBlank()) 
+                ? actorNameParam 
+                : resolveParticipantDisplayName(conversation, userId);
         createAndEmitSystemMessage(conversation, userId, SocketEventTypes.APPOINTMENT_CREATED, actorName + " da len lich hen");
 
         return savedDTO;

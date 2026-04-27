@@ -15,4 +15,5 @@ public class AppointmentCreateRequest {
     private LocalDateTime time;
     private String location;
     private String description;
+    private String actorName;
 }

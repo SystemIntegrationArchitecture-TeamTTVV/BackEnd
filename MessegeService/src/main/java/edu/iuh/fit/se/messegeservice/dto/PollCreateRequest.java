@@ -14,5 +14,6 @@ public class PollCreateRequest {
     private boolean canAddOptions;
     private boolean hideResultsBeforeVote;
     private boolean hideVoters;
+    private String actorName;
     private LocalDateTime deadline;
 }

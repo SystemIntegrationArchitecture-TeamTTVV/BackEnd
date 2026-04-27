@@ -191,6 +191,7 @@ public class MessageController {
                         request.isCanAddOptions(),
                         request.isHideResultsBeforeVote(),
                         request.isHideVoters(),
+                        request.getActorName(),
                         request.getDeadline()
                 ));
     }
@@ -212,7 +213,8 @@ public class MessageController {
                         request.getTitle(),
                         request.getTime(),
                         request.getLocation(),
-                        request.getDescription()
+                        request.getDescription(),
+                        request.getActorName()
                 ));
     }
 
