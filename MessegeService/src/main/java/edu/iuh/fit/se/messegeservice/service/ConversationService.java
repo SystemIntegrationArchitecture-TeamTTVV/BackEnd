@@ -1206,9 +1206,14 @@ public class ConversationService {
         return toDTO(conversationRepository.save(conversation));
     }
 
-    public ConversationDTO updateNickname(String conversationId, String requesterId, String nickname) {
+    public ConversationDTO updateNickname(String conversationId, String requesterId, String targetUserId, String nickname) {
         Conversation conversation = getConversationEntity(conversationId);
         ensureParticipant(conversation, requesterId);
+        // Target must also be a participant
+        if (targetUserId == null || targetUserId.isBlank()) {
+            targetUserId = requesterId; // fallback: set own nickname
+        }
+        ensureParticipant(conversation, targetUserId);
 
         java.util.Map<String, String> nicknames = conversation.getNicknames();
         if (nicknames == null) {
@@ -1216,18 +1221,33 @@ public class ConversationService {
         }
 
         if (nickname == null || nickname.isBlank()) {
-            nicknames.remove(requesterId);
+            nicknames.remove(targetUserId);
         } else {
-            nicknames.put(requesterId, nickname);
+            nicknames.put(targetUserId, nickname);
         }
         conversation.setNicknames(nicknames);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+
+        String actorName = getParticipantDisplayName(conversation, requesterId);
+        String targetName = getParticipantDisplayName(conversation, targetUserId);
+        String systemContent = (nickname == null || nickname.isBlank())
+                ? actorName + " da xoa biet danh cua " + targetName
+                : actorName + " da doi biet danh cua " + targetName + " thanh \"" + nickname + "\"";
 
         if (conversation.isGroup()) {
-            emitGroupSystemEvent(conversation, requesterId, SocketEventTypes.CONVERSATION_META_UPDATED, 
-                resolveUserDisplayName(requesterId) + " da doi biet danh thanh " + nickname);
+            emitGroupSystemEvent(saved, requesterId, SocketEventTypes.CONVERSATION_META_UPDATED, systemContent);
+        } else {
+            // Direct chat: create system message + emit to both participants
+            try {
+                messageService.createSystemMessage(saved.getId(), requesterId, "NICKNAME_CHANGED", systemContent);
+            } catch (Exception e) {
+                log.warn("Failed to create system message for nickname change in DM {}: {}", saved.getId(), e.getMessage());
+            }
+            emitDirectConversationMetaUpdated(saved);
         }
 
-        return toDTO(conversationRepository.save(conversation));
+        return toDTO(saved);
     }
 
     // ── Phase B Methods ─────────────────────────────────────────────────────
@@ -1331,6 +1351,33 @@ public class ConversationService {
         }
     }
 
+    /**
+     * Emit CONVERSATION_META_UPDATED to all participants of a direct (1-1) conversation.
+     * Used when nickname or background changes in a DM so all clients can refresh.
+     */
+    private void emitDirectConversationMetaUpdated(Conversation conversation) {
+        if (conversation == null || conversation.getParticipantIds() == null) {
+            return;
+        }
+        try {
+            Map<String, Object> metaPayload = new java.util.HashMap<>();
+            metaPayload.put("conversationId", conversation.getId());
+            metaPayload.put("nicknames", conversation.getNicknames());
+            metaPayload.put("backgroundUrl", conversation.getBackgroundUrl());
+            metaPayload.put("blockedByUserIds", conversation.getBlockedByUserIds());
+            metaPayload.put("mutedByUserIds", conversation.getMutedByUserIds());
+            SocketEventDTO metaEvent = new SocketEventDTO();
+            metaEvent.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+            metaEvent.setData(metaPayload);
+            metaEvent.setTimestamp(java.time.LocalDateTime.now());
+            for (String participantId : conversation.getParticipantIds()) {
+                socketEmitterService.emitToUserById(participantId, metaEvent);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to emit CONVERSATION_META_UPDATED for DM {}: {}", conversation.getId(), e.getMessage());
+        }
+    }
+
     private String getParticipantDisplayName(Conversation conversation, String userId) {
         if (conversation != null
                 && conversation.getParticipantIds() != null
@@ -1417,35 +1464,67 @@ public class ConversationService {
 
     public ConversationDTO toggleBlock(String conversationId, String requesterId) {
         Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, requesterId);
+
         List<String> blockedBy = conversation.getBlockedByUserIds();
         if (blockedBy == null) {
             blockedBy = new ArrayList<>();
         }
 
-        if (blockedBy.contains(requesterId)) {
+        boolean wasBlocked = blockedBy.contains(requesterId);
+        if (wasBlocked) {
             blockedBy.remove(requesterId);
         } else {
             blockedBy.add(requesterId);
         }
         conversation.setBlockedByUserIds(blockedBy);
+        conversation.setUpdatedAt(LocalDateTime.now());
 
         Conversation saved = conversationRepository.save(conversation);
-        
-        // Emit event (only to the one who blocked? or both? Usually just a state update)
-        // For now, no system message for block.
-        
+
+        // For direct (1-1) chats: create system message + emit realtime to both participants
+        if (!saved.isGroup()) {
+            String actorName = getParticipantDisplayName(saved, requesterId);
+            String systemContent = wasBlocked
+                    ? actorName + " da bo chan nguoi dung nay"
+                    : actorName + " da chan nguoi dung nay";
+            try {
+                messageService.createSystemMessage(saved.getId(), requesterId,
+                        wasBlocked ? "USER_UNBLOCKED" : "USER_BLOCKED", systemContent);
+            } catch (Exception e) {
+                log.warn("Failed to create system message for block toggle in DM {}: {}", saved.getId(), e.getMessage());
+            }
+            emitDirectConversationMetaUpdated(saved);
+        }
+
         return toDTO(saved);
     }
 
     public ConversationDTO updateBackground(String conversationId, String backgroundUrl) {
+        return updateBackground(conversationId, backgroundUrl, null);
+    }
+
+    public ConversationDTO updateBackground(String conversationId, String backgroundUrl, String requesterId) {
         Conversation conversation = getConversationEntity(conversationId);
         conversation.setBackgroundUrl(backgroundUrl);
         conversation.setUpdatedAt(LocalDateTime.now());
         
         Conversation saved = conversationRepository.save(conversation);
+
+        String systemContent = "Hinh nen da duoc thay doi";
         
-        // Emit event
-        emitGroupSystemEvent(saved, null, SocketEventTypes.CONVERSATION_META_UPDATED, "Hinh nen da duoc thay doi");
+        if (saved.isGroup()) {
+            // Existing group behavior
+            emitGroupSystemEvent(saved, requesterId, SocketEventTypes.CONVERSATION_META_UPDATED, systemContent);
+        } else {
+            // Direct chat: create system message + emit meta update to both participants
+            try {
+                messageService.createSystemMessage(saved.getId(), requesterId, "BACKGROUND_CHANGED", systemContent);
+            } catch (Exception e) {
+                log.warn("Failed to create system message for background change in DM {}: {}", saved.getId(), e.getMessage());
+            }
+            emitDirectConversationMetaUpdated(saved);
+        }
         
         return toDTO(saved);
     }

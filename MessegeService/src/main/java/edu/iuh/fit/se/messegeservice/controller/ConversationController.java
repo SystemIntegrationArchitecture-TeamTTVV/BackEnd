@@ -187,9 +187,15 @@ public class ConversationController {
     }
 
     @PostMapping("/{id}/nickname")
-    public ResponseEntity<ConversationDTO> updateNickname(@PathVariable String id, @RequestBody edu.iuh.fit.se.messegeservice.dto.ConversationActionRequest request) {
-        // Payload is the nickname, userId is the target user
-        return ResponseEntity.ok(conversationService.updateNickname(id, request.getUserId(), request.getPayload()));
+    public ResponseEntity<ConversationDTO> updateNickname(
+            @PathVariable String id,
+            @RequestBody edu.iuh.fit.se.messegeservice.dto.ConversationActionRequest request,
+            @RequestParam(required = false) String requesterId
+    ) {
+        // userId in body = the person being nicknamed (target)
+        // requesterId query param = who is making the change
+        String actualRequesterId = (requesterId != null && !requesterId.isBlank()) ? requesterId : request.getUserId();
+        return ResponseEntity.ok(conversationService.updateNickname(id, actualRequesterId, request.getUserId(), request.getPayload()));
     }
 
     // ── Phase B: Invite Links ───────────────────────────────────────────────
@@ -217,8 +223,8 @@ public class ConversationController {
     }
 
     @PostMapping("/{id}/background")
-    public ResponseEntity<ConversationDTO> updateBackground(@PathVariable String id, @RequestParam String backgroundUrl) {
-        return ResponseEntity.ok(conversationService.updateBackground(id, backgroundUrl));
+    public ResponseEntity<ConversationDTO> updateBackground(@PathVariable String id, @RequestParam String backgroundUrl, @RequestParam(required = false) String userId) {
+        return ResponseEntity.ok(conversationService.updateBackground(id, backgroundUrl, userId));
     }
 }
 
