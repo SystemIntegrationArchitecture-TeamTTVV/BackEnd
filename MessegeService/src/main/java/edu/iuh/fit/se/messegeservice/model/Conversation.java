@@ -76,6 +76,12 @@ public class Conversation {
     /** UserIds who blocked the other party (only relevant for 1-1). */
     private List<String> blockedByUserIds;
 
+    /** UserIds who blocked messages only (granular, 1-1). */
+    private List<String> messageBlockedByUserIds;
+
+    /** UserIds who blocked calls only (granular, 1-1). */
+    private List<String> callBlockedByUserIds;
+
     /** Custom background URL/image for the conversation. */
     private String backgroundUrl;
 
