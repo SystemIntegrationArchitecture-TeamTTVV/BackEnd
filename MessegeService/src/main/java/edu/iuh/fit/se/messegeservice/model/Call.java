@@ -7,6 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "calls")
@@ -22,10 +23,19 @@ public class Call {
     private List<String> calleeIds;
 
     private String type; // VOICE, VIDEO
-    private String status; // MISSED, COMPLETED, DECLINED
+    private String status; // legacy — kept for backward compat
+
+    // ── New fields for smart call lifecycle ──
+    private String callType;  // DIRECT | GROUP
+    private String hostId;    // userId who created the call
+    private List<String> activeParticipantIds = new ArrayList<>();
+    private List<String> leftParticipantIds = new ArrayList<>();
+    private String state; // RINGING | CONNECTED | ENDED
 
     private int durationSeconds;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
-}
 
+    /** Max participants for group calls */
+    public static final int MAX_GROUP_PARTICIPANTS = 5;
+}
