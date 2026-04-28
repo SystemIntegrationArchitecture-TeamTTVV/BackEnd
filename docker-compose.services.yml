@@ -130,3 +130,23 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  # ─── Live Stream Server (RTMP → HLS) ──────────────────────────────────
+  live-stream-server:
+    build:
+      context: ./LiveStreamServer
+      dockerfile: Dockerfile
+    container_name: live-stream-server
+    restart: unless-stopped
+    ports:
+      - "1935:1935"    # RTMP (OBS pushes here)
+      - "8888:8888"    # HLS HTTP (browser fetches .m3u8 here)
+    environment:
+      MESSAGE_SERVICE_URL: http://message-service:8082
+      FFMPEG_PATH: /usr/bin/ffmpeg
+    volumes:
+      - ./LiveStreamServer/media:/app/media
+    depends_on:
+      - message-service
+    networks:
+      - infra
