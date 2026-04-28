@@ -21,6 +21,7 @@ public class ConversationDTO {
     private String ownerId;
     private List<String> adminIds;
     // Dùng wrapper Boolean để tránh lỗi khi client gửi null cho field boolean
+    @JsonProperty("approvalsRequired")
     private Boolean approvalsRequired;
     private List<String> pendingJoinIds;
     @JsonProperty("isGroup")
@@ -28,13 +29,19 @@ public class ConversationDTO {
     private String groupName;
     private String groupAvatar;
     private String description;
+    @JsonProperty("onlyAdminsCanSend")
     private Boolean onlyAdminsCanSend;
+    @JsonProperty("onlyAdminsCanAddMembers")
     private Boolean onlyAdminsCanAddMembers;
     private Boolean hiddenForCurrentUser;
     private Boolean hiddenRequiresPin;
     private LocalDateTime clearBeforeAt;
     private String lastMessagePreview;
+    private String lastMessageType;
+    private String lastMessageSenderId;
+    private String lastMessageSenderName;
     private LocalDateTime lastMessageAt;
+    private Boolean isDisbanded;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -55,6 +62,10 @@ public class ConversationDTO {
     @JsonIgnore
     public boolean isGroup() {
         return Boolean.TRUE.equals(isGroup);
+    }
+
+    public boolean isDisbanded() {
+        return Boolean.TRUE.equals(isDisbanded);
     }
 
     // Giữ tương thích với code đang gọi setGroup(...)

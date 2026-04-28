@@ -59,7 +59,9 @@ public class ConversationService {
     private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
+        long t0 = System.currentTimeMillis();
         List<HiddenConversation> visibilityRows = hiddenConversationRepository.findByUserId(userId);
+        long t1 = System.currentTimeMillis();
         Set<String> hiddenConversationIds = visibilityRows.stream()
             .filter(HiddenConversation::isHidden)
                 .map(HiddenConversation::getConversationId)
@@ -72,13 +74,17 @@ public class ConversationService {
                 .stream()
                 .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
                 .collect(Collectors.toList());
+        long t2 = System.currentTimeMillis();
 
         // ── Batch-prefetch all participant info in ONE call ──
         Map<String, UserDTO> userCache = batchPrefetchUsers(conversations);
+        long t3 = System.currentTimeMillis();
 
-        return conversations.stream()
+        List<Conversation> modifiedConversations = new ArrayList<>();
+
+        List<ConversationDTO> result = conversations.stream()
                 .map(conversation -> {
-                    ConversationDTO dto = toDTOWithCache(conversation, userCache);
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache, modifiedConversations);
                     HiddenConversation visibility = visibilityByConversationId.get(conversation.getId());
                     LocalDateTime clearCutoff = visibility != null ? visibility.getClearBeforeAt() : null;
                     // Recompute preview only for conversations that were user-cleared.
@@ -92,6 +98,14 @@ public class ConversationService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+        long t4 = System.currentTimeMillis();
+
+        if (!modifiedConversations.isEmpty()) {
+            conversationRepository.saveAll(modifiedConversations);
+        }
+        log.info("[PERF] getConversationsByUserId total: {}ms (visibility: {}ms, fetchConvs: {}ms, prefetchUsers: {}ms, toDTO: {}ms, count: {})",
+                (t4 - t0), (t1 - t0), (t2 - t1), (t3 - t2), (t4 - t3), result.size());
+        return result;
     }
 
     public List<ConversationDTO> getHiddenConversationsByUserId(String userId) {
@@ -107,10 +121,16 @@ public class ConversationService {
         java.util.Map<String, HiddenConversation> hiddenByConvId = hiddenRows.stream()
             .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
 
-        return conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
+        List<Conversation> conversations = conversationRepository.findByParticipantIdsContainingOrderByLastMessageAtDesc(userId).stream()
                 .filter(c -> hiddenConvIds.contains(c.getId()))
+                .collect(Collectors.toList());
+
+        Map<String, UserDTO> userCache = batchPrefetchUsers(conversations);
+
+        List<Conversation> modifiedConversations = new ArrayList<>();
+        List<ConversationDTO> result = conversations.stream()
                 .map(conversation -> {
-                    ConversationDTO dto = toDTO(conversation);
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache, modifiedConversations);
                     HiddenConversation hc = hiddenByConvId.get(conversation.getId());
                     dto.setHiddenForCurrentUser(true);
                     dto.setHiddenRequiresPin(hc != null && hc.isRequirePinUnlock());
@@ -118,6 +138,11 @@ public class ConversationService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        if (!modifiedConversations.isEmpty()) {
+            conversationRepository.saveAll(modifiedConversations);
+        }
+        return result;
     }
 
     public List<ConversationDTO> searchGroupConversations(String userId, String keyword) {
@@ -371,7 +396,15 @@ public class ConversationService {
 
     public ConversationDTO getConversationById(String id) {
         return conversationRepository.findById(id)
-                .map(this::toDTO)
+                .map(conversation -> {
+                    java.util.Map<String, UserDTO> userCache = batchPrefetchUsers(java.util.Collections.singletonList(conversation));
+                    List<Conversation> modified = new ArrayList<>();
+                    ConversationDTO dto = toDTOWithCache(conversation, userCache, modified);
+                    if (!modified.isEmpty()) {
+                        conversationRepository.saveAll(modified);
+                    }
+                    return dto;
+                })
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
     }
 
@@ -402,6 +435,7 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversation.setLastMessageAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
+
         return toDTO(saved);
     }
 
@@ -493,6 +527,68 @@ public class ConversationService {
                                 ? " da bat che do chi admin duoc them thanh vien"
                                 : " da tat che do chi admin duoc them thanh vien"));
             }
+
+            // Emit CONVERSATION_META_UPDATED with new field values so all clients
+            // patch their state in realtime without needing to call loadConversations()
+            try {
+                Map<String, Object> metaPayload = new java.util.HashMap<>();
+                metaPayload.put("conversationId", saved.getId());
+                metaPayload.put("onlyAdminsCanSend", saved.isOnlyAdminsCanSend());
+                metaPayload.put("approvalsRequired", saved.isApprovalsRequired());
+                metaPayload.put("groupName", saved.getGroupName());
+                metaPayload.put("groupAvatar", saved.getGroupAvatar());
+                SocketEventDTO metaEvent = new SocketEventDTO();
+                metaEvent.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+                metaEvent.setUserId(request.getRequesterId());
+                metaEvent.setData(metaPayload);
+                metaEvent.setTimestamp(java.time.LocalDateTime.now());
+                for (String participantId : saved.getParticipantIds()) {
+                    socketEmitterService.emitToUserById(participantId, metaEvent);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to emit CONVERSATION_META_UPDATED after meta update: {}", e.getMessage());
+            }
+        }
+
+        return toDTO(saved);
+    }
+
+    public ConversationDTO disbandGroup(String conversationId, String requesterId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
+        if (!conversation.isGroup()) {
+            throw new IllegalArgumentException("Cannot disband a direct conversation");
+        }
+
+        if (requesterId == null || requesterId.isBlank()) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        if (conversation.getOwnerId() == null || !conversation.getOwnerId().equals(requesterId)) {
+            throw new IllegalArgumentException("Only the owner can disband the group");
+        }
+
+        messageRepository.deleteByConversationId(conversationId);
+
+        conversation.setDisbanded(true);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+
+        try {
+            Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("conversationId", saved.getId());
+            payload.put("isDisbanded", true);
+            SocketEventDTO event = new SocketEventDTO();
+            event.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+            event.setUserId(requesterId);
+            event.setData(payload);
+            event.setTimestamp(java.time.LocalDateTime.now());
+            for (String participantId : saved.getParticipantIds()) {
+                socketEmitterService.emitToUserById(participantId, event);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to emit event after disbanding: {}", e.getMessage());
         }
 
         return toDTO(saved);
@@ -716,11 +812,14 @@ public class ConversationService {
         if (!conversation.isGroup()) {
             throw new IllegalArgumentException("Cannot add members to a direct conversation");
         }
-        if (conversation.isOnlyAdminsCanAddMembers()) {
-            ensureManager(conversation, request.getRequesterId());
-        } else {
-            ensureParticipant(conversation, request.getRequesterId());
-        }
+
+        // Any member of the group can invite friends.
+        // If onlyAdminsCanAddMembers is ON, only managers may add directly —
+        // but regular members can still invite (invitees go to pending if approvalsRequired is ON).
+        boolean isManager = (conversation.getOwnerId() != null && conversation.getOwnerId().equals(request.getRequesterId()))
+                || (conversation.getAdminIds() != null && conversation.getAdminIds().contains(request.getRequesterId()));
+
+        ensureParticipant(conversation, request.getRequesterId());
 
         Set<String> newMembers = sanitizeIds(request.getParticipantIds());
         if (newMembers.isEmpty()) {
@@ -745,14 +844,59 @@ public class ConversationService {
                     "Tất cả người dùng đã chặn lời mời nhóm từ người lạ");
         }
 
-        Set<String> participants = new HashSet<>(conversation.getParticipantIds());
-        participants.addAll(newMembers);
+        // Remove already-existing participants (no-op for them)
+        Set<String> existing = new HashSet<>(conversation.getParticipantIds());
+        newMembers.removeAll(existing);
+        if (newMembers.isEmpty()) {
+            return toDTO(conversation); // everyone already in group
+        }
 
-        if (participants.size() < 3) {
+        // Non-managers: if approvals required OR onlyAdminsCanAddMembers → put in pending queue
+        boolean routeToPending = !isManager && (conversation.isApprovalsRequired() || conversation.isOnlyAdminsCanAddMembers());
+
+        if (routeToPending) {
+            List<String> pending = conversation.getPendingJoinIds();
+            if (pending == null) pending = new ArrayList<>();
+            for (String memberId : newMembers) {
+                if (!pending.contains(memberId)) {
+                    pending.add(memberId);
+                }
+            }
+            conversation.setPendingJoinIds(pending);
+            conversation.setUpdatedAt(LocalDateTime.now());
+            Conversation saved = conversationRepository.save(conversation);
+
+            // Notify admins/owner of new pending requests
+            try {
+                SocketEventDTO event = new SocketEventDTO();
+                event.setType(SocketEventTypes.JOIN_REQUEST_CREATED);
+                event.setUserId(request.getRequesterId());
+                java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("conversationId", saved.getId());
+                payload.put("requesterId", request.getRequesterId());
+                payload.put("pendingIds", new ArrayList<>(newMembers));
+                event.setData(payload);
+                event.setTimestamp(java.time.LocalDateTime.now());
+                java.util.Set<String> targets = new java.util.HashSet<>();
+                if (saved.getOwnerId() != null) targets.add(saved.getOwnerId());
+                if (saved.getAdminIds() != null) targets.addAll(saved.getAdminIds());
+                for (String targetId : targets) {
+                    socketEmitterService.emitToUserById(targetId, event);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to emit JOIN_REQUEST_CREATED after member invite: {}", e.getMessage());
+            }
+
+            return toDTO(saved);
+        }
+
+        // Manager path (or no restrictions): add directly
+        existing.addAll(newMembers);
+        if (existing.size() < 3) {
             throw new IllegalStateException("Group must have at least 3 members");
         }
 
-        conversation.setParticipantIds(new ArrayList<>(participants));
+        conversation.setParticipantIds(new ArrayList<>(existing));
         conversation.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
 
@@ -879,6 +1023,24 @@ public class ConversationService {
                     actorName + " da go admin: " + demoted.stream().map(this::resolveUserDisplayName).collect(Collectors.joining(", ")));
         }
 
+        // Broadcast updated adminIds + ownerId to all participants so clients update in realtime
+        try {
+            Map<String, Object> metaPayload = new java.util.HashMap<>();
+            metaPayload.put("conversationId", saved.getId());
+            metaPayload.put("ownerId", saved.getOwnerId());
+            metaPayload.put("adminIds", saved.getAdminIds() != null ? saved.getAdminIds() : new ArrayList<>());
+            SocketEventDTO metaEvent = new SocketEventDTO();
+            metaEvent.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
+            metaEvent.setUserId(request.getRequesterId());
+            metaEvent.setData(metaPayload);
+            metaEvent.setTimestamp(java.time.LocalDateTime.now());
+            for (String participantId : saved.getParticipantIds()) {
+                socketEmitterService.emitToUserById(participantId, metaEvent);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to emit CONVERSATION_META_UPDATED after role update: {}", e.getMessage());
+        }
+
         return toDTO(saved);
     }
 
@@ -931,6 +1093,17 @@ public class ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversation.setLastMessageAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);
+
+        // Notify all members so they see the new group in their chat list in real-time.
+        String ownerDisplayName = resolveUserDisplayName(conversationDTO.getOwnerId());
+        String groupDisplayName = saved.getGroupName() != null ? saved.getGroupName() : "New Group Chat";
+        emitGroupSystemEvent(
+            saved,
+            conversationDTO.getOwnerId(),
+            SocketEventTypes.MEMBERS_ADDED,
+            ownerDisplayName + " da tao nhom \"" + groupDisplayName + "\""
+        );
+
         return toDTO(saved);
     }
 
@@ -982,6 +1155,10 @@ public class ConversationService {
         Conversation conversation = getConversationEntity(conversationId);
         ensureParticipant(conversation, userId);
 
+        if (conversation.isAiAssistantEnabled()) {
+            throw new IllegalArgumentException("AI Assistant is always pinned on top");
+        }
+
         List<String> pinned = conversation.getPinnedByUserIds();
         if (pinned == null) {
             pinned = new ArrayList<>();
@@ -989,6 +1166,10 @@ public class ConversationService {
         if (pinned.contains(userId)) {
             pinned.remove(userId);
         } else {
+            long currentPinnedCount = conversationRepository.countByPinnedByUserIds(userId);
+            if (currentPinnedCount >= 5) {
+                throw new IllegalStateException("Bạn chỉ được ghim tối đa 5 cuộc hội thoại");
+            }
             pinned.add(userId);
         }
         conversation.setPinnedByUserIds(pinned);
@@ -1345,7 +1526,7 @@ public class ConversationService {
     /**
      * Same as toDTO but uses a pre-fetched user cache instead of calling getUserById per participant.
      */
-    private ConversationDTO toDTOWithCache(Conversation conversation, Map<String, UserDTO> userCache) {
+    private ConversationDTO toDTOWithCache(Conversation conversation, Map<String, UserDTO> userCache, List<Conversation> modifiedConversations) {
         ConversationDTO dto = new ConversationDTO();
         dto.setId(conversation.getId());
         dto.setParticipantIds(conversation.getParticipantIds());
@@ -1360,6 +1541,8 @@ public class ConversationService {
             participantNames = new ArrayList<>(participantNames.subList(0, participantIds.size()));
         if (participantAvatars.size() > participantIds.size())
             participantAvatars = new ArrayList<>(participantAvatars.subList(0, participantIds.size()));
+
+        boolean modified = false;
 
         for (int i = 0; i < participantIds.size(); i++) {
             String existingName = participantNames.get(i);
@@ -1376,12 +1559,23 @@ public class ConversationService {
                             ? user.getFullName()
                             : user.getUsername();
                     participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                    modified = true;
                 }
                 if (existingAvatar == null) {
                     participantAvatars.set(i, user.getAvatar());
+                    modified = true;
                 }
             } else if (existingName == null || existingName.isBlank()) {
                 participantNames.set(i, "Unknown User");
+                modified = true;
+            }
+        }
+
+        if (modified) {
+            conversation.setParticipantNames(new ArrayList<>(participantNames));
+            conversation.setParticipantAvatars(new ArrayList<>(participantAvatars));
+            if (modifiedConversations != null) {
+                modifiedConversations.add(conversation);
             }
         }
 
@@ -1408,7 +1602,11 @@ public class ConversationService {
         dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
 
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
+        dto.setLastMessageType(conversation.getLastMessageType());
+        dto.setLastMessageSenderId(conversation.getLastMessageSenderId());
+        dto.setLastMessageSenderName(conversation.getLastMessageSenderName());
         dto.setLastMessageAt(conversation.getLastMessageAt());
+        dto.setIsDisbanded(conversation.isDisbanded());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setUpdatedAt(conversation.getUpdatedAt());
         return dto;
@@ -1437,6 +1635,8 @@ public class ConversationService {
             participantAvatars = new ArrayList<>(participantAvatars.subList(0, participantIds.size()));
         }
 
+        boolean modified = false;
+
         for (int i = 0; i < participantIds.size(); i++) {
             String existingName = participantNames.get(i);
             String existingAvatar = participantAvatars.get(i);
@@ -1453,18 +1653,28 @@ public class ConversationService {
                                 ? user.getFullName()
                                 : user.getUsername();
                         participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                        modified = true;
                     }
                     if (existingAvatar == null) {
                         participantAvatars.set(i, user.getAvatar());
+                        modified = true;
                     }
                 } else if (existingName == null || existingName.isBlank()) {
                     participantNames.set(i, "Unknown User");
+                    modified = true;
                 }
             } catch (Exception e) {
                 if (existingName == null || existingName.isBlank()) {
                     participantNames.set(i, "Unknown User");
+                    modified = true;
                 }
             }
+        }
+
+        if (modified) {
+            conversation.setParticipantNames(new ArrayList<>(participantNames));
+            conversation.setParticipantAvatars(new ArrayList<>(participantAvatars));
+            conversationRepository.save(conversation);
         }
 
         dto.setParticipantNames(participantNames);
@@ -1491,7 +1701,11 @@ public class ConversationService {
         dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
 
         dto.setLastMessagePreview(conversation.getLastMessagePreview());
+        dto.setLastMessageType(conversation.getLastMessageType());
+        dto.setLastMessageSenderId(conversation.getLastMessageSenderId());
+        dto.setLastMessageSenderName(conversation.getLastMessageSenderName());
         dto.setLastMessageAt(conversation.getLastMessageAt());
+        dto.setIsDisbanded(conversation.isDisbanded());
         dto.setCreatedAt(conversation.getCreatedAt());
         dto.setUpdatedAt(conversation.getUpdatedAt());
         return dto;
@@ -1525,3 +1739,4 @@ public class ConversationService {
         return conversation;
     }
 }
+

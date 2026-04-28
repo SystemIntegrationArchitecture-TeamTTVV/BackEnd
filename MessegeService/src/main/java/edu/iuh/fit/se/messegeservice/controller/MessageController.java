@@ -5,6 +5,8 @@ import edu.iuh.fit.se.messegeservice.dto.MessagePageDTO;
 import edu.iuh.fit.se.messegeservice.dto.ForwardMessageRequest;
 import edu.iuh.fit.se.messegeservice.dto.PollCreateRequest;
 import edu.iuh.fit.se.messegeservice.dto.PollVoteRequest;
+import edu.iuh.fit.se.messegeservice.dto.AppointmentCreateRequest;
+import edu.iuh.fit.se.messegeservice.dto.AppointmentJoinRequest;
 import edu.iuh.fit.se.messegeservice.dto.SeenEventRequest;
 import edu.iuh.fit.se.messegeservice.dto.TypingEventRequest;
 import edu.iuh.fit.se.messegeservice.service.MessageService;
@@ -185,13 +187,40 @@ public class MessageController {
                         request.getUserId(),
                         request.getQuestion(),
                         request.getOptions(),
-                        request.isMultipleChoice()
+                        request.isMultipleChoice(),
+                        request.isCanAddOptions(),
+                        request.isHideResultsBeforeVote(),
+                        request.isHideVoters(),
+                        request.getActorName(),
+                        request.getDeadline()
                 ));
     }
 
     @PostMapping("/{id}/poll-vote")
     public ResponseEntity<MessageDTO> votePoll(@PathVariable String id, @RequestBody PollVoteRequest request) {
         return ResponseEntity.ok(messageService.votePoll(id, request.getUserId(), request.getOptionIds()));
+    }
+
+    @PostMapping("/conversation/{conversationId}/appointment")
+    public ResponseEntity<MessageDTO> createAppointment(
+            @PathVariable String conversationId,
+            @RequestBody AppointmentCreateRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(messageService.createAppointment(
+                        conversationId,
+                        request.getUserId(),
+                        request.getTitle(),
+                        request.getTime(),
+                        request.getLocation(),
+                        request.getDescription(),
+                        request.getActorName()
+                ));
+    }
+
+    @PostMapping("/{id}/appointment-join")
+    public ResponseEntity<MessageDTO> joinAppointment(@PathVariable String id, @RequestBody AppointmentJoinRequest request) {
+        return ResponseEntity.ok(messageService.joinAppointment(id, request.getUserId()));
     }
 }
 

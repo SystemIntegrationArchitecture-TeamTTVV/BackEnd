@@ -9,7 +9,16 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
+
 @Document(collection = "conversations")
+@CompoundIndexes({
+    @CompoundIndex(name = "participants_lastMessageAt_idx", def = "{'participantIds': 1, 'lastMessageAt': -1}"),
+    @CompoundIndex(name = "isGroup_lastMessageAt_idx", def = "{'isGroup': 1, 'lastMessageAt': -1}"),
+    @CompoundIndex(name = "participants_isGroup_lastMessageAt_idx", def = "{'participantIds': 1, 'isGroup': 1, 'lastMessageAt': -1}")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -61,6 +70,7 @@ public class Conversation {
 
     // ── Invite Link ─────────────────────────────────────────────────────────
     /** Unique invite token for group join-by-link. */
+    @Indexed
     private String inviteLinkToken;
 
     /** UserIds who blocked the other party (only relevant for 1-1). */
@@ -73,9 +83,13 @@ public class Conversation {
     private boolean aiAssistantEnabled = false;
 
     private String lastMessagePreview;
+    private String lastMessageType;
+    private String lastMessageSenderId;
+    private String lastMessageSenderName;
     private LocalDateTime lastMessageAt;
+
+    private boolean isDisbanded = false;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-

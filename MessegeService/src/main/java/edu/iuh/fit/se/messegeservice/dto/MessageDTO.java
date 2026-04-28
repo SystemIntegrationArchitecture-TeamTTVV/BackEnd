@@ -27,7 +27,15 @@ public class MessageDTO {
     private String pollQuestion;
     private Boolean pollMultipleChoice;
     private Boolean pollClosed;
+    private Boolean pollCanAddOptions;
+    private Boolean pollHideResultsBeforeVote;
+    private Boolean pollHideVoters;
     private List<PollOption> pollOptions;
+    private LocalDateTime pollDeadline;
+    private String appointmentTitle;
+    private LocalDateTime appointmentTime;
+    private String appointmentLocation;
+    private List<String> appointmentParticipants;
     private List<String> mentionUserIds;
     private List<String> seenByUserIds;
     private List<String> deliveredToUserIds;

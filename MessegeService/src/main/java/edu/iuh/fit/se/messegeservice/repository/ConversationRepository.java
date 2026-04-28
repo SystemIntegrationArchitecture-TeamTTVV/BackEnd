@@ -17,4 +17,5 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
             String keyword
     );
     Optional<Conversation> findByInviteLinkToken(String inviteLinkToken);
+    long countByPinnedByUserIds(String userId);
 }

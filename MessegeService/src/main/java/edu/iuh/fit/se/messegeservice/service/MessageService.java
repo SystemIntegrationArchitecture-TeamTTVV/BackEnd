@@ -42,6 +42,7 @@ public class MessageService {
     private static final String TYPE_TEXT = "TEXT";
     private static final String TYPE_SYSTEM = "SYSTEM";
     private static final String TYPE_POLL = "POLL";
+    private static final String TYPE_APPOINTMENT = "APPOINTMENT";
     private static final long DEFAULT_RECALL_WINDOW_SECONDS = 120L;
 
     private final MessageRepository messageRepository;
@@ -293,9 +294,7 @@ public class MessageService {
         log.info("✅ Message saved with id: {}", saved.getId());
         
         // Update conversation last message
-        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, saved);
         conversationRepository.save(conversation);
         
         MessageDTO savedDTO = toDTO(saved);
@@ -368,6 +367,13 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(message.getConversationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + message.getConversationId()));
         ensureParticipant(conversation, userId);
+
+        if (!message.isPinned()) {
+            long pinnedCount = messageRepository.countByConversationIdAndPinnedTrue(conversation.getId());
+            if (pinnedCount >= 5) {
+                throw new IllegalStateException("Bạn chỉ được ghim tối đa 5 tin nhắn trong mỗi cuộc hội thoại");
+            }
+        }
 
         message.setPinned(!message.isPinned());
         message.setUpdatedAt(LocalDateTime.now());
@@ -457,7 +463,12 @@ public class MessageService {
             String userId,
             String question,
             List<String> options,
-            boolean multipleChoice
+            boolean multipleChoice,
+            boolean canAddOptions,
+            boolean hideResultsBeforeVote,
+            boolean hideVoters,
+            String actorNameParam,
+            java.time.LocalDateTime deadline
     ) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
@@ -489,6 +500,10 @@ public class MessageService {
         poll.setPollQuestion(question.trim());
         poll.setPollMultipleChoice(multipleChoice);
         poll.setPollClosed(false);
+        poll.setPollCanAddOptions(canAddOptions);
+        poll.setPollHideResultsBeforeVote(hideResultsBeforeVote);
+        poll.setPollHideVoters(hideVoters);
+        poll.setPollDeadline(deadline);
         poll.setPollOptions(
                 java.util.stream.IntStream.range(0, normalizedOptions.size())
                         .mapToObj(i -> new PollOption("opt-" + (i + 1), normalizedOptions.get(i), new ArrayList<>()))
@@ -504,9 +519,7 @@ public class MessageService {
         Message saved = messageRepository.save(poll);
         unhideSoftDeletedConversationForParticipants(conversation);
 
-        conversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, saved);
         conversationRepository.save(conversation);
 
         MessageDTO savedDTO = toDTO(saved);
@@ -523,7 +536,9 @@ public class MessageService {
             }).start();
         }
 
-        String actorName = resolveParticipantDisplayName(conversation, userId);
+        String actorName = (actorNameParam != null && !actorNameParam.isBlank()) 
+                ? actorNameParam 
+                : resolveParticipantDisplayName(conversation, userId);
         createAndEmitSystemMessage(conversation, userId, SocketEventTypes.POLL_CREATED, actorName + " da tao binh chon");
 
         return savedDTO;
@@ -541,6 +556,9 @@ public class MessageService {
         }
         if (poll.isPollClosed()) {
             throw new IllegalStateException("Poll has been closed");
+        }
+        if (poll.getPollDeadline() != null && LocalDateTime.now().isAfter(poll.getPollDeadline())) {
+            throw new IllegalStateException("Poll deadline has passed");
         }
 
         Conversation conversation = conversationRepository.findById(poll.getConversationId())
@@ -594,6 +612,108 @@ public class MessageService {
         emitEventToConversationParticipants(
                 conversation,
                 SocketEventTypes.POLL_UPDATED,
+                Map.of(
+                        "conversationId", conversation.getId(),
+                        "message", dto
+                ),
+                null
+        );
+
+        return dto;
+    }
+
+    public MessageDTO createAppointment(
+            String conversationId,
+            String userId,
+            String title,
+            LocalDateTime time,
+            String location,
+            String description,
+            String actorNameParam
+    ) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+        ensureParticipant(conversation, userId);
+        ensureCanSend(conversation, userId);
+
+        if (title == null || title.trim().isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        if (time == null) {
+            throw new IllegalArgumentException("time is required");
+        }
+
+        Message appointment = new Message();
+        appointment.setConversation(conversation);
+        appointment.setConversationId(conversation.getId());
+        appointment.setSenderId(userId);
+        appointment.setSenderName(resolveParticipantDisplayName(conversation, userId));
+        appointment.setMessageType(TYPE_APPOINTMENT);
+        appointment.setContent(description != null ? description.trim() : "");
+        appointment.setAppointmentTitle(title.trim());
+        appointment.setAppointmentTime(time);
+        appointment.setAppointmentLocation(location != null ? location.trim() : null);
+        appointment.setAppointmentParticipants(new ArrayList<>(List.of(userId)));
+        
+        appointment.setSeenByUserIds(new ArrayList<>(List.of(userId)));
+        appointment.setHiddenForUserIds(new ArrayList<>());
+        appointment.setDeleted(false);
+        appointment.setEdited(false);
+        appointment.setCreatedAt(LocalDateTime.now());
+        appointment.setUpdatedAt(LocalDateTime.now());
+
+        Message saved = messageRepository.save(appointment);
+        unhideSoftDeletedConversationForParticipants(conversation);
+
+        updateConversationLastMessage(conversation, saved);
+        conversationRepository.save(conversation);
+
+        MessageDTO savedDTO = toDTO(saved);
+        emitMessageReceivedToConversation(conversation, savedDTO);
+
+        String actorName = (actorNameParam != null && !actorNameParam.isBlank()) 
+                ? actorNameParam 
+                : resolveParticipantDisplayName(conversation, userId);
+        createAndEmitSystemMessage(conversation, userId, SocketEventTypes.APPOINTMENT_CREATED, actorName + " da len lich hen");
+
+        return savedDTO;
+    }
+
+    public MessageDTO joinAppointment(String messageId, String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        Message appointment = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
+        if (!TYPE_APPOINTMENT.equalsIgnoreCase(appointment.getMessageType())) {
+            throw new IllegalArgumentException("Message is not an appointment");
+        }
+
+        Conversation conversation = conversationRepository.findById(appointment.getConversationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + appointment.getConversationId()));
+        ensureParticipant(conversation, userId);
+
+        List<String> participants = appointment.getAppointmentParticipants();
+        if (participants == null) {
+            participants = new ArrayList<>();
+        }
+        
+        if (participants.contains(userId)) {
+            participants.remove(userId);
+        } else {
+            participants.add(userId);
+        }
+        
+        appointment.setAppointmentParticipants(participants.stream().distinct().collect(Collectors.toList()));
+        appointment.setUpdatedAt(LocalDateTime.now());
+
+        Message updated = messageRepository.save(appointment);
+        MessageDTO dto = toDTO(updated);
+
+        emitEventToConversationParticipants(
+                conversation,
+                SocketEventTypes.APPOINTMENT_UPDATED,
                 Map.of(
                         "conversationId", conversation.getId(),
                         "message", dto
@@ -861,9 +981,7 @@ public class MessageService {
         Message saved = messageRepository.save(forwarded);
         unhideSoftDeletedConversationForParticipants(targetConversation);
 
-        targetConversation.setLastMessagePreview(buildLastMessagePreview(saved));
-        targetConversation.setLastMessageAt(saved.getCreatedAt());
-        targetConversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(targetConversation, saved);
         conversationRepository.save(targetConversation);
         emitConversationMetaUpdated(targetConversation);
 
@@ -1060,11 +1178,9 @@ public class MessageService {
         );
 
         if (!latest.isEmpty()) {
-            conversation.setLastMessagePreview(buildLastMessagePreview(latest.get(0)));
-            conversation.setLastMessageAt(latest.get(0).getCreatedAt());
+            updateConversationLastMessage(conversation, latest.get(0));
         } else {
-            conversation.setLastMessagePreview("");
-            conversation.setLastMessageAt(null);
+            updateConversationLastMessage(conversation, null);
         }
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -1095,6 +1211,9 @@ public class MessageService {
         Map<String, Object> payload = new HashMap<>();
         payload.put("conversationId", conversation.getId());
         payload.put("lastMessagePreview", conversation.getLastMessagePreview());
+        payload.put("lastMessageType", conversation.getLastMessageType());
+        payload.put("lastMessageSenderId", conversation.getLastMessageSenderId());
+        payload.put("lastMessageSenderName", conversation.getLastMessageSenderName());
         payload.put(
                 "lastMessageAt",
                 conversation.getLastMessageAt() != null ? conversation.getLastMessageAt().toString() : null
@@ -1136,7 +1255,15 @@ public class MessageService {
         dto.setPollQuestion(message.getPollQuestion());
         dto.setPollMultipleChoice(message.isPollMultipleChoice());
         dto.setPollClosed(message.isPollClosed());
+        dto.setPollCanAddOptions(message.isPollCanAddOptions());
+        dto.setPollHideResultsBeforeVote(message.isPollHideResultsBeforeVote());
+        dto.setPollHideVoters(message.isPollHideVoters());
         dto.setPollOptions(message.getPollOptions());
+        dto.setPollDeadline(message.getPollDeadline());
+        dto.setAppointmentTitle(message.getAppointmentTitle());
+        dto.setAppointmentTime(message.getAppointmentTime());
+        dto.setAppointmentLocation(message.getAppointmentLocation());
+        dto.setAppointmentParticipants(message.getAppointmentParticipants());
         dto.setMentionUserIds(message.getMentionUserIds());
         dto.setSeenByUserIds(message.getSeenByUserIds());
         dto.setDeliveredToUserIds(message.getDeliveredToUserIds());
@@ -1171,6 +1298,10 @@ public class MessageService {
         message.setPollMultipleChoice(Boolean.TRUE.equals(dto.getPollMultipleChoice()));
         message.setPollClosed(Boolean.TRUE.equals(dto.getPollClosed()));
         message.setPollOptions(dto.getPollOptions());
+        message.setAppointmentTitle(dto.getAppointmentTitle());
+        message.setAppointmentTime(dto.getAppointmentTime());
+        message.setAppointmentLocation(dto.getAppointmentLocation());
+        message.setAppointmentParticipants(dto.getAppointmentParticipants());
         message.setMentionUserIds(dto.getMentionUserIds());
         message.setSeenByUserIds(dto.getSeenByUserIds());
         message.setDeliveredToUserIds(dto.getDeliveredToUserIds());
@@ -1180,6 +1311,11 @@ public class MessageService {
     }
 
     private void ensureCanSend(Conversation conversation, String userId) {
+        // Check if group is disbanded
+        if (conversation.isDisbanded()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This group has been disbanded");
+        }
+
         // Check if user is banned from this group
         if (conversation.getBannedUserIds() != null && conversation.getBannedUserIds().contains(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are banned from this conversation");
@@ -1292,9 +1428,7 @@ public class MessageService {
         Message savedSystemMessage = messageRepository.save(systemMessage);
         unhideSoftDeletedConversationForParticipants(conversation);
 
-        conversation.setLastMessagePreview(buildLastMessagePreview(savedSystemMessage));
-        conversation.setLastMessageAt(LocalDateTime.now());
-        conversation.setUpdatedAt(LocalDateTime.now());
+        updateConversationLastMessage(conversation, savedSystemMessage);
         conversationRepository.save(conversation);
 
         emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage));
@@ -1427,6 +1561,23 @@ public class MessageService {
         cloned.setData(source.getData());
         cloned.setTimestamp(source.getTimestamp());
         return cloned;
+    }
+
+    private void updateConversationLastMessage(Conversation conversation, Message message) {
+        if (message == null) {
+            conversation.setLastMessagePreview("");
+            conversation.setLastMessageType(null);
+            conversation.setLastMessageSenderId(null);
+            conversation.setLastMessageSenderName(null);
+            conversation.setLastMessageAt(null);
+        } else {
+            conversation.setLastMessagePreview(buildLastMessagePreview(message));
+            conversation.setLastMessageType(message.getMessageType());
+            conversation.setLastMessageSenderId(message.getSenderId());
+            conversation.setLastMessageSenderName(message.getSenderName());
+            conversation.setLastMessageAt(message.getCreatedAt() != null ? message.getCreatedAt() : LocalDateTime.now());
+        }
+        conversation.setUpdatedAt(LocalDateTime.now());
     }
 }
 
