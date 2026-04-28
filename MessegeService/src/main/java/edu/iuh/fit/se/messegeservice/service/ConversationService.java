@@ -1365,6 +1365,8 @@ public class ConversationService {
             metaPayload.put("nicknames", conversation.getNicknames());
             metaPayload.put("backgroundUrl", conversation.getBackgroundUrl());
             metaPayload.put("blockedByUserIds", conversation.getBlockedByUserIds());
+            metaPayload.put("messageBlockedByUserIds", conversation.getMessageBlockedByUserIds());
+            metaPayload.put("callBlockedByUserIds", conversation.getCallBlockedByUserIds());
             metaPayload.put("mutedByUserIds", conversation.getMutedByUserIds());
             SocketEventDTO metaEvent = new SocketEventDTO();
             metaEvent.setType(SocketEventTypes.CONVERSATION_META_UPDATED);
@@ -1493,6 +1495,114 @@ public class ConversationService {
                         wasBlocked ? "USER_UNBLOCKED" : "USER_BLOCKED", systemContent);
             } catch (Exception e) {
                 log.warn("Failed to create system message for block toggle in DM {}: {}", saved.getId(), e.getMessage());
+            }
+            emitDirectConversationMetaUpdated(saved);
+        }
+
+        return toDTO(saved);
+    }
+
+    public ConversationDTO toggleBlockMessages(String conversationId, String requesterId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, requesterId);
+
+        List<String> blocked = conversation.getMessageBlockedByUserIds();
+        if (blocked == null) {
+            blocked = new ArrayList<>();
+        }
+
+        boolean wasBlocked = blocked.contains(requesterId);
+        if (wasBlocked) {
+            blocked.remove(requesterId);
+        } else {
+            blocked.add(requesterId);
+        }
+        conversation.setMessageBlockedByUserIds(blocked);
+        conversation.setUpdatedAt(LocalDateTime.now());
+
+        Conversation saved = conversationRepository.save(conversation);
+
+        if (!saved.isGroup()) {
+            String actorName = getParticipantDisplayName(saved, requesterId);
+            String systemContent = wasBlocked
+                    ? actorName + " da mo chan tin nhan"
+                    : actorName + " da chan tin nhan";
+            try {
+                messageService.createSystemMessage(saved.getId(), requesterId,
+                        wasBlocked ? "MESSAGES_UNBLOCKED" : "MESSAGES_BLOCKED", systemContent);
+            } catch (Exception e) {
+                log.warn("Failed to create system message for message block toggle in DM {}: {}", saved.getId(), e.getMessage());
+            }
+            emitDirectConversationMetaUpdated(saved);
+        }
+
+        return toDTO(saved);
+    }
+
+    public ConversationDTO toggleBlockCalls(String conversationId, String requesterId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, requesterId);
+
+        List<String> blocked = conversation.getCallBlockedByUserIds();
+        if (blocked == null) {
+            blocked = new ArrayList<>();
+        }
+
+        boolean wasBlocked = blocked.contains(requesterId);
+        if (wasBlocked) {
+            blocked.remove(requesterId);
+        } else {
+            blocked.add(requesterId);
+        }
+        conversation.setCallBlockedByUserIds(blocked);
+        conversation.setUpdatedAt(LocalDateTime.now());
+
+        Conversation saved = conversationRepository.save(conversation);
+
+        if (!saved.isGroup()) {
+            String actorName = getParticipantDisplayName(saved, requesterId);
+            String systemContent = wasBlocked
+                    ? actorName + " da mo chan cuoc goi"
+                    : actorName + " da chan cuoc goi";
+            try {
+                messageService.createSystemMessage(saved.getId(), requesterId,
+                        wasBlocked ? "CALLS_UNBLOCKED" : "CALLS_BLOCKED", systemContent);
+            } catch (Exception e) {
+                log.warn("Failed to create system message for call block toggle in DM {}: {}", saved.getId(), e.getMessage());
+            }
+            emitDirectConversationMetaUpdated(saved);
+        }
+
+        return toDTO(saved);
+    }
+
+    public ConversationDTO unblockAll(String conversationId, String requesterId) {
+        Conversation conversation = getConversationEntity(conversationId);
+        ensureParticipant(conversation, requesterId);
+
+        // Remove from all block lists
+        List<String> blockedAll = conversation.getBlockedByUserIds();
+        if (blockedAll != null) blockedAll.remove(requesterId);
+        conversation.setBlockedByUserIds(blockedAll);
+
+        List<String> blockedMsg = conversation.getMessageBlockedByUserIds();
+        if (blockedMsg != null) blockedMsg.remove(requesterId);
+        conversation.setMessageBlockedByUserIds(blockedMsg);
+
+        List<String> blockedCall = conversation.getCallBlockedByUserIds();
+        if (blockedCall != null) blockedCall.remove(requesterId);
+        conversation.setCallBlockedByUserIds(blockedCall);
+
+        conversation.setUpdatedAt(LocalDateTime.now());
+        Conversation saved = conversationRepository.save(conversation);
+
+        if (!saved.isGroup()) {
+            String actorName = getParticipantDisplayName(saved, requesterId);
+            try {
+                messageService.createSystemMessage(saved.getId(), requesterId,
+                        "ALL_UNBLOCKED", actorName + " da mo chan tat ca");
+            } catch (Exception e) {
+                log.warn("Failed to create system message for unblock all in DM {}: {}", saved.getId(), e.getMessage());
             }
             emitDirectConversationMetaUpdated(saved);
         }
@@ -1776,6 +1886,8 @@ public class ConversationService {
         dto.setNicknames(conversation.getNicknames());
         dto.setInviteLinkToken(conversation.getInviteLinkToken());
         dto.setBlockedByUserIds(conversation.getBlockedByUserIds());
+        dto.setMessageBlockedByUserIds(conversation.getMessageBlockedByUserIds());
+        dto.setCallBlockedByUserIds(conversation.getCallBlockedByUserIds());
         dto.setBackgroundUrl(conversation.getBackgroundUrl());
         dto.setAiAssistantEnabled(conversation.isAiAssistantEnabled());
 
@@ -1813,6 +1925,8 @@ public class ConversationService {
         conversation.setNicknames(dto.getNicknames());
         conversation.setInviteLinkToken(dto.getInviteLinkToken());
         conversation.setBlockedByUserIds(dto.getBlockedByUserIds());
+        conversation.setMessageBlockedByUserIds(dto.getMessageBlockedByUserIds());
+        conversation.setCallBlockedByUserIds(dto.getCallBlockedByUserIds());
         conversation.setBackgroundUrl(dto.getBackgroundUrl());
         conversation.setAiAssistantEnabled(dto.getAiAssistantEnabled() != null && dto.getAiAssistantEnabled());
         return conversation;

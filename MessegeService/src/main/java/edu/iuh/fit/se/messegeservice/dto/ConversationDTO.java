@@ -52,6 +52,8 @@ public class ConversationDTO {
     private Map<String, String> nicknames;
     private String inviteLinkToken;
     private List<String> blockedByUserIds;
+    private List<String> messageBlockedByUserIds;
+    private List<String> callBlockedByUserIds;
     private String backgroundUrl;
     private Boolean aiAssistantEnabled;
 

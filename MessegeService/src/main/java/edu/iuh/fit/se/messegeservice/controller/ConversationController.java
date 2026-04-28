@@ -222,6 +222,21 @@ public class ConversationController {
         return ResponseEntity.ok(conversationService.toggleBlock(id, userId));
     }
 
+    @PostMapping("/{id}/block-messages")
+    public ResponseEntity<ConversationDTO> toggleBlockMessages(@PathVariable String id, @RequestParam String userId) {
+        return ResponseEntity.ok(conversationService.toggleBlockMessages(id, userId));
+    }
+
+    @PostMapping("/{id}/block-calls")
+    public ResponseEntity<ConversationDTO> toggleBlockCalls(@PathVariable String id, @RequestParam String userId) {
+        return ResponseEntity.ok(conversationService.toggleBlockCalls(id, userId));
+    }
+
+    @PostMapping("/{id}/unblock-all")
+    public ResponseEntity<ConversationDTO> unblockAll(@PathVariable String id, @RequestParam String userId) {
+        return ResponseEntity.ok(conversationService.unblockAll(id, userId));
+    }
+
     @PostMapping("/{id}/background")
     public ResponseEntity<ConversationDTO> updateBackground(@PathVariable String id, @RequestParam String backgroundUrl, @RequestParam(required = false) String userId) {
         return ResponseEntity.ok(conversationService.updateBackground(id, backgroundUrl, userId));
