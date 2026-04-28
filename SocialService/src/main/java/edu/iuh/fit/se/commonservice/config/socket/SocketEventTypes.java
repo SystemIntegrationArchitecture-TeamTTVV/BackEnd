@@ -68,4 +68,7 @@ public final class SocketEventTypes {
     public static final String CALL_ICE_CANDIDATE = "CALL_ICE_CANDIDATE";
     public static final String CALL_REJECT = "CALL_REJECT";
     public static final String CALL_END = "CALL_END";
+    public static final String CALL_USER_JOINED = "CALL_USER_JOINED";
+    public static final String CALL_USER_LEFT = "CALL_USER_LEFT";
+    public static final String CALL_HOST_TRANSFERRED = "CALL_HOST_TRANSFERRED";
 }

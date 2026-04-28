@@ -16,19 +16,31 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FileUploadService {
 
+    private final S3StorageService s3StorageService;
     private final CloudinaryStorageService cloudinaryStorageService;
 
     private static final String STORY_DIR = "uploads/stories";
 
     public String uploadStoryFile(MultipartFile file) {
+        // Priority 1: AWS S3
+        if (s3StorageService.isEnabled()) {
+            try {
+                return s3StorageService.upload(file, "ttvv/stories");
+            } catch (Exception e) {
+                throw new RuntimeException("S3 upload failed", e);
+            }
+        }
+
+        // Priority 2: Cloudinary
         if (cloudinaryStorageService.isEnabled()) {
             try {
                 return cloudinaryStorageService.upload(file, "ttvv/stories");
             } catch (Exception e) {
-                throw new RuntimeException("Upload file failed", e);
+                throw new RuntimeException("Cloudinary upload failed", e);
             }
         }
 
+        // Priority 3: Local filesystem
         try {
             File dir = new File(STORY_DIR);
             if (!dir.exists()) {

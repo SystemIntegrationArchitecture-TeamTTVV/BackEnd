@@ -48,8 +48,14 @@ public class UserEntity {
     private String firstName;
     private String lastName;
     private String fullName;
+
+    @Column(columnDefinition = "TEXT")
     private String avatar;
+
+    @Column(columnDefinition = "TEXT")
     private String coverPhoto;
+
+    @Column(columnDefinition = "TEXT")
     private String bio;
     private String phoneNumber;
     private LocalDateTime dateOfBirth;

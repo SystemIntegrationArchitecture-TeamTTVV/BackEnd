@@ -54,9 +54,34 @@ public class CallController {
         return ResponseEntity.ok(callService.joinCall(id, request.getUserId()));
     }
 
+    /** User leaves the call (group: only self, direct: ends for both) */
+    @PostMapping("/{id}/leave")
+    public ResponseEntity<CallDTO> leave(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.leaveCall(id, request.getUserId(), request.getTransferToUserId()));
+    }
+
+    /** End call (backward-compatible: direct → end both, group host → end all, group member → leave) */
     @PostMapping("/{id}/end")
     public ResponseEntity<CallDTO> end(@PathVariable String id, @RequestBody CallActionRequest request) {
         return ResponseEntity.ok(callService.endCall(id, request.getUserId()));
+    }
+
+    /** Host ends call for ALL participants (group only) */
+    @PostMapping("/{id}/end-all")
+    public ResponseEntity<CallDTO> endAll(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.endCallForAll(id, request.getUserId()));
+    }
+
+    /** Rejoin a call after disconnect (if call is still active) */
+    @PostMapping("/{id}/rejoin")
+    public ResponseEntity<CallDTO> rejoin(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.rejoinCall(id, request.getUserId()));
+    }
+
+    /** Transfer host to another participant (group only) */
+    @PostMapping("/{id}/transfer-host")
+    public ResponseEntity<CallDTO> transferHost(@PathVariable String id, @RequestBody CallActionRequest request) {
+        return ResponseEntity.ok(callService.transferHost(id, request.getUserId(), request.getTransferToUserId()));
     }
 
     @PostMapping("/{id}/missed")
@@ -64,9 +89,14 @@ public class CallController {
         return ResponseEntity.ok(callService.markMissed(id, request.getUserId()));
     }
 
+    /** Get active participants of a call */
+    @GetMapping("/{id}/participants")
+    public ResponseEntity<List<String>> getParticipants(@PathVariable String id) {
+        return ResponseEntity.ok(callService.getActiveParticipants(id));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<CallDTO> updateCall(@PathVariable String id, @RequestBody CallDTO callDTO) {
         return ResponseEntity.ok(callService.updateCall(id, callDTO));
     }
 }
-

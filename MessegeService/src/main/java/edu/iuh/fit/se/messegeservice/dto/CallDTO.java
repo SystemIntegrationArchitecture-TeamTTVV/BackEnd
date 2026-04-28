@@ -16,9 +16,15 @@ public class CallDTO {
     private String callerId;
     private List<String> calleeIds;
     private String type; // VOICE, VIDEO
-    private String status; // COMPLETED, MISSED, REJECTED, ONGOING
+    private String status; // legacy
+
+    // ── Smart call fields ──
+    private String callType;  // DIRECT | GROUP
+    private String hostId;
+    private List<String> activeParticipantIds;
+    private String state; // RINGING | CONNECTED | ENDED
+
     private int durationSeconds;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
 }
-

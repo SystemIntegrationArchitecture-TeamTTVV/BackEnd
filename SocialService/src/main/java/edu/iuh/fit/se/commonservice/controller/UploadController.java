@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import edu.iuh.fit.se.commonservice.service.CloudinaryStorageService;
+import edu.iuh.fit.se.commonservice.service.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -35,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class UploadController {
 
+    private final S3StorageService s3StorageService;
     private final CloudinaryStorageService cloudinaryStorageService;
 
     @Value("${app.upload.dir:uploads}")
@@ -49,6 +51,20 @@ public class UploadController {
                 return ResponseEntity.badRequest().body(error);
             }
 
+            // Priority 1: AWS S3
+            if (s3StorageService.isEnabled()) {
+                String secureUrl = s3StorageService.upload(file, "ttvv/uploads");
+                Map<String, Object> response = new HashMap<>();
+                response.put("url", secureUrl);
+                response.put("fileName", file.getOriginalFilename());
+                response.put("fileSize", file.getSize());
+                response.put("fileType", file.getContentType());
+                response.put("path", secureUrl);
+                log.info("File uploaded to S3: {}", file.getOriginalFilename());
+                return ResponseEntity.ok(response);
+            }
+
+            // Priority 2: Cloudinary
             if (cloudinaryStorageService.isEnabled()) {
                 String secureUrl = cloudinaryStorageService.upload(file, "ttvv/uploads");
                 Map<String, Object> response = new HashMap<>();
