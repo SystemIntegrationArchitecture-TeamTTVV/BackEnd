@@ -23,6 +23,8 @@ public class Comment {
 
     private String postId;
     private String authorId;
+    private String authorName;   // denormalized for fast reads
+    private String authorAvatar; // denormalized for fast reads
 
     @DBRef
     private Video video;
