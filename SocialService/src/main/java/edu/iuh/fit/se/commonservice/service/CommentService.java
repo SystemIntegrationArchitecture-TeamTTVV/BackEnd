@@ -54,6 +54,20 @@ public class CommentService {
         aiViolationCheckService.checkOrThrow(commentDTO.getContent(), "COMMENT");
 
         Comment comment = toEntity(commentDTO);
+
+        // Fetch and store user info at creation time (denormalized)
+        if (commentDTO.getUserId() != null && comment.getAuthorName() == null) {
+            try {
+                UserDTO user = authServiceClient.getUserById(commentDTO.getUserId());
+                if (user != null) {
+                    comment.setAuthorName(user.getFullName());
+                    comment.setAuthorAvatar(user.getAvatar());
+                }
+            } catch (Exception e) {
+                // Proceed without user info — display will fall back to authorId
+            }
+        }
+
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
         Comment saved = commentRepository.save(comment);
@@ -143,14 +157,22 @@ public class CommentService {
             dto.setPostId(comment.getPost().getId());
         }
         if (comment.getAuthorId() != null) {
-            try {
-                UserDTO user = authServiceClient.getUserById(comment.getAuthorId());
-                dto.setUserId(user.getId());
-                dto.setUserName(user.getFullName());
-                dto.setUserAvatar(user.getAvatar());
-            } catch (Exception e) {
+            // Fast path: use denormalized fields stored at write time
+            if (comment.getAuthorName() != null) {
                 dto.setUserId(comment.getAuthorId());
-                dto.setUserName("Unknown User");
+                dto.setUserName(comment.getAuthorName());
+                dto.setUserAvatar(comment.getAuthorAvatar());
+            } else {
+                // Slow path: call AuthService (legacy comments without stored name)
+                try {
+                    UserDTO user = authServiceClient.getUserById(comment.getAuthorId());
+                    dto.setUserId(user.getId());
+                    dto.setUserName(user.getFullName());
+                    dto.setUserAvatar(user.getAvatar());
+                } catch (Exception e) {
+                    dto.setUserId(comment.getAuthorId());
+                    dto.setUserName(comment.getAuthorId()); // show ID instead of "Unknown User"
+                }
             }
         }
         dto.setContent(comment.getContent());
@@ -171,6 +193,7 @@ public class CommentService {
             Post post = postRepository.findById(dto.getPostId())
                     .orElseThrow(() -> new RuntimeException("Post not found"));
             comment.setPost(post);
+            comment.setPostId(dto.getPostId());
         }
         if (dto.getUserId() != null) {
             comment.setAuthorId(dto.getUserId());
