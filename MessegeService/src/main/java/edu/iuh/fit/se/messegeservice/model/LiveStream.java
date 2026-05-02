@@ -27,6 +27,11 @@ public class LiveStream {
     private String title;
     private String description;
 
+    /** LiveKit room name (unique per active stream) */
+    @Indexed(unique = true)
+    private String roomName;
+
+    /** Legacy/public key for stream documents (kept for existing DB unique index compatibility) */
     @Indexed(unique = true)
     private String streamKey;
 
@@ -34,13 +39,14 @@ public class LiveStream {
     @Indexed
     private String status = "PENDING";
 
-    /** Full HLS URL for playback, e.g. http://host:8888/live/<streamKey>/index.m3u8 */
-    private String hlsUrl;
-
     private String thumbnailUrl;
 
     private int viewerCount = 0;
     private List<String> viewerIds = new ArrayList<>();
+
+    /** If true, host must approve viewers before they can watch */
+    private boolean requiresApproval = false;
+    private List<String> approvedViewerIds = new ArrayList<>();
 
     /** Optional: conversation ID for live chat */
     private String chatConversationId;

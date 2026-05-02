@@ -125,6 +125,21 @@ public class DataSeeder implements CommandLineRunner {
         calls.add(buildCall(c2, hong, List.of(lan.id(), minh.id()), "VOICE", "COMPLETED", 600));
         mongoTemplate.insert(calls, Call.class);
 
+        // Gifts (Livestream)
+        if (mongoTemplate.getCollection("gifts").countDocuments() == 0) {
+            List<Gift> gifts = new ArrayList<>();
+            gifts.add(new Gift(null, "Hoa hồng", 10, "🌹", null, "popular"));
+            gifts.add(new Gift(null, "Cà phê", 20, "☕", null, "popular"));
+            gifts.add(new Gift(null, "Trà sữa", 30, "🧋", null, "popular"));
+            gifts.add(new Gift(null, "Ngôi sao", 50, "⭐", null, "popular"));
+            gifts.add(new Gift(null, "Kim cương", 100, "💎", null, "premium"));
+            gifts.add(new Gift(null, "Siêu xe", 500, "🏎️", null, "premium"));
+            gifts.add(new Gift(null, "Tên lửa", 1000, "🚀", null, "premium"));
+            gifts.add(new Gift(null, "Lâu đài", 5000, "🏰", null, "premium"));
+            mongoTemplate.insert(gifts, Gift.class);
+            System.out.println("🎁 Seeded default gifts.");
+        }
+
         System.out.println("✅ Data seeding completed successfully!");
         System.out.println("💡 To disable seeding on next run, set 'app.data.seed.enabled=false' in application.properties");
     }

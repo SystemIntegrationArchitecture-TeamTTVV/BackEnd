@@ -1,14 +1,20 @@
 package edu.iuh.fit.se.messegeservice.controller;
 
+import edu.iuh.fit.se.messegeservice.dto.CreateStreamRequest;
+import edu.iuh.fit.se.messegeservice.dto.LiveChatRequest;
+import edu.iuh.fit.se.messegeservice.dto.LiveStreamApproveRequest;
 import edu.iuh.fit.se.messegeservice.dto.LiveStreamDTO;
+import edu.iuh.fit.se.messegeservice.dto.LiveStreamKickRequest;
+import edu.iuh.fit.se.messegeservice.dto.LiveStreamSettingsRequest;
 import edu.iuh.fit.se.messegeservice.service.LiveStreamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/livestream")
@@ -19,24 +25,30 @@ public class LiveStreamController {
 
     // ── Create a new stream session ──────────────────────────────────────
     @PostMapping("/create")
-    public ResponseEntity<LiveStreamDTO> createStream(
-            @RequestParam String userId,
-            @RequestParam(required = false) String streamerName,
-            @RequestParam(required = false) String streamerAvatar,
-            @RequestParam String title,
-            @RequestParam(required = false) String description
-    ) {
+    public ResponseEntity<LiveStreamDTO> createStream(@RequestBody CreateStreamRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(liveStreamService.createStream(userId, streamerName, streamerAvatar, title, description));
+                .body(liveStreamService.createStream(req.getUserId(), req.getStreamerName(),
+                        req.getStreamerAvatar(), req.getTitle(), req.getDescription(),
+                        req.getRequiresApproval(), req.getThumbnailUrl()));
     }
 
-    // ── Get all active (LIVE) streams ──────────────────────────────────────
+    // ── Get LiveKit token for joining ────────────────────────────────────
+    @GetMapping("/token")
+    public ResponseEntity<LiveStreamDTO> getToken(
+            @RequestParam String roomName,
+            @RequestParam String userId,
+            @RequestParam(required = false, defaultValue = "User") String userName
+    ) {
+        return ResponseEntity.ok(liveStreamService.getToken(roomName, userId, userName));
+    }
+
+    // ── Get all active (LIVE) streams ────────────────────────────────────
     @GetMapping("/active")
     public ResponseEntity<List<LiveStreamDTO>> getActiveStreams() {
         return ResponseEntity.ok(liveStreamService.getActiveStreams());
     }
 
-    // ── Get stream by ID ──────────────────────────────────────────────────
+    // ── Get stream by ID ─────────────────────────────────────────────────
     @GetMapping("/{id}")
     public ResponseEntity<LiveStreamDTO> getStreamById(
             @PathVariable String id,
@@ -45,7 +57,7 @@ public class LiveStreamController {
         return ResponseEntity.ok(liveStreamService.getStreamById(id, userId));
     }
 
-    // ── Get my active/pending stream ──────────────────────────────────────
+    // ── Get my active/pending stream ─────────────────────────────────────
     @GetMapping("/my/{userId}")
     public ResponseEntity<LiveStreamDTO> getMyActiveStream(@PathVariable String userId) {
         LiveStreamDTO stream = liveStreamService.getMyActiveStream(userId);
@@ -55,13 +67,13 @@ public class LiveStreamController {
         return ResponseEntity.ok(stream);
     }
 
-    // ── Get all my streams (history) ──────────────────────────────────────
+    // ── Get all my streams (history) ─────────────────────────────────────
     @GetMapping("/my/{userId}/history")
     public ResponseEntity<List<LiveStreamDTO>> getMyStreams(@PathVariable String userId) {
         return ResponseEntity.ok(liveStreamService.getMyStreams(userId));
     }
 
-    // ── End a stream ──────────────────────────────────────────────────────
+    // ── End a stream ─────────────────────────────────────────────────────
     @PostMapping("/{id}/end")
     public ResponseEntity<LiveStreamDTO> endStream(
             @PathVariable String id,
@@ -70,7 +82,7 @@ public class LiveStreamController {
         return ResponseEntity.ok(liveStreamService.endStream(id, userId));
     }
 
-    // ── Viewer joins a stream ──────────────────────────────────────────────
+    // ── Viewer joins a stream ────────────────────────────────────────────
     @PostMapping("/{id}/join")
     public ResponseEntity<LiveStreamDTO> joinStream(
             @PathVariable String id,
@@ -79,7 +91,7 @@ public class LiveStreamController {
         return ResponseEntity.ok(liveStreamService.joinStream(id, userId));
     }
 
-    // ── Viewer leaves a stream ──────────────────────────────────────────────
+    // ── Viewer leaves a stream ───────────────────────────────────────────
     @PostMapping("/{id}/leave")
     public ResponseEntity<LiveStreamDTO> leaveStream(
             @PathVariable String id,
@@ -89,25 +101,42 @@ public class LiveStreamController {
         return result != null ? ResponseEntity.ok(result) : ResponseEntity.noContent().build();
     }
 
-    // ── RTMP Server Webhooks (internal, called by Node Media Server) ──────
-
-    @PostMapping("/hook/start")
-    public ResponseEntity<Void> hookStreamStart(@RequestBody Map<String, String> body) {
-        String streamKey = body.get("streamKey");
-        if (streamKey == null || streamKey.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        liveStreamService.onStreamStartHook(streamKey);
-        return ResponseEntity.ok().build();
+    @PatchMapping("/{id}/settings")
+    public ResponseEntity<LiveStreamDTO> updateSettings(
+            @PathVariable String id,
+            @RequestBody LiveStreamSettingsRequest body
+    ) {
+        return ResponseEntity.ok(liveStreamService.updateSettings(id, body.getHostUserId(), body.isRequiresApproval()));
     }
 
-    @PostMapping("/hook/end")
-    public ResponseEntity<Void> hookStreamEnd(@RequestBody Map<String, String> body) {
-        String streamKey = body.get("streamKey");
-        if (streamKey == null || streamKey.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        liveStreamService.onStreamEndHook(streamKey);
+    @PostMapping("/{id}/approve-viewer")
+    public ResponseEntity<LiveStreamDTO> approveViewer(
+            @PathVariable String id,
+            @RequestBody LiveStreamApproveRequest body
+    ) {
+        return ResponseEntity.ok(liveStreamService.approveViewer(id, body));
+    }
+
+    @PostMapping("/{id}/kick")
+    public ResponseEntity<LiveStreamDTO> kickViewer(
+            @PathVariable String id,
+            @RequestBody LiveStreamKickRequest body
+    ) {
+        return ResponseEntity.ok(liveStreamService.kickViewer(id, body));
+    }
+
+    @PostMapping("/{id}/thumbnail")
+    public ResponseEntity<LiveStreamDTO> uploadThumbnail(
+            @PathVariable String id,
+            @RequestParam String userId,
+            @RequestParam("file") MultipartFile file
+    ) throws IOException {
+        return ResponseEntity.ok(liveStreamService.uploadThumbnail(id, userId, file));
+    }
+
+    @PostMapping("/{id}/chat")
+    public ResponseEntity<Void> sendLiveChat(@PathVariable String id, @RequestBody LiveChatRequest body) {
+        liveStreamService.broadcastLiveChat(id, body.getUserId(), body.getUserName(), body.getContent());
         return ResponseEntity.ok().build();
     }
 }

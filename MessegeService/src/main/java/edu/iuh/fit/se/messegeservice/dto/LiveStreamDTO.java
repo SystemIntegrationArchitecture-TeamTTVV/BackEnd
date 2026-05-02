@@ -18,18 +18,30 @@ public class LiveStreamDTO {
     private String title;
     private String description;
 
-    /** Only returned to the stream owner, null for others */
-    private String streamKey;
-
-    /** RTMP URL for OBS — only returned to the stream owner */
-    private String rtmpUrl;
-
+    private String roomName;
     private String status;
-    private String hlsUrl;
     private String thumbnailUrl;
     private int viewerCount;
     private List<String> viewerIds;
     private String chatConversationId;
+
+    private boolean requiresApproval;
+
+    /** Chỉ host mới nhận danh sách khi gọi getStreamById với userId = streamer */
+    private List<String> approvedViewerIds;
+
+    /** Trả về kèm token: host hay viewer */
+    private Boolean isHost;
+    /** false = chờ duyệt (waiting room), chỉ có sau getToken */
+    private Boolean canSubscribe;
+    /** APPROVED | WAITING — gợi ý UI trước/sau token */
+    private String joinStatus;
+
+    /** LiveKit connection token — only returned when joining */
+    private String livekitToken;
+    /** LiveKit server URL — only returned when joining */
+    private String livekitUrl;
+
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private LocalDateTime createdAt;

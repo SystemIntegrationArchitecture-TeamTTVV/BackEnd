@@ -80,4 +80,9 @@ public final class SocketEventTypes {
     public static final String LIVE_STARTED = "LIVE_STARTED";
     public static final String LIVE_ENDED = "LIVE_ENDED";
     public static final String LIVE_VIEWER_COUNT = "LIVE_VIEWER_COUNT";
+    public static final String LIVE_GIFT_RECEIVED = "LIVE_GIFT_RECEIVED";
+    public static final String LIVE_CHAT = "LIVE_CHAT";
+    public static final String COIN_DEPOSITED = "COIN_DEPOSITED";
+    public static final String LIVE_VIEWER_APPROVED = "LIVE_VIEWER_APPROVED";
+    public static final String LIVE_KICKED = "LIVE_KICKED";
 }

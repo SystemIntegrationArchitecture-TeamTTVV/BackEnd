@@ -5,6 +5,8 @@ import edu.iuh.fit.se.authservice.dto.AuthResponseDTO;
 import edu.iuh.fit.se.authservice.dto.ForgotPasswordRequestDTO;
 import edu.iuh.fit.se.authservice.dto.ResetPasswordRequestDTO;
 import edu.iuh.fit.se.authservice.dto.UserDTO;
+import edu.iuh.fit.se.authservice.dto.VerifyOtpRequestDTO;
+import edu.iuh.fit.se.authservice.dto.VerifyOtpResponseDTO;
 import edu.iuh.fit.se.authservice.service.AuthenticationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -77,8 +79,21 @@ public class AuthController {
             // Do not reveal whether email exists
         }
         return ResponseEntity.ok(Map.of(
-                "message", "If an account exists with this email, you will receive password reset instructions."
+                "message", "Nếu email tồn tại, mã xác minh đã được gửi đến hộp thư của bạn."
         ));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtpRequestDTO request) {
+        try {
+            VerifyOtpResponseDTO response = authenticationService.verifyOtp(request.getEmail(), request.getOtp());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "Xác minh thất bại",
+                    "message", e.getMessage() != null ? e.getMessage() : "Mã xác minh không hợp lệ"
+            ));
+        }
     }
 
     @PostMapping("/reset-password")
