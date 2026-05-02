@@ -16,7 +16,7 @@ public interface LiveStreamRepository extends MongoRepository<LiveStream, String
 
     List<LiveStream> findByStreamerIdAndStatusIn(String streamerId, List<String> statuses);
 
-    Optional<LiveStream> findByStreamKey(String streamKey);
+    Optional<LiveStream> findByRoomName(String roomName);
 
     List<LiveStream> findByStreamerIdOrderByCreatedAtDesc(String streamerId);
 }

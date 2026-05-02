@@ -3,10 +3,13 @@ package edu.iuh.fit.se.authservice.service;
 import edu.iuh.fit.se.authservice.dto.AuthRequestDTO;
 import edu.iuh.fit.se.authservice.dto.AuthResponseDTO;
 import edu.iuh.fit.se.authservice.dto.UserDTO;
+import edu.iuh.fit.se.authservice.dto.VerifyOtpResponseDTO;
+import edu.iuh.fit.se.authservice.entity.OtpEntity;
 import edu.iuh.fit.se.authservice.entity.PasswordResetTokenEntity;
 import edu.iuh.fit.se.authservice.entity.RoleEntity;
 import edu.iuh.fit.se.authservice.entity.UserEntity;
 import edu.iuh.fit.se.authservice.event.UserRegisteredEvent;
+import edu.iuh.fit.se.authservice.repository.OtpRepository;
 import edu.iuh.fit.se.authservice.repository.PasswordResetTokenRepository;
 import edu.iuh.fit.se.authservice.repository.RoleRepository;
 import edu.iuh.fit.se.authservice.repository.UserRepository;
@@ -21,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -35,9 +39,12 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final OtpRepository otpRepository;
     private final EmailService emailService;
     private final TokenStoreService tokenStoreService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Value("${app.kafka.enabled:false}")
     private boolean kafkaEnabled;
@@ -134,23 +141,60 @@ public class AuthenticationService {
         UserEntity user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User with this email not found"));
 
-        passwordResetTokenRepository.deleteByUserId(user.getId());
+        // Xóa OTP cũ, tạo OTP 6 chữ số mới
+        otpRepository.deleteByEmail(email);
 
-        String token = UUID.randomUUID().toString();
-        PasswordResetTokenEntity resetToken = PasswordResetTokenEntity.builder()
-                .userId(user.getId())
-                .token(token)
-                .expiryDate(LocalDateTime.now().plusHours(1))
+        String otp = String.format("%06d", RANDOM.nextInt(1_000_000));
+        OtpEntity otpEntity = OtpEntity.builder()
+                .email(email)
+                .code(otp)
+                .expiryDate(LocalDateTime.now().plusMinutes(15))
                 .used(false)
                 .createdAt(LocalDateTime.now())
                 .build();
-        passwordResetTokenRepository.save(resetToken);
+        otpRepository.save(otpEntity);
 
-        emailService.sendPasswordResetEmail(
-                user.getEmail(),
-                token,
+        emailService.sendOtpEmail(
+                email,
+                otp,
                 user.getFullName() != null ? user.getFullName() : user.getUsername()
         );
+    }
+
+    @Transactional
+    public VerifyOtpResponseDTO verifyOtp(String email, String otp) {
+        OtpEntity otpEntity = otpRepository.findByEmailAndCode(email, otp)
+                .orElseThrow(() -> new RuntimeException("Mã xác minh không hợp lệ"));
+
+        if (Boolean.TRUE.equals(otpEntity.getUsed())) {
+            throw new RuntimeException("Mã xác minh đã được sử dụng");
+        }
+
+        if (otpEntity.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Mã xác minh đã hết hạn. Vui lòng yêu cầu mã mới");
+        }
+
+        // Đánh dấu OTP đã dùng
+        otpEntity.setUsed(true);
+        otpRepository.save(otpEntity);
+
+        // Tìm user và tạo reset token
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
+
+        passwordResetTokenRepository.deleteByUserId(user.getId());
+
+        String resetToken = UUID.randomUUID().toString();
+        PasswordResetTokenEntity resetTokenEntity = PasswordResetTokenEntity.builder()
+                .userId(user.getId())
+                .token(resetToken)
+                .expiryDate(LocalDateTime.now().plusMinutes(30))
+                .used(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        passwordResetTokenRepository.save(resetTokenEntity);
+
+        return new VerifyOtpResponseDTO(resetToken, "Xác minh thành công");
     }
 
     @Transactional

@@ -140,6 +140,13 @@
             <version>0.12.3</version>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- LiveKit server API (rooms / participants) -->
+        <dependency>
+            <groupId>io.livekit</groupId>
+            <artifactId>livekit-server</artifactId>
+            <version>0.12.1</version>
+        </dependency>
         
         <!-- Method Security - AOP is already included in spring-boot-starter-security -->
         
