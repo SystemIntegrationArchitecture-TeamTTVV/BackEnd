@@ -24,6 +24,8 @@ public class GroupDTO {
     private int postCount;
     private List<String> tags;
     private String category;
+    private String linkedConversationId;
+    private List<String> joinQuestions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private boolean isActive;

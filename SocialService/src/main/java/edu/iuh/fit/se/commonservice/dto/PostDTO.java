@@ -31,5 +31,6 @@ public class PostDTO {
     private String pageId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private boolean isPinned;
 }
 

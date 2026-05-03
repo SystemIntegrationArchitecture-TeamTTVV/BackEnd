@@ -33,6 +33,8 @@ public class Group {
     
     private List<String> tags; // Thẻ tag
     private String category; // Danh mục nhóm
+    private String linkedConversationId; // ID of the linked Messenger group chat
+    private List<String> joinQuestions; // Questions for joining private group
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

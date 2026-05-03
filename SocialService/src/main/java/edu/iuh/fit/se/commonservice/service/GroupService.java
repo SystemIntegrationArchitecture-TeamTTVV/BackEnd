@@ -87,6 +87,12 @@ public class GroupService {
         group.setDescription(groupDTO.getDescription());
         group.setCoverPhoto(groupDTO.getCoverPhoto());
         group.setAvatar(groupDTO.getAvatar());
+        if (groupDTO.getLinkedConversationId() != null) {
+            group.setLinkedConversationId(groupDTO.getLinkedConversationId());
+        }
+        if (groupDTO.getJoinQuestions() != null) {
+            group.setJoinQuestions(groupDTO.getJoinQuestions());
+        }
         group.setUpdatedAt(LocalDateTime.now());
 
         Group updated = groupRepository.save(group);
@@ -126,6 +132,8 @@ public class GroupService {
         dto.setPostCount(group.getPostCount());
         dto.setTags(group.getTags());
         dto.setCategory(group.getCategory());
+        dto.setLinkedConversationId(group.getLinkedConversationId());
+        dto.setJoinQuestions(group.getJoinQuestions());
         dto.setCreatedAt(group.getCreatedAt());
         dto.setUpdatedAt(group.getUpdatedAt());
         dto.setActive(group.isActive());
@@ -145,6 +153,8 @@ public class GroupService {
         group.setVisibility(dto.getVisibility() != null ? dto.getVisibility() : "VISIBLE");
         group.setTags(dto.getTags());
         group.setCategory(dto.getCategory());
+        group.setLinkedConversationId(dto.getLinkedConversationId());
+        group.setJoinQuestions(dto.getJoinQuestions());
         return group;
     }
     public void addMembers(String groupId, List<String> userIds) {
@@ -264,7 +274,7 @@ public class GroupService {
                 .existsByGroupIdAndUserIdAndStatus(groupId, userId, "ACTIVE");
 
     }
-    public void joinGroup(String groupId, String userId) {
+    public void joinGroup(String groupId, String userId, java.util.List<String> answers) {
 
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
@@ -296,6 +306,10 @@ public class GroupService {
             }
 
             member.setStatus(newStatus);
+            if (answers != null && !answers.isEmpty()) {
+                member.setJoinAnswers(answers);
+            }
+            
             if ("ACTIVE".equals(newStatus)) {
                 member.setJoinedAt(LocalDateTime.now());
             }
@@ -314,6 +328,9 @@ public class GroupService {
 
             member.setRole("MEMBER");
             member.setStatus(newStatus);
+            if (answers != null && !answers.isEmpty()) {
+                member.setJoinAnswers(answers);
+            }
 
             member.setJoinedAt(LocalDateTime.now());
             member.setUpdatedAt(LocalDateTime.now());
