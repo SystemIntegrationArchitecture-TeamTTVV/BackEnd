@@ -84,9 +84,10 @@ public class GroupController {
     @PostMapping("/{groupId}/join/{userId}")
     public ResponseEntity<Void> joinGroup(
             @PathVariable String groupId,
-            @PathVariable String userId) {
+            @PathVariable String userId,
+            @RequestBody(required = false) java.util.List<String> answers) {
 
-        groupService.joinGroup(groupId, userId);
+        groupService.joinGroup(groupId, userId, answers);
 
         return ResponseEntity.ok().build();
     }
@@ -133,7 +134,7 @@ public class GroupController {
         String status = groupService.getUserStatus(groupId, userId);
         return ResponseEntity.ok(status);
     }
-    public record PendingMemberDTO(String userId, String fullName, String avatar, String status) {}
+    public record PendingMemberDTO(String userId, String fullName, String avatar, String status, java.util.List<String> joinAnswers) {}
     @GetMapping("/{groupId}/pending-members")
     public ResponseEntity<List<PendingMemberDTO>> getPendingMembers(@PathVariable String groupId) {
         List<edu.iuh.fit.se.commonservice.model.GroupMember> pending = groupService.getPendingMembers(groupId);
@@ -158,7 +159,8 @@ public class GroupController {
                         m.getUserId(),
                         u != null ? (u.getFullName() != null ? u.getFullName() : u.getUsername()) : "Unknown",
                         u != null ? u.getAvatar() : "",
-                        m.getStatus()
+                        m.getStatus(),
+                        m.getJoinAnswers()
                     );
                 })
                 .toList();

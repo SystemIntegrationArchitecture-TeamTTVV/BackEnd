@@ -47,4 +47,5 @@ public class Post {
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
     private boolean isDeleted = false;
+    private boolean isPinned = false;
 }

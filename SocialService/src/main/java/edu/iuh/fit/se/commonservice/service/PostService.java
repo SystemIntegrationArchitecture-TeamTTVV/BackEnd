@@ -314,6 +314,7 @@ public class PostService {
         post.setVisibility(normalizeVisibility(dto.getVisibility()));
         post.setAllowComments(dto.getAllowComments() == null ? Boolean.TRUE : dto.getAllowComments());
         post.setAllowSharing(dto.getAllowSharing() == null ? Boolean.TRUE : dto.getAllowSharing());
+        post.setGroupId(dto.getGroupId());
         return post;
     }
 

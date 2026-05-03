@@ -28,6 +28,8 @@ public class GroupMember {
     private String role = "MEMBER"; // MEMBER, ADMIN, MODERATOR
     private String status = "ACTIVE"; // ACTIVE, PENDING, BANNED, REJECT
     
+    private java.util.List<String> joinAnswers; // User's answers to group join questions
+    
     private LocalDateTime joinedAt;
     private LocalDateTime updatedAt;
 }

@@ -65,4 +65,13 @@ public class PostGroupController {
         postService.deletePost(postId);
         return ResponseEntity.ok().build();
     }
+    
+    // ================= PIN =================
+
+    @PostMapping("/{postId}/pin")
+    public ResponseEntity<PostDTO> togglePinPost(
+            @PathVariable String postId
+    ) {
+        return ResponseEntity.ok(postService.togglePinPost(postId));
+    }
 }

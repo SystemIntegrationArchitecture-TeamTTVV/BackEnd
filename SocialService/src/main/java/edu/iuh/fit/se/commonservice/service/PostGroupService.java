@@ -39,7 +39,11 @@ public class PostGroupService {
         return postRepository
                 .findByGroupIdAndNotDeleted(groupId)
                 .stream()
-                .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // newest first
+                .sorted((p1, p2) -> {
+                    if (p1.isPinned() && !p2.isPinned()) return -1;
+                    if (!p1.isPinned() && p2.isPinned()) return 1;
+                    return p2.getCreatedAt().compareTo(p1.getCreatedAt()); // newest first
+                })
                 .map(post -> toDTOForViewer(post, viewerId))
                 .collect(Collectors.toList());
     }
@@ -170,6 +174,18 @@ public class PostGroupService {
 
         postRepository.save(post);
     }
+    
+    // ================= PIN =================
+
+    public PostDTO togglePinPost(String id) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+        
+        post.setPinned(!post.isPinned());
+        post.setUpdatedAt(LocalDateTime.now());
+        
+        return toDTO(postRepository.save(post));
+    }
 
     // ================= MAPPER =================
 
@@ -209,6 +225,7 @@ public class PostGroupService {
 
         dto.setCreatedAt(post.getCreatedAt());
         dto.setUpdatedAt(post.getUpdatedAt());
+        dto.setPinned(post.isPinned());
 
         return dto;
     }
