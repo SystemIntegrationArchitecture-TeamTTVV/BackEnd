@@ -44,6 +44,8 @@ public class UserMapper {
         dto.setAllowMessageFrom(user.getAllowMessageFrom());
         dto.setAllowCallFrom(user.getAllowCallFrom());
         dto.setAllowGroupInviteFrom(user.getAllowGroupInviteFrom());
+        dto.setStatusText(user.getStatusText());
+        dto.setStatusEmoji(user.getStatusEmoji());
         return dto;
     }
 }

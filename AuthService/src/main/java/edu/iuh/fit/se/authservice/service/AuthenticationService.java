@@ -23,7 +23,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -42,6 +45,7 @@ public class AuthenticationService {
     private final OtpRepository otpRepository;
     private final EmailService emailService;
     private final TokenStoreService tokenStoreService;
+    private final DeviceSessionService deviceSessionService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -63,6 +67,13 @@ public class AuthenticationService {
             String refreshToken = UUID.randomUUID().toString();
 
             tokenStoreService.storeTokens(accessToken, refreshToken, user.getId());
+                deviceSessionService.onLogin(
+                    user.getId(),
+                    user.getUsername(),
+                    refreshToken,
+                    currentUserAgent(),
+                    currentIpAddress()
+                );
 
             return new AuthResponseDTO(
                     accessToken,
@@ -124,6 +135,13 @@ public class AuthenticationService {
         String refreshToken = UUID.randomUUID().toString();
 
         tokenStoreService.storeTokens(accessToken, refreshToken, saved.getId());
+        deviceSessionService.onRegister(
+            saved.getId(),
+            saved.getUsername(),
+            refreshToken,
+            currentUserAgent(),
+            currentIpAddress()
+        );
 
         return new AuthResponseDTO(
                 accessToken,
@@ -237,6 +255,12 @@ public class AuthenticationService {
 
         tokenStoreService.storeTokens(newAccessToken, newRefreshToken, user.getId());
         tokenStoreService.deleteRefreshToken(refreshToken);
+        deviceSessionService.onRefresh(
+            refreshToken,
+            newRefreshToken,
+            currentUserAgent(),
+            currentIpAddress()
+        );
 
         return new AuthResponseDTO(
                 newAccessToken,
@@ -250,6 +274,38 @@ public class AuthenticationService {
     }
 
     public void logout(String refreshToken) {
+        deviceSessionService.onLogout(refreshToken);
         tokenStoreService.deleteRefreshToken(refreshToken);
+    }
+
+    private String currentUserAgent() {
+        HttpServletRequest request = currentRequest();
+        if (request == null) {
+            return null;
+        }
+        return request.getHeader("User-Agent");
+    }
+
+    private String currentIpAddress() {
+        HttpServletRequest request = currentRequest();
+        if (request == null) {
+            return null;
+        }
+
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            String[] parts = forwarded.split(",");
+            return parts[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private HttpServletRequest currentRequest() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            return attrs != null ? attrs.getRequest() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }
