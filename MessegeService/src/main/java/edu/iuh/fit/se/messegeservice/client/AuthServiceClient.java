@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Map;
@@ -24,4 +25,16 @@ public interface AuthServiceClient {
 
     @GetMapping("/api/users/metrics/summary")
     Map<String, Object> userMetricsSummary();
+
+    @GetMapping("/api/users/privacy/can-message")
+    Map<String, Object> canMessageByBlock(@RequestParam("senderId") String senderId,
+                                          @RequestParam("receiverId") String receiverId);
+
+    @GetMapping("/api/users/privacy/can-call")
+    Map<String, Object> canCallByBlock(@RequestParam("callerId") String callerId,
+                                       @RequestParam("receiverId") String receiverId);
+
+    @GetMapping("/api/users/privacy/can-invite-group")
+    Map<String, Object> canInviteGroupByBlock(@RequestParam("inviterId") String inviterId,
+                                               @RequestParam("targetUserId") String targetUserId);
 }
