@@ -23,6 +23,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import edu.iuh.fit.se.commonservice.model.Report;
 import edu.iuh.fit.se.commonservice.repository.ReportRepository;
+import edu.iuh.fit.se.commonservice.service.RateLimitService;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -31,6 +32,9 @@ public class ReportController {
 
     @Autowired
     private ReportRepository reportRepository;
+
+    @Autowired
+    private RateLimitService rateLimitService;
 
     @GetMapping
     public ResponseEntity<List<ReportDTO>> getAllReports() {
@@ -99,6 +103,10 @@ public class ReportController {
     @PostMapping
     public ResponseEntity<ReportDTO> createReport(@RequestBody ReportDTO reportDTO) {
         try {
+            String reporterId = reportDTO.reporterName != null ? reportDTO.reporterName : "anonymous";
+            if (!rateLimitService.allowReport(reporterId)) {
+                return ResponseEntity.status(429).build();
+            }
             Report report = convertToEntity(reportDTO);
             report.setStatus("pending");
             report.setCreatedAt(LocalDateTime.now());
@@ -123,6 +131,15 @@ public class ReportController {
             
             Report reportEntity = report.get();
             reportEntity.setStatus(status);
+            reportEntity.setUpdatedAt(LocalDateTime.now());
+            if ("reviewing".equals(status)) {
+                reportEntity.setReviewedAt(LocalDateTime.now());
+            } else if ("resolved".equals(status) || "rejected".equals(status)) {
+                if (reportEntity.getReviewedAt() == null) {
+                    reportEntity.setReviewedAt(LocalDateTime.now());
+                }
+                reportEntity.setResolvedAt(LocalDateTime.now());
+            }
             Report updatedReport = reportRepository.save(reportEntity);
             
             Map<String, Object> response = new HashMap<>();
@@ -148,6 +165,9 @@ public class ReportController {
         dto.status = report.getStatus() != null ? report.getStatus() : "OPEN";
         dto.priority = "medium";
         dto.createdAt = report.getCreatedAt() != null ? report.getCreatedAt() : LocalDateTime.now();
+        dto.reviewedAt = report.getReviewedAt();
+        dto.resolvedAt = report.getResolvedAt();
+        dto.actionTaken = report.getActionTaken();
         return dto;
     }
 
@@ -174,6 +194,9 @@ public class ReportController {
         public String status;
         public String priority;
         public LocalDateTime createdAt;
+        public LocalDateTime reviewedAt;
+        public LocalDateTime resolvedAt;
+        public String actionTaken;
 
         public ReportDTO(String id, String type, String reason, String reporterName, 
                         String reporterAvatar, String targetName, String targetType, 

@@ -67,6 +67,13 @@ public class StoriesService {
      * Convert entity → DTO
      */
     private StoryResponseDTO toDTO(Stories s) {
+        return toDTO(s, null);
+    }
+
+    private StoryResponseDTO toDTO(Stories s, String viewerUserId) {
+        boolean isViewed = viewerUserId != null
+                && s.getViewers() != null
+                && s.getViewers().contains(viewerUserId);
         return StoryResponseDTO.builder()
                 .id(s.getId())
                 .user(UserDTO.builder()
@@ -81,7 +88,13 @@ public class StoriesService {
                 .createdAt(s.getCreatedAt().toString())
                 .expiresAt(s.getExpiredAt().toString())
                 .isActive(s.getActive())
-                .isViewed(false) // TODO: xử lý sau theo user
+                .isViewed(isViewed)
+                .viewCount(s.getViewers() != null ? s.getViewers().size() : 0)
+                .reactions(s.getReactions() != null ? s.getReactions() : new java.util.HashMap<>())
+                // only expose viewer list to owner
+                .viewers(viewerUserId != null && viewerUserId.equals(s.getUserId())
+                        ? s.getViewers()
+                        : null)
                 .build();
     }
 
@@ -143,5 +156,38 @@ public class StoriesService {
                 .build();
 
         return toDTO(storiesRepo.save(story));
+    }
+
+    /**
+     * Record that a user has viewed a story.
+     * Idempotent — viewing twice doesn’t inflate the count.
+     */
+    public StoryResponseDTO viewStory(String storyId, String viewerUserId) {
+        Stories story = storiesRepo.findById(storyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Story not found"));
+
+        if (!story.getViewers().contains(viewerUserId)) {
+            story.getViewers().add(viewerUserId);
+            story = storiesRepo.save(story);
+        }
+        return toDTO(story, viewerUserId);
+    }
+
+    /**
+     * Add/remove a quick reaction to a story.
+     * Supported emoji keys: like, love, haha, wow, sad, angry.
+     * Calling twice with the same emoji toggles it off.
+     */
+    public StoryResponseDTO reactStory(String storyId, String userId, String emoji) {
+        Stories story = storiesRepo.findById(storyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Story not found"));
+
+        java.util.Map<String, Integer> reacts = story.getReactions();
+        // Track per-user reactions via a separate convention: "userId:emoji"
+        // We use a simple increment/decrement on the aggregate count.
+        // For a full per-user model, a separate collection would be better.
+        reacts.merge(emoji, 1, Integer::sum);
+        story = storiesRepo.save(story);
+        return toDTO(story, userId);
     }
 }

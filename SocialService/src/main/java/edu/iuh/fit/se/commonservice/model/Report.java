@@ -30,5 +30,7 @@ public class Report {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime reviewedAt;
+    private LocalDateTime resolvedAt;
 }
 

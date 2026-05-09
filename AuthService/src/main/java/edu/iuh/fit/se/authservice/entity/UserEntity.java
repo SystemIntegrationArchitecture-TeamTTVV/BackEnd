@@ -67,9 +67,11 @@ public class UserEntity {
     private String relationshipStatus;
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean active = true;
 
     @Column(name = "is_verified")
+    @Builder.Default
     private Boolean verified = false;
 
     @ManyToOne(fetch = FetchType.EAGER)
@@ -100,6 +102,23 @@ public class UserEntity {
     private String allowCallFrom = "EVERYONE";
     @Builder.Default
     private String allowGroupInviteFrom = "EVERYONE";
+
+    /** User-set status text (max 80 chars) */
+    @Column(length = 80)
+    private String statusText;
+
+    /** Emoji code for status, e.g. "😊" */
+    @Column(length = 8)
+    private String statusEmoji;
+
+    /** TOTP secret for 2FA (null = 2FA disabled) */
+    @Column(name = "totp_secret", length = 64)
+    private String totpSecret;
+
+    /** Whether 2FA is confirmed and active */
+    @Column(name = "totp_enabled", nullable = false, columnDefinition = "boolean not null default false")
+    @Builder.Default
+    private boolean totpEnabled = false;
 
     @PrePersist
     void prePersist() {

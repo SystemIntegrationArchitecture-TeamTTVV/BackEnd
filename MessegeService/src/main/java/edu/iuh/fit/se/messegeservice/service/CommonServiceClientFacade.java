@@ -10,6 +10,7 @@ import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,9 @@ public class CommonServiceClientFacade {
 
     private final CommonServiceClient commonServiceClient;
     private final AuthServiceClient authServiceClient;
+
+    @Value("${app.features.privacy-block-check.enabled:false}")
+    private boolean privacyBlockCheckEnabled;
 
     @Cacheable(value = "msg-user-cache", key = "#id", unless = "#result == null || #result.username == 'unknown'")
     @Bulkhead(name = "authService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "getUserByIdFallback")
@@ -118,6 +122,9 @@ public class CommonServiceClientFacade {
     @Retry(name = "commonService", fallbackMethod = "canMessageFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "canMessageFallback")
     public boolean canMessage(String senderId, String receiverId) {
+        if (!checkBlockPolicy("MESSAGE", senderId, receiverId)) {
+            return false;
+        }
         java.util.Map<String, Object> result = commonServiceClient.canMessage(senderId, receiverId);
         return Boolean.TRUE.equals(result.get("allowed"));
     }
@@ -133,6 +140,9 @@ public class CommonServiceClientFacade {
     @Retry(name = "commonService", fallbackMethod = "canCallFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "canCallFallback")
     public boolean canCall(String callerId, String receiverId) {
+        if (!checkBlockPolicy("CALL", callerId, receiverId)) {
+            return false;
+        }
         java.util.Map<String, Object> result = commonServiceClient.canCall(callerId, receiverId);
         return Boolean.TRUE.equals(result.get("allowed"));
     }
@@ -148,6 +158,9 @@ public class CommonServiceClientFacade {
     @Retry(name = "commonService", fallbackMethod = "canInviteGroupFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "canInviteGroupFallback")
     public boolean canInviteGroup(String inviterId, String targetUserId) {
+        if (!checkBlockPolicy("INVITE_GROUP", inviterId, targetUserId)) {
+            return false;
+        }
         java.util.Map<String, Object> result = commonServiceClient.canInviteGroup(inviterId, targetUserId);
         return Boolean.TRUE.equals(result.get("allowed"));
     }
@@ -156,6 +169,32 @@ public class CommonServiceClientFacade {
     private boolean canInviteGroupFallback(String inviterId, String targetUserId, Throwable throwable) {
         log.warn("⚠️ [Privacy] canInviteGroup fallback for {}→{}: {}", inviterId, targetUserId, throwable.getMessage());
         return true;
+    }
+
+    private boolean checkBlockPolicy(String action, String actorId, String targetId) {
+        if (!privacyBlockCheckEnabled || actorId == null || targetId == null || actorId.equals(targetId)) {
+            return true;
+        }
+
+        try {
+            java.util.Map<String, Object> result;
+            switch (action) {
+                case "CALL" -> result = authServiceClient.canCallByBlock(actorId, targetId);
+                case "INVITE_GROUP" -> result = authServiceClient.canInviteGroupByBlock(actorId, targetId);
+                default -> result = authServiceClient.canMessageByBlock(actorId, targetId);
+            }
+
+            boolean allowed = Boolean.TRUE.equals(result.get("allowed"));
+            if (!allowed) {
+                Object reason = result.get("reason");
+                log.info("🚫 [Privacy-Block] {} blocked for {}→{}: {}", action, actorId, targetId, reason);
+            }
+            return allowed;
+        } catch (Exception e) {
+            // Keep legacy behavior if block pre-check service is unavailable.
+            log.warn("⚠️ [Privacy-Block] pre-check fallback for {} {}→{}: {}", action, actorId, targetId, e.getMessage());
+            return true;
+        }
     }
 }
 

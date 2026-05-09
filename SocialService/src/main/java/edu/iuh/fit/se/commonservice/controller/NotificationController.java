@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -29,6 +30,29 @@ public class NotificationController {
     @GetMapping("/recipient/{recipientId}/unread/count")
     public ResponseEntity<Long> getUnreadNotificationCount(@PathVariable String recipientId) {
         return ResponseEntity.ok(notificationService.getUnreadNotificationCount(recipientId));
+    }
+
+    /**
+     * Filter notifications by one or more comma-separated types, e.g.:
+     * GET /recipient/{id}/filter?type=FRIEND_REQUEST,FRIEND_ACCEPTED
+     * GET /recipient/{id}/filter?type=LIKE_POST
+     * Omit ?type to return all.
+     */
+    @GetMapping("/recipient/{recipientId}/filter")
+    public ResponseEntity<List<NotificationDTO>> getNotificationsByType(
+            @PathVariable String recipientId,
+            @RequestParam(required = false) String type) {
+        if (type == null || type.isBlank()) {
+            return ResponseEntity.ok(notificationService.getNotificationsByRecipientId(recipientId));
+        }
+        List<String> types = Arrays.stream(type.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        if (types.size() == 1) {
+            return ResponseEntity.ok(notificationService.getNotificationsByRecipientIdAndType(recipientId, types.get(0)));
+        }
+        return ResponseEntity.ok(notificationService.getNotificationsByRecipientIdAndTypes(recipientId, types));
     }
 
     @GetMapping("/{id}")

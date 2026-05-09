@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/stories")
@@ -58,6 +59,29 @@ public class StoriesController {
                 .build();
 
         return storiesService.createStory(userId, userName, userAvatar, data, file);
+    }
+
+    /**
+     * Mark story as viewed by current user.
+     * POST /api/stories/{id}/view?userId={userId}
+     */
+    @PostMapping("/{id}/view")
+    public StoryResponseDTO viewStory(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        return storiesService.viewStory(id, userId);
+    }
+
+    /**
+     * Quick reaction to a story.
+     * POST /api/stories/{id}/react?userId={userId}&emoji=like
+     */
+    @PostMapping("/{id}/react")
+    public StoryResponseDTO reactStory(
+            @PathVariable String id,
+            @RequestParam String userId,
+            @RequestParam String emoji) {
+        return storiesService.reactStory(id, userId, emoji);
     }
 
 }

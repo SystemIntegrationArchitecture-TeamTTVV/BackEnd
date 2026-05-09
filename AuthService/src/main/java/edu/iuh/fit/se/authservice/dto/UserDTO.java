@@ -44,4 +44,6 @@ public class UserDTO {
     private String allowMessageFrom;
     private String allowCallFrom;
     private String allowGroupInviteFrom;
+    private String statusText;
+    private String statusEmoji;
 }
