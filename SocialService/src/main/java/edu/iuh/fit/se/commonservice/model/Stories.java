@@ -7,6 +7,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Document(collection = "stories")
 @Data
@@ -46,4 +50,13 @@ public class Stories {
 
     // ===== Trạng thái =====
     private Boolean active;
+
+    // ===== Analytics =====
+    /** List of userId who viewed this story */
+    @Builder.Default
+    private List<String> viewers = new ArrayList<>();
+
+    /** Reaction counts: emoji -> count (e.g. "like" -> 3) */
+    @Builder.Default
+    private Map<String, Integer> reactions = new HashMap<>();
 }
