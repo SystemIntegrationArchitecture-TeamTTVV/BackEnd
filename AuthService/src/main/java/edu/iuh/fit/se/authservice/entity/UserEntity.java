@@ -67,9 +67,11 @@ public class UserEntity {
     private String relationshipStatus;
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean active = true;
 
     @Column(name = "is_verified")
+    @Builder.Default
     private Boolean verified = false;
 
     @ManyToOne(fetch = FetchType.EAGER)
@@ -114,7 +116,8 @@ public class UserEntity {
     private String totpSecret;
 
     /** Whether 2FA is confirmed and active */
-    @Column(name = "totp_enabled", nullable = false)
+    @Column(name = "totp_enabled", nullable = false, columnDefinition = "boolean not null default false")
+    @Builder.Default
     private boolean totpEnabled = false;
 
     @PrePersist

@@ -89,7 +89,7 @@
         <!-- TOTP / 2FA -->
         <dependency>
             <groupId>dev.samstevens.totp</groupId>
-            <artifactId>totp-spring-boot-starter</artifactId>
+            <artifactId>totp</artifactId>
             <version>1.7.1</version>
         </dependency>
     </dependencies>
