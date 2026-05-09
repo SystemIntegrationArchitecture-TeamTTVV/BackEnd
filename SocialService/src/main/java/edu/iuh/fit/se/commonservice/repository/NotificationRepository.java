@@ -4,6 +4,7 @@ import edu.iuh.fit.se.commonservice.model.Notification;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -16,5 +17,13 @@ public interface NotificationRepository extends MongoRepository<Notification, St
     void deleteByRelatedIdAndType(String relatedId, String type);
     List<Notification> findByRecipientIdAndRelatedIdAndType(String recipientId, String relatedId, String type);
     void deleteByRecipientIdAndRelatedIdAndType(String recipientId, String relatedId, String type);
+
+    // Filter by type
+    List<Notification> findByRecipientIdAndTypeOrderByCreatedAtDesc(String recipientId, String type);
+    List<Notification> findByRecipientIdAndTypeInOrderByCreatedAtDesc(String recipientId, List<String> types);
+
+    // Dedupe: check if exact same notification already exists in the recent window
+    boolean existsByRecipientIdAndActorIdAndTypeAndRelatedIdAndCreatedAtAfter(
+            String recipientId, String actorId, String type, String relatedId, LocalDateTime after);
 }
 

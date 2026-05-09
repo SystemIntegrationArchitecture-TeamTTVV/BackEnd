@@ -13,9 +13,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// Burst dedupe window: identical (recipient, actor, type, relatedId) within this many seconds
+// is silently dropped to prevent spam notifications.
+// Value must be kept short enough not to suppress legitimate repeated actions (e.g. 30 s).
+
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
+
+    private static final int DEDUPE_SECONDS = 30;
 
     private final NotificationRepository notificationRepository;
     private final AuthServiceClient authServiceClient;
@@ -43,7 +49,37 @@ public class NotificationService {
                 .orElseThrow(() -> new RuntimeException("Notification not found with id: " + id));
     }
 
+    public List<NotificationDTO> getNotificationsByRecipientIdAndType(String recipientId, String type) {
+        return notificationRepository.findByRecipientIdAndTypeOrderByCreatedAtDesc(recipientId, type).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<NotificationDTO> getNotificationsByRecipientIdAndTypes(String recipientId, List<String> types) {
+        return notificationRepository.findByRecipientIdAndTypeInOrderByCreatedAtDesc(recipientId, types).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public NotificationDTO createNotification(NotificationDTO notificationDTO) {
+        // Burst dedupe: drop identical notification within DEDUPE_SECONDS window
+        if (notificationDTO.getRecipientId() != null
+                && notificationDTO.getActorId() != null
+                && notificationDTO.getType() != null
+                && notificationDTO.getRelatedId() != null) {
+            LocalDateTime dedupeWindow = LocalDateTime.now().minusSeconds(DEDUPE_SECONDS);
+            boolean isDuplicate = notificationRepository.existsByRecipientIdAndActorIdAndTypeAndRelatedIdAndCreatedAtAfter(
+                    notificationDTO.getRecipientId(),
+                    notificationDTO.getActorId(),
+                    notificationDTO.getType(),
+                    notificationDTO.getRelatedId(),
+                    dedupeWindow);
+            if (isDuplicate) {
+                // Return a dummy DTO with no id so callers don't break; nothing is persisted
+                return notificationDTO;
+            }
+        }
+
         Notification notification = toEntity(notificationDTO);
         notification.setRead(false);
         notification.setCreatedAt(LocalDateTime.now());
