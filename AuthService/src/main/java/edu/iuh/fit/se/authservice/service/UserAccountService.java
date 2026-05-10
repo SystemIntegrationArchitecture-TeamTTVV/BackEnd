@@ -13,6 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -41,7 +44,7 @@ public class UserAccountService {
     public UserDTO getUserById(String id) {
         return userRepository.findById(id)
                 .map(userMapper::toDto)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id));
     }
 
     @Cacheable(value = "users", key = "'username:' + #username")
@@ -49,14 +52,14 @@ public class UserAccountService {
     public UserDTO getUserByUsername(String username) {
         return userRepository.findByUsername(username)
                 .map(userMapper::toDto)
-                .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with username: " + username));
     }
 
     @Transactional(readOnly = true)
     public UserDTO getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .map(userMapper::toDto)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with email: " + email));
     }
 
     @Transactional(readOnly = true)
