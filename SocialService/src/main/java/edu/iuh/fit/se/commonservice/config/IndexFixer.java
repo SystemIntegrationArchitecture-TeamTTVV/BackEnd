@@ -68,11 +68,10 @@ public class IndexFixer implements CommandLineRunner {
                 }
                 
                 // Kiểm tra nếu là index cần fix và không có sparse option
-                if (("user_post_idx".equals(indexName) || "user_comment_idx".equals(indexName)) 
-                    && !indexInfo.isSparse()) {
+                if (("user_post_idx".equals(indexName) || "user_comment_idx".equals(indexName))) {
                     try {
                         indexOps.dropIndex(indexName);
-                        logger.info("✅ Dropped old {} (missing sparse option)", indexName);
+                        logger.info("✅ Dropped old {} to fix unique constraints and sparse issues", indexName);
                     } catch (Exception e) {
                         logger.debug("Could not drop {}: {}", indexName, e.getMessage());
                     }
@@ -106,10 +105,8 @@ public class IndexFixer implements CommandLineRunner {
                         .sparse()
                         .named(indexName);
                 
-                // Only add unique constraint for user_post_idx
-                if ("user_post_idx".equals(indexName)) {
-                    index = index.unique();
-                }
+                // Removed unique constraint for user_post_idx because it breaks comment reactions (postId=null)
+                // The ReactionService already checks for existing reactions to prevent duplicates.
                 
                 String createdIndexName = indexOps.createIndex(index);
                 logger.info("✅ Created {} with sparse option: {}", indexName, createdIndexName);
