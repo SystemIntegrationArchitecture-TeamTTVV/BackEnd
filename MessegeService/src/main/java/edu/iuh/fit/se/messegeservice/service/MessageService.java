@@ -529,10 +529,9 @@ public class MessageService {
         if (conversation.isAiAssistantEnabled() && saved.getContent() != null && saved.getContent().contains("@ZalaBot")) {
             new Thread(() -> {
                 try {
-                    Thread.sleep(2000); // Simulate processing
                     createAndEmitSystemMessage(conversation, "ZalaBot", "AI_REPLY", 
                         "Chao ban! Toi la ZalaBot. Hien tai toi dang trong qua trinh nang cap, hay thu lai sau nhe!");
-                } catch (InterruptedException ignored) {}
+                } catch (Exception ignored) {}
             }).start();
         }
 
