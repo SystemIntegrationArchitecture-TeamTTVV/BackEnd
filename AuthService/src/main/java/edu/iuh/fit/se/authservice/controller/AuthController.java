@@ -8,9 +8,11 @@ import edu.iuh.fit.se.authservice.dto.UserDTO;
 import edu.iuh.fit.se.authservice.dto.VerifyOtpRequestDTO;
 import edu.iuh.fit.se.authservice.dto.VerifyOtpResponseDTO;
 import edu.iuh.fit.se.authservice.service.AuthenticationService;
+import edu.iuh.fit.se.authservice.service.RecaptchaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,9 +26,21 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthenticationService authenticationService;
+    private final RecaptchaService recaptchaService;
+
+    @GetMapping("/captcha/challenge")
+    public ResponseEntity<?> captchaChallenge() {
+        return ResponseEntity.ok(recaptchaService.generateChallenge());
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequestDTO request) {
+        if (!recaptchaService.verify(request.getCaptchaToken(), request.getCaptchaText())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "captcha_failed",
+                    "message", "Xác minh CAPTCHA không hợp lệ. Vui lòng thử lại."
+            ));
+        }
         try {
             return ResponseEntity.ok(authenticationService.login(request));
         } catch (RuntimeException e) {
@@ -63,10 +77,16 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, String>> logout(
+            @RequestBody Map<String, String> body,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authHeader) {
         String refreshToken = body.get("refreshToken");
+        String accessToken = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            accessToken = authHeader.substring(7);
+        }
         if (refreshToken != null && !refreshToken.isBlank()) {
-            authenticationService.logout(refreshToken);
+            authenticationService.logout(refreshToken, accessToken);
         }
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }

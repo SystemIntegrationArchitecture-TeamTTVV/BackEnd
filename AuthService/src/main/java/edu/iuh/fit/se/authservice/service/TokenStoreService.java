@@ -88,4 +88,11 @@ public class TokenStoreService {
         }
         stringRedisTemplate.delete(refreshKey(refreshToken));
     }
+
+    public void deleteAccessToken(String accessToken) {
+        if (accessToken == null || accessToken.isEmpty() || !tokenStoreEnabled) {
+            return;
+        }
+        stringRedisTemplate.delete(accessKey(accessToken));
+    }
 }
