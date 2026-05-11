@@ -39,6 +39,8 @@ public class Comment {
 
     private String parentCommentId;
 
+    private List<String> mentionedUserIds;
+
     private int likeCount = 0;
     private int replyCount = 0;
 

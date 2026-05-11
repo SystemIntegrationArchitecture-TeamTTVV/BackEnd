@@ -309,6 +309,13 @@ public class MessageService {
             log.error("❌ Failed to emit socket event for new message: {}", e.getMessage(), e);
             // Don't fail the entire operation if socket emit fails
         }
+
+        // Emit NOTIFICATION (MENTION) to users tagged in the message
+        try {
+            emitMentionNotifications(conversation, saved);
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to emit mention notifications: {}", e.getMessage());
+        }
         
         return savedDTO;
     }
@@ -1406,6 +1413,38 @@ public class MessageService {
                 }
             }
         });
+    }
+
+    private void emitMentionNotifications(Conversation conversation, Message saved) {
+        List<String> mentionIds = saved.getMentionUserIds();
+        if (mentionIds == null || mentionIds.isEmpty()) return;
+
+        String senderId = saved.getSenderId();
+        String senderName = saved.getSenderName() != null ? saved.getSenderName() : senderId;
+        String groupName = conversation.getGroupName() != null ? conversation.getGroupName() : "cuộc trò chuyện";
+        String rawContent = saved.getContent();
+        String preview = rawContent != null
+                ? (rawContent.length() > 80 ? rawContent.substring(0, 80) + "…" : rawContent)
+                : "[file đính kèm]";
+
+        Map<String, Object> notifPayload = new HashMap<>();
+        notifPayload.put("type", "MENTION");
+        notifPayload.put("actorId", senderId);
+        notifPayload.put("actorName", senderName);
+        notifPayload.put("content", senderName + " đã nhắc đến bạn trong " + groupName + ": " + preview);
+        notifPayload.put("relatedId", conversation.getId());
+        notifPayload.put("relatedType", "CONVERSATION");
+
+        SocketEventDTO mentionEvent = SocketEventDTO.of(SocketEventTypes.NOTIFICATION, null, notifPayload);
+
+        for (String mentionedUserId : mentionIds) {
+            if (mentionedUserId == null || mentionedUserId.equals(senderId)) continue;
+            try {
+                socketEmitterService.emitToUserById(mentionedUserId, mentionEvent);
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to emit MENTION notification to {}: {}", mentionedUserId, e.getMessage());
+            }
+        }
     }
 
     private Message createAndEmitSystemMessage(Conversation conversation, String actorUserId, String action, String content) {

@@ -20,6 +20,7 @@ public class CommentDTO {
     private String content;
     private List<String> images;
     private String parentCommentId;
+    private List<String> mentionedUserIds;
     private Integer likeCount;
     private Integer replyCount;
 

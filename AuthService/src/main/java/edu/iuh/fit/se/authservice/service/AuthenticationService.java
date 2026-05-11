@@ -273,9 +273,12 @@ public class AuthenticationService {
         );
     }
 
-    public void logout(String refreshToken) {
+    public void logout(String refreshToken, String accessToken) {
         deviceSessionService.onLogout(refreshToken);
         tokenStoreService.deleteRefreshToken(refreshToken);
+        if (accessToken != null && !accessToken.isBlank()) {
+            tokenStoreService.deleteAccessToken(accessToken);
+        }
     }
 
     private String currentUserAgent() {

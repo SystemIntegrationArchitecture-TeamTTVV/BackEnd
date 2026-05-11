@@ -219,11 +219,41 @@ public class WebSocketController {
     @MessageMapping("/webrtc/end")
     public void handleCallEnd(SocketEventDTO event) {
         log.info("Call ended: {}", event);
-        String recipientUsername = getUsernameById(event.getUserId());
-        if (recipientUsername != null) {
-            messagingTemplate.convertAndSendToUser(recipientUsername, "/queue/webrtc", event);
-        } else {
-            log.error("User not found for ID: {}", event.getUserId());
+        
+        try {
+            Map<String, Object> callData = (Map<String, Object>) event.getData();
+            Boolean isGroup = callData != null ? (Boolean) callData.get("isGroup") : null;
+            String conversationId = callData != null ? (String) callData.get("conversationId") : null;
+            
+            if (Boolean.TRUE.equals(isGroup) && conversationId != null) {
+                log.info("📞 Broadcasting group call end to conversation: {}", conversationId);
+                Map<String, Object> conversation = messageServiceClientFacade.getConversationById(conversationId);
+                if (conversation != null) {
+                    List<String> participantIds = (List<String>) conversation.get("participantIds");
+                    if (participantIds != null) {
+                        for (String participantId : participantIds) {
+                            String participantUsername = getUsernameById(participantId);
+                            if (participantUsername != null) {
+                                SocketEventDTO participantEvent = new SocketEventDTO();
+                                participantEvent.setType(event.getType());
+                                participantEvent.setUserId(participantId);
+                                participantEvent.setData(event.getData());
+                                participantEvent.setTimestamp(event.getTimestamp());
+                                messagingTemplate.convertAndSendToUser(participantUsername, "/queue/webrtc", participantEvent);
+                            }
+                        }
+                    }
+                }
+            } else {
+                String recipientUsername = getUsernameById(event.getUserId());
+                if (recipientUsername != null) {
+                    messagingTemplate.convertAndSendToUser(recipientUsername, "/queue/webrtc", event);
+                } else {
+                    log.error("User not found for ID: {}", event.getUserId());
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ Error handling call end: {}", e.getMessage(), e);
         }
     }
 
