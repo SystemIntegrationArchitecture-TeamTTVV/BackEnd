@@ -3,6 +3,7 @@ package edu.iuh.fit.se.commonservice.service;
 import edu.iuh.fit.se.commonservice.dto.story.CreateStoryRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.story.StoryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.story.UserDTO;
+import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.Stories;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
@@ -27,6 +28,7 @@ public class StoriesService {
     private final StoriesRepository storiesRepo;
     private final FriendRepository friendRepo;
     private final FileUploadService fileUploadService;
+    private final AuthServiceClient authServiceClient;
     /**
      * Lấy tất cả active stories chưa hết hạn
      */
@@ -74,12 +76,28 @@ public class StoriesService {
         boolean isViewed = viewerUserId != null
                 && s.getViewers() != null
                 && s.getViewers().contains(viewerUserId);
+
+        // Resolve avatar: nếu story không lưu avatar (blob/data bị sanitize ở FE),
+        // lấy avatar mới nhất từ AuthService theo userId.
+        String resolvedAvatar = s.getUserAvatar();
+        if (resolvedAvatar == null || resolvedAvatar.isBlank()) {
+            try {
+                edu.iuh.fit.se.commonservice.dto.UserDTO author =
+                        authServiceClient.getUserById(s.getUserId());
+                if (author != null && author.getAvatar() != null) {
+                    resolvedAvatar = author.getAvatar();
+                }
+            } catch (Exception ignored) {
+                // AuthService không phản hồi — giữ nguyên rỗng, FE dùng initials fallback
+            }
+        }
+
         return StoryResponseDTO.builder()
                 .id(s.getId())
-                .user(UserDTO.builder()
+                .user(edu.iuh.fit.se.commonservice.dto.story.UserDTO.builder()
                         .id(s.getUserId())
                         .name(s.getUserName())
-                        .avatar(s.getUserAvatar())
+                        .avatar(resolvedAvatar)
                         .build())
                 .contentType(s.getContentType())
                 .content(s.getContent())
