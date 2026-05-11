@@ -92,7 +92,11 @@ public class CommentService {
         // Handle reply notification
         if (commentDTO.getParentCommentId() != null) {
             updateReplyCount(commentDTO.getParentCommentId());
+        }
 
+        // Notify mentioned users
+        if (commentDTO.getMentionedUserIds() != null && !commentDTO.getMentionedUserIds().isEmpty()) {
+            notifyMentionedUsersInComment(commentDTO, saved);
         }
 
         return toDTO(saved);
@@ -180,6 +184,7 @@ public class CommentService {
         if (comment.getParentComment() != null) {
             dto.setParentCommentId(comment.getParentComment().getId());
         }
+        dto.setMentionedUserIds(comment.getMentionedUserIds());
         dto.setLikeCount(comment.getLikeCount());
         dto.setReplyCount(comment.getReplyCount());
         dto.setCreatedAt(comment.getCreatedAt());
@@ -210,9 +215,42 @@ public class CommentService {
                     .orElseThrow(() -> new RuntimeException("Video not found"));
             comment.setVideo(video);
         }
+        comment.setMentionedUserIds(dto.getMentionedUserIds());
         comment.setLikeCount(0);
         comment.setReplyCount(0);
         return comment;
+    }
+
+    private void notifyMentionedUsersInComment(CommentDTO commentDTO, Comment saved) {
+        try {
+            UserDTO commenter = authServiceClient.getUserById(commentDTO.getUserId());
+            if (commenter == null) return;
+
+            String relatedId = commentDTO.getPostId() != null ? commentDTO.getPostId() : commentDTO.getVideoId();
+            String relatedType = commentDTO.getPostId() != null ? "POST" : "VIDEO";
+
+            for (String mentionedUserId : commentDTO.getMentionedUserIds()) {
+                if (mentionedUserId == null || mentionedUserId.equals(commentDTO.getUserId())) continue;
+                try {
+                    NotificationDTO notificationDTO = new NotificationDTO();
+                    notificationDTO.setRecipientId(mentionedUserId);
+                    notificationDTO.setActorId(commentDTO.getUserId());
+                    notificationDTO.setActorName(commenter.getFullName());
+                    notificationDTO.setActorAvatar(commenter.getAvatar());
+                    notificationDTO.setType("MENTION");
+                    notificationDTO.setTitle("Bạn được nhắc đến");
+                    notificationDTO.setContent(commenter.getFullName() + " đã nhắc đến bạn trong một bình luận");
+                    notificationDTO.setRelatedId(relatedId);
+                    notificationDTO.setRelatedType(relatedType);
+                    notificationDTO.setRead(false);
+                    notificationService.createNotification(notificationDTO);
+                } catch (Exception e) {
+                    // Skip this mention; don't fail the whole request
+                }
+            }
+        } catch (Exception e) {
+            // Ignore if commenter info unavailable
+        }
     }
 
     public void updateReplyCount(String parentCommentId) {
