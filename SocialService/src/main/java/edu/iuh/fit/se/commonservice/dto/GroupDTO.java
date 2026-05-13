@@ -28,6 +28,6 @@ public class GroupDTO {
     private List<String> joinQuestions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private boolean isActive;
+    private boolean active;
 }
 

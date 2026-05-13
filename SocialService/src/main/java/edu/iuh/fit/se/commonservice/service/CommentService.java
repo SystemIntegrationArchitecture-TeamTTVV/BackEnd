@@ -30,10 +30,18 @@ public class CommentService {
     private final NotificationService notificationService;
     private final VideoRepository videoRepository;
     private final AIViolationCheckService aiViolationCheckService;
+    private final org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
-        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
-                .filter(comment -> comment.getParentComment() == null) // Only root comments
+        org.springframework.data.mongodb.core.query.Criteria criteria = new org.springframework.data.mongodb.core.query.Criteria().orOperator(
+                org.springframework.data.mongodb.core.query.Criteria.where("postId").is(postId),
+                org.springframework.data.mongodb.core.query.Criteria.where("post.$id").is(org.bson.types.ObjectId.isValid(postId) ? new org.bson.types.ObjectId(postId) : postId)
+        );
+        org.springframework.data.mongodb.core.query.Query query = new org.springframework.data.mongodb.core.query.Query(criteria);
+        query.with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "createdAt"));
+        
+        return mongoTemplate.find(query, Comment.class).stream()
+                .filter(comment -> comment.getParentComment() == null && comment.getParentCommentId() == null) // Only root comments
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }

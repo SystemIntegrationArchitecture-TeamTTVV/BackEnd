@@ -31,8 +31,13 @@ public class UserController {
     }
 
     @GetMapping("/metrics/summary")
-    public ResponseEntity<Map<String, Object>> userMetricsSummary() {
-        return ResponseEntity.ok(userAccountService.metricsSummary());
+    public ResponseEntity<Map<String, Object>> userMetricsSummary(@RequestParam(required = false) String timeRange) {
+        return ResponseEntity.ok(userAccountService.metricsSummary(timeRange));
+    }
+
+    @GetMapping("/metrics/growth")
+    public ResponseEntity<Map<String, Integer>> getUserGrowth(@RequestParam(required = false) String timeRange) {
+        return ResponseEntity.ok(userAccountService.getUserGrowth(timeRange));
     }
 
     @GetMapping
@@ -72,13 +77,13 @@ public class UserController {
     }
 
     @PutMapping("/{id}/role")
-    public ResponseEntity<UserDTO> updateUserRole(@PathVariable String id, @RequestBody String role) {
-        return ResponseEntity.ok(userAccountService.updateUserRole(id, role));
+    public ResponseEntity<UserDTO> updateUserRole(@PathVariable String id, @RequestBody Map<String, String> payload) {
+        return ResponseEntity.ok(userAccountService.updateUserRole(id, payload.get("role")));
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<UserDTO> updateUserStatus(@PathVariable String id, @RequestBody String status) {
-        return ResponseEntity.ok(userAccountService.updateUserStatus(id, status));
+    public ResponseEntity<UserDTO> updateUserStatus(@PathVariable String id, @RequestBody Map<String, String> payload) {
+        return ResponseEntity.ok(userAccountService.updateUserStatus(id, payload.get("status")));
     }
 
     @PutMapping("/{id}/deactivate")

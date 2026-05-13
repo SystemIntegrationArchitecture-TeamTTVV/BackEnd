@@ -13,5 +13,8 @@ public interface CommentRepository extends MongoRepository<Comment, String> {
     long countByPostId(String postId);
     List<Comment> findByVideoIdOrderByCreatedAtAsc(String videoId);
     long countByVideoId(String videoId);
+    
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    long count();
 }
 

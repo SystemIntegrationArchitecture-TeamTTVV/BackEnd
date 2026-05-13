@@ -24,7 +24,10 @@ public interface AuthServiceClient {
     List<UserDTO> batchLookup(@RequestBody List<String> ids);
 
     @GetMapping("/api/users/metrics/summary")
-    Map<String, Object> userMetricsSummary();
+    Map<String, Object> userMetricsSummary(@org.springframework.web.bind.annotation.RequestParam(value = "timeRange", required = false) String timeRange);
+
+    @GetMapping("/api/users/metrics/growth")
+    Map<String, Integer> getUserGrowth(@org.springframework.web.bind.annotation.RequestParam(value = "timeRange", required = false) String timeRange);
 
     @PutMapping("/api/users/{id}/deactivate")
     void deactivateUser(@PathVariable("id") String id);

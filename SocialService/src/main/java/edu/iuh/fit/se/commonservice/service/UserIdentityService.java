@@ -101,7 +101,7 @@ public class UserIdentityService {
 
     public Map<String, Object> userMetricsSummary() {
         try {
-            return authServiceClient.userMetricsSummary();
+            return authServiceClient.userMetricsSummary(null);
         } catch (FeignException e) {
             log.warn("AuthService metrics failed: {}", e.getMessage());
             return Map.of("totalUsers", 0L, "activeUsers", 0L, "newUsersThisMonth", 0L);

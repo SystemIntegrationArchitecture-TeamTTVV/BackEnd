@@ -25,6 +25,11 @@ public class GroupController {
         return ResponseEntity.ok(groupService.getAllGroups());
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<GroupDTO>> getAllGroupsIncludingInactive() {
+        return ResponseEntity.ok(groupService.getAllGroupsIncludingInactive());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<GroupDTO> getGroupById(@PathVariable String id) {
         return ResponseEntity.ok(groupService.getGroupById(id));
@@ -54,6 +59,13 @@ public class GroupController {
     public ResponseEntity<Void> deleteGroup(@PathVariable String id) {
         groupService.deleteGroup(id);
         return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/{id}/toggle-lock")
+    public ResponseEntity<GroupDTO> toggleLock(@PathVariable String id) {
+        // We reuse deleteGroup logic but make it a toggle
+        edu.iuh.fit.se.commonservice.model.Group group = groupService.getGroupEntityById(id);
+        group.setActive(!group.isActive());
+        return ResponseEntity.ok(groupService.saveGroupEntity(group));
     }
     @PostMapping("/{groupId}/members")
     public void addMembers(

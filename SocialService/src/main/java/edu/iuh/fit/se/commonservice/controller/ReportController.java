@@ -37,9 +37,14 @@ public class ReportController {
     private RateLimitService rateLimitService;
 
     @GetMapping
-    public ResponseEntity<List<ReportDTO>> getAllReports() {
+    public ResponseEntity<List<ReportDTO>> getAllReports(@RequestParam(required = false) String targetId) {
         try {
-            List<Report> reports = reportRepository.findAll();
+            List<Report> reports;
+            if (targetId != null && !targetId.isEmpty()) {
+                reports = reportRepository.findByTargetId(targetId);
+            } else {
+                reports = reportRepository.findAll();
+            }
             List<ReportDTO> reportDTOs = reports.stream()
                     .map(this::convertToDTO)
                     .collect(Collectors.toList());
@@ -103,11 +108,14 @@ public class ReportController {
     @PostMapping
     public ResponseEntity<ReportDTO> createReport(@RequestBody ReportDTO reportDTO) {
         try {
-            String reporterId = reportDTO.reporterName != null ? reportDTO.reporterName : "anonymous";
+            String reporterId = (reportDTO.reporterName != null && !reportDTO.reporterName.trim().isEmpty()) 
+                ? reportDTO.reporterName 
+                : "anonymous";
             if (!rateLimitService.allowReport(reporterId)) {
                 return ResponseEntity.status(429).build();
             }
             Report report = convertToEntity(reportDTO);
+            report.setReporterId(reporterId);
             report.setStatus("pending");
             report.setCreatedAt(LocalDateTime.now());
             

@@ -36,10 +36,26 @@ public class GroupService {
                 .collect(Collectors.toList());
     }
 
+    public List<GroupDTO> getAllGroupsIncludingInactive() {
+        return groupRepository.findAll().stream()
+                .sorted((g1, g2) -> g2.getCreatedAt().compareTo(g1.getCreatedAt()))
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public GroupDTO getGroupById(String id) {
         return groupRepository.findById(id)
                 .map(this::toDTO)
                 .orElseThrow(() -> new RuntimeException("Group not found with id: " + id));
+    }
+
+    public Group getGroupEntityById(String id) {
+        return groupRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Group not found with id: " + id));
+    }
+
+    public GroupDTO saveGroupEntity(Group group) {
+        return toDTO(groupRepository.save(group));
     }
 
     public List<GroupDTO> searchGroups(String name) {
