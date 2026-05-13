@@ -15,8 +15,8 @@ public interface PostRepository extends MongoRepository<Post, String> {
     List<Post> findByIsDeletedFalseAndGroupIdIsNullOrderByCreatedAtDesc();
     @Query("{ 'groupId': ?0, 'isDeleted': false }")
     List<Post> findByGroupIdAndNotDeleted(String groupId);
-
-
-
+    
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    long count();
 }
 

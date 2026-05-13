@@ -14,6 +14,12 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
     long countByActiveTrue();
 
     long countByCreatedAtAfter(java.time.LocalDateTime createdAt);
+    
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    
+    long countByActiveTrueAndCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    
+    List<UserEntity> findAllByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
     @EntityGraph(attributePaths = {"interests", "role"})
     Optional<UserEntity> findById(String id);
 

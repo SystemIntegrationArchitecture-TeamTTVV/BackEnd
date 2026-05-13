@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.commonservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -31,6 +32,13 @@ public class PostDTO {
     private String pageId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
+    private String deleteReason;
+    @JsonProperty("isPinned")
     private boolean isPinned;
+    @JsonProperty("isHidden")
+    private boolean isHidden;
+    @JsonProperty("isDeleted")
+    private boolean isDeleted;
 }
 

@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import com.mongodb.DBRef;
@@ -27,7 +28,7 @@ import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
-import edu.iuh.fit.se.commonservice.repository.PostRepository;
+import edu.iuh.fit.se.commonservice.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -42,6 +43,117 @@ public class PostService {
     private final NotificationService notificationService;
     private final FriendService friendService;
     private final AIViolationCheckService aiViolationCheckService;
+    private final ReportRepository reportRepository;
+
+    public List<PostDTO> getAdminPosts(String status, String sortBy, LocalDateTime startDate, LocalDateTime endDate) {
+        List<Criteria> criteriaList = new ArrayList<>();
+        
+        if ("REPORTED".equalsIgnoreCase(status)) {
+            List<String> reportedPostIds = reportRepository.findByTargetType("POST").stream()
+                .map(edu.iuh.fit.se.commonservice.model.Report::getTargetId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+            if (reportedPostIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            criteriaList.add(Criteria.where("_id").in(
+                reportedPostIds.stream().map(id -> org.bson.types.ObjectId.isValid(id) ? new org.bson.types.ObjectId(id) : id).collect(Collectors.toList())
+            ));
+        } else if ("ACTIVE".equalsIgnoreCase(status)) {
+            criteriaList.add(Criteria.where("isDeleted").is(false).and("isHidden").is(false));
+        } else if ("HIDDEN".equalsIgnoreCase(status)) {
+            criteriaList.add(Criteria.where("isHidden").is(true).and("isDeleted").is(false));
+        } else if ("DELETED".equalsIgnoreCase(status)) {
+            criteriaList.add(Criteria.where("isDeleted").is(true));
+        }
+
+        if (startDate != null && endDate != null) {
+            criteriaList.add(Criteria.where("createdAt").gte(startDate).lte(endDate));
+        } else if (startDate != null) {
+            criteriaList.add(Criteria.where("createdAt").gte(startDate));
+        } else if (endDate != null) {
+            criteriaList.add(Criteria.where("createdAt").lte(endDate));
+        }
+
+        Criteria matchCriteria = criteriaList.isEmpty() ? new Criteria() : new Criteria().andOperator(criteriaList.toArray(new Criteria[0]));
+
+        String sortField = "createdAt";
+        if ("INTERACTION".equalsIgnoreCase(sortBy)) {
+            sortField = "likeCount";
+        }
+        
+        Aggregation agg = Aggregation.newAggregation(
+                Aggregation.match(matchCriteria),
+                addResolvedAuthorIdStage(),
+                Aggregation.sort(Sort.Direction.DESC, sortField),
+                Aggregation.limit(500)
+        );
+
+        List<Document> docs = mongoTemplate.aggregate(agg, "posts", Document.class).getMappedResults();
+        
+        List<String> authorIds = docs.stream()
+                .map(PostService::extractResolvedAuthorIdFromDoc)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        Map<String, UserDTO> users = userIdentityService.batchLookupMap(authorIds);
+        
+        return docs.stream()
+                .map(d -> documentToPostDTO(d, users))
+                .collect(Collectors.toList());
+    }
+
+    public PostDTO toggleHidePost(String id) {
+        Post post = postRepository.findById(id).orElseThrow(() -> new RuntimeException("Post not found"));
+        post.setHidden(!post.isHidden());
+        post.setUpdatedAt(LocalDateTime.now());
+        return toDTO(postRepository.save(post));
+    }
+
+    public PostDTO toggleLockComments(String id) {
+        Post post = postRepository.findById(id).orElseThrow(() -> new RuntimeException("Post not found"));
+        post.setAllowComments(post.getAllowComments() != null ? !post.getAllowComments() : false);
+        post.setUpdatedAt(LocalDateTime.now());
+        return toDTO(postRepository.save(post));
+    }
+
+    public PostDTO softDeletePostWithReason(String id, String reason) {
+        Post post = postRepository.findById(id).orElseThrow(() -> new RuntimeException("Post not found"));
+        post.setDeleted(true);
+        post.setDeletedAt(LocalDateTime.now());
+        post.setDeleteReason(reason);
+        Post saved = postRepository.save(post);
+        
+        if (post.getAuthorId() != null) {
+            NotificationDTO notificationDTO = new NotificationDTO();
+            notificationDTO.setRecipientId(post.getAuthorId());
+            notificationDTO.setActorId("system");
+            notificationDTO.setActorName("System Admin");
+            notificationDTO.setType("SYSTEM");
+            notificationDTO.setTitle("Bài viết đã bị xóa");
+            notificationDTO.setContent("Một bài viết của bạn đã bị quản trị viên xóa do vi phạm quy định. Lý do: " + reason);
+            notificationDTO.setRelatedId(id);
+            notificationDTO.setRelatedType("POST");
+            notificationDTO.setRead(false);
+            notificationDTO.setCreatedAt(LocalDateTime.now());
+            notificationService.createNotification(notificationDTO);
+        }
+        
+        return toDTO(saved);
+    }
+
+    public PostDTO restorePost(String id) {
+        Post post = postRepository.findById(id).orElseThrow(() -> new RuntimeException("Post not found"));
+        post.setDeleted(false);
+        post.setDeletedAt(null);
+        post.setUpdatedAt(LocalDateTime.now());
+        return toDTO(postRepository.save(post));
+    }
+
+    public void hardDeletePost(String id) {
+        postRepository.deleteById(id);
+    }
 
     public List<PostDTO> getAllPosts() {
         return getAllPosts(null);
@@ -50,7 +162,9 @@ public class PostService {
     public List<PostDTO> getAllPosts(String viewerId) {
         Set<String> friendIds = buildFriendIdSet(viewerId);
         List<Document> docs = findPostsAggregated(
-                Criteria.where("isDeleted").is(false).and("groupId").is(null));
+                Criteria.where("isDeleted").is(false)
+                        .and("isHidden").is(false)
+                        .and("groupId").is(null));
         List<String> authorIds = docs.stream()
                 .map(PostService::extractResolvedAuthorIdFromDoc)
                 .filter(id -> id != null && !id.isBlank())
@@ -89,6 +203,7 @@ public class PostService {
         Criteria authorMatch = new Criteria().orOperator(authorOr.toArray(new Criteria[0]));
         Criteria full = new Criteria().andOperator(
                 Criteria.where("isDeleted").is(false),
+                Criteria.where("isHidden").is(false),
                 authorMatch
         );
         List<Document> docs = findPostsAggregated(full);
@@ -294,8 +409,12 @@ public class PostService {
         if (post.getPage() != null) {
             dto.setPageId(post.getPage().getId());
         }
+        dto.setHidden(post.isHidden());
+        dto.setDeleted(post.isDeleted());
         dto.setCreatedAt(post.getCreatedAt());
         dto.setUpdatedAt(post.getUpdatedAt());
+        dto.setDeletedAt(post.getDeletedAt());
+        dto.setDeleteReason(post.getDeleteReason());
         return dto;
     }
 
@@ -405,8 +524,12 @@ public class PostService {
         if (pageRef instanceof DBRef) {
             dto.setPageId(extractId(((DBRef) pageRef).getId()));
         }
+        dto.setHidden(doc.getBoolean("isHidden", false));
+        dto.setDeleted(doc.getBoolean("isDeleted", false));
         dto.setCreatedAt(toLocalDateTime(doc.get("createdAt")));
         dto.setUpdatedAt(toLocalDateTime(doc.get("updatedAt")));
+        dto.setDeletedAt(toLocalDateTime(doc.get("deletedAt")));
+        dto.setDeleteReason(doc.getString("deleteReason"));
         return dto;
     }
 
@@ -414,6 +537,12 @@ public class PostService {
         if (dto == null || dto.getAuthorId() == null) {
             return false;
         }
+        
+        // If post is hidden, only the author can see it
+        if (dto.isHidden()) {
+            return dto.getAuthorId().equals(viewerId);
+        }
+
         String visibility = dto.getVisibility();
         if ("PUBLIC".equals(visibility)) {
             return true;

@@ -73,21 +73,113 @@ public class UserAccountService {
                 .collect(Collectors.toList());
     }
 
-    public Map<String, Object> metricsSummary() {
-        LocalDateTime monthStart = LocalDateTime.now()
-                .withDayOfMonth(1)
-                .withHour(0)
-                .withMinute(0)
-                .withSecond(0)
-                .withNano(0);
+    public Map<String, Object> metricsSummary(String timeRange) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startDate = null;
+        LocalDateTime endDate = now;
+
+        if (timeRange != null && !timeRange.isEmpty()) {
+            if (timeRange.startsWith("custom_")) {
+                try {
+                    String[] parts = timeRange.split("_");
+                    startDate = java.time.LocalDate.parse(parts[1]).atStartOfDay();
+                    endDate = java.time.LocalDate.parse(parts[2]).atTime(23, 59, 59);
+                } catch (Exception e) {
+                    startDate = now.minusDays(6).withHour(0).withMinute(0);
+                }
+            } else if ("30days".equals(timeRange)) {
+                startDate = now.minusDays(29).withHour(0).withMinute(0);
+            } else if ("90days".equals(timeRange)) {
+                startDate = now.minusDays(89).withHour(0).withMinute(0);
+            } else if ("1year".equals(timeRange)) {
+                startDate = now.minusMonths(11).withDayOfMonth(1).withHour(0).withMinute(0);
+            } else if ("7days".equals(timeRange)) {
+                startDate = now.minusDays(6).withHour(0).withMinute(0);
+            }
+        }
+
         long total = userRepository.count();
         long active = userRepository.countByActiveTrue();
-        long newMonth = userRepository.countByCreatedAtAfter(monthStart);
+        
+        long newUsersInRange;
+        if (startDate != null) {
+            newUsersInRange = userRepository.countByCreatedAtBetween(startDate, endDate);
+        } else {
+            newUsersInRange = userRepository.countByCreatedAtAfter(now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0));
+        }
+
         return Map.of(
                 "totalUsers", total,
                 "activeUsers", active,
-                "newUsersThisMonth", newMonth
+                "newUsersThisMonth", newUsersInRange
         );
+    }
+
+    public Map<String, Integer> getUserGrowth(String timeRange) {
+        Map<String, Integer> growth = new java.util.LinkedHashMap<>();
+        
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startDate = now;
+        LocalDateTime endDate = now;
+        String type = "day"; 
+        
+        if (timeRange == null || timeRange.isEmpty()) timeRange = "7days";
+        
+        try {
+            if (timeRange.startsWith("custom_")) {
+                String[] parts = timeRange.split("_");
+                startDate = java.time.LocalDate.parse(parts[1]).atStartOfDay();
+                endDate = java.time.LocalDate.parse(parts[2]).atTime(23, 59, 59);
+                if (java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) > 60) {
+                    type = "month";
+                }
+            } else if ("30days".equals(timeRange)) {
+                startDate = now.minusDays(29).withHour(0).withMinute(0);
+            } else if ("90days".equals(timeRange)) {
+                startDate = now.minusDays(89).withHour(0).withMinute(0);
+                type = "month";
+            } else if ("1year".equals(timeRange)) {
+                startDate = now.minusMonths(11).withDayOfMonth(1).withHour(0).withMinute(0);
+                type = "month";
+            } else {
+                startDate = now.minusDays(6).withHour(0).withMinute(0);
+            }
+        } catch (Exception e) {
+            startDate = now.minusDays(6).withHour(0).withMinute(0);
+        }
+
+        if ("month".equals(type)) {
+            LocalDateTime current = startDate.withDayOfMonth(1);
+            while (!current.isAfter(endDate)) {
+                String label = "T" + current.getMonthValue() + "/" + current.getYear();
+                growth.put(label, 0);
+                current = current.plusMonths(1);
+            }
+        } else {
+            LocalDateTime current = startDate;
+            while (!current.isAfter(endDate) && growth.size() < 100) {
+                String label = current.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"));
+                growth.put(label, 0);
+                current = current.plusDays(1);
+            }
+        }
+
+        List<UserEntity> users = userRepository.findAllByCreatedAtBetween(startDate, endDate);
+        
+        for (UserEntity user : users) {
+            if (user.getCreatedAt() != null) {
+                LocalDateTime created = user.getCreatedAt();
+                String label;
+                if ("month".equals(type)) {
+                    label = "T" + created.getMonthValue() + "/" + created.getYear();
+                } else {
+                    label = created.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"));
+                }
+                growth.put(label, growth.getOrDefault(label, 0) + 1);
+            }
+        }
+        
+        return growth;
     }
 
     @Transactional(readOnly = true)

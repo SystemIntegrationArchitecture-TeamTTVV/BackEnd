@@ -46,6 +46,8 @@ public class Post {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
+    private String deleteReason;
     private boolean isDeleted = false;
+    private boolean isHidden = false; // Shadowban field added per request
     private boolean isPinned = false;
 }

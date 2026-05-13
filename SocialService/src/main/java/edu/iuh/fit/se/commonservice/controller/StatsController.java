@@ -13,6 +13,10 @@ import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.CommentRepository;
+import edu.iuh.fit.se.commonservice.service.UserIdentityService;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.bson.Document;
+import com.mongodb.DBRef;
 
 @RestController
 @RequestMapping("/api/stats")
@@ -27,18 +31,48 @@ public class StatsController {
     @Autowired
     private CommentRepository commentRepository;
 
+    @Autowired
+    private UserIdentityService userIdentityService;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
     /**
      * Get dashboard statistics - Query từ database
      */
     @GetMapping("/dashboard")
-    public ResponseEntity<Map<String, Object>> getDashboardStats() {
+    public ResponseEntity<Map<String, Object>> getDashboardStats(@RequestParam(required = false) String timeRange) {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            // Query từ Auth Service
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime startDate = null;
+            LocalDateTime endDate = now;
+
+            if (timeRange != null && !timeRange.isEmpty()) {
+                if (timeRange.startsWith("custom_")) {
+                    try {
+                        String[] parts = timeRange.split("_");
+                        startDate = java.time.LocalDate.parse(parts[1]).atStartOfDay();
+                        endDate = java.time.LocalDate.parse(parts[2]).atTime(23, 59, 59);
+                    } catch (Exception e) {
+                        startDate = now.minusDays(6).withHour(0).withMinute(0);
+                    }
+                } else if ("30days".equals(timeRange)) {
+                    startDate = now.minusDays(29).withHour(0).withMinute(0);
+                } else if ("90days".equals(timeRange)) {
+                    startDate = now.minusDays(89).withHour(0).withMinute(0);
+                } else if ("1year".equals(timeRange)) {
+                    startDate = now.minusMonths(11).withDayOfMonth(1).withHour(0).withMinute(0);
+                } else if ("7days".equals(timeRange)) {
+                    startDate = now.minusDays(6).withHour(0).withMinute(0);
+                }
+            }
+
+            // Query từ Auth Service (lọc theo timeRange)
             Map<String, Object> userMetrics = new HashMap<>();
             try {
-                userMetrics = authServiceClient.userMetricsSummary();
+                userMetrics = authServiceClient.userMetricsSummary(timeRange);
             } catch (Exception e) {
                 // Fallback
                 userMetrics.put("totalUsers", 0L);
@@ -46,17 +80,23 @@ public class StatsController {
                 userMetrics.put("newUsersThisMonth", 0L);
             }
 
-            List<Post> allPosts = postRepository.findAll();
-            List<Comment> allComments = commentRepository.findAll();
+            long totalPosts;
+            long totalComments;
+            
+            if (startDate != null) {
+                totalPosts = postRepository.countByCreatedAtBetween(startDate, endDate);
+                totalComments = commentRepository.countByCreatedAtBetween(startDate, endDate);
+            } else {
+                totalPosts = postRepository.count();
+                totalComments = commentRepository.count();
+            }
 
             long totalUsers = ((Number) userMetrics.getOrDefault("totalUsers", 0L)).longValue();
             long activeUsers = ((Number) userMetrics.getOrDefault("activeUsers", 0L)).longValue();
             long newUsersThisMonth = ((Number) userMetrics.getOrDefault("newUsersThisMonth", 0L)).longValue();
-            long totalPosts = allPosts.size();
-            long totalComments = allComments.size();
-            long totalViews = allPosts.stream()
-                    .mapToLong(p -> p.getLikeCount() != null ? p.getLikeCount() : 0)
-                    .sum() * 3; // Estimate: views = likes * 3
+            
+            // Total views is roughly totalPosts * 3 (just an estimate since we don't have view counts)
+            long totalViews = totalPosts * 3;
 
             stats.put("totalUsers", totalUsers);
             stats.put("activeUsers", activeUsers);
@@ -66,8 +106,13 @@ public class StatsController {
             stats.put("newUsersThisMonth", newUsersThisMonth);
             stats.put("engagementRate", calculateEngagementRate(totalPosts, totalComments));
 
-            // Growth statistics mock
+            // Growth statistics từ Auth Service
             Map<String, Integer> userGrowth = new LinkedHashMap<>();
+            try {
+                userGrowth = authServiceClient.getUserGrowth(timeRange);
+            } catch (Exception e) {
+                // Ignore
+            }
             stats.put("userGrowth", userGrowth);
 
         } catch (Exception e) {
@@ -94,21 +139,33 @@ public class StatsController {
                     .limit(limit)
                     .toList();
 
-            List<String> authorIds = topPostEntities.stream()
-                    .map(Post::getAuthorId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
+            List<String> authorIds = new ArrayList<>();
+            for (Post p : topPostEntities) {
+                if (p.getAuthorId() != null) {
+                    authorIds.add(p.getAuthorId());
+                } else {
+                    Document doc = mongoTemplate.findById(p.getId(), Document.class, "posts");
+                    if (doc != null) {
+                        Object author = doc.get("author");
+                        if (author instanceof DBRef) {
+                            DBRef ref = (DBRef) author;
+                            if (ref.getId() != null) {
+                                String aid = ref.getId() instanceof org.bson.types.ObjectId 
+                                        ? ((org.bson.types.ObjectId) ref.getId()).toHexString() 
+                                        : ref.getId().toString();
+                                p.setAuthorId(aid);
+                                authorIds.add(aid);
+                            }
+                        }
+                    }
+                }
+            }
+            authorIds = authorIds.stream().distinct().toList();
             
             Map<String, UserDTO> usersMap = new HashMap<>();
             if (!authorIds.isEmpty()) {
                 try {
-                    List<UserDTO> users = authServiceClient.batchLookup(authorIds);
-                    if (users != null) {
-                        for (UserDTO u : users) {
-                            usersMap.put(u.getId(), u);
-                        }
-                    }
+                    usersMap.putAll(userIdentityService.batchLookupMap(authorIds));
                 } catch (Exception e) {
                     // Ignore
                 }
@@ -190,7 +247,7 @@ public class StatsController {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            Map<String, Object> userMetrics = authServiceClient.userMetricsSummary();
+            Map<String, Object> userMetrics = authServiceClient.userMetricsSummary(null);
 
             long totalUsers = ((Number) userMetrics.getOrDefault("totalUsers", 0L)).longValue();
             long activeUsers = ((Number) userMetrics.getOrDefault("activeUsers", 0L)).longValue();
