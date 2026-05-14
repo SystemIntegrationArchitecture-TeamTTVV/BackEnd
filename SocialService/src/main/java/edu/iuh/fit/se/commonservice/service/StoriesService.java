@@ -87,8 +87,9 @@ public class StoriesService {
                 if (author != null && author.getAvatar() != null) {
                     resolvedAvatar = author.getAvatar();
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
                 // AuthService không phản hồi — giữ nguyên rỗng, FE dùng initials fallback
+                System.err.println("Failed to get user avatar for story " + s.getId() + " - " + e.getMessage());
             }
         }
 
