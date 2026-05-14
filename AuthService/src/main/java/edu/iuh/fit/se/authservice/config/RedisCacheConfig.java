@@ -28,7 +28,7 @@ import java.util.Map;
  * Includes a CacheErrorHandler that falls back to DB when Redis is unavailable.
  */
 @Configuration
-@EnableCaching
+// @EnableCaching // Tạm thời tắt Cache để tránh lỗi Timeout của Redis
 public class RedisCacheConfig implements CachingConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(RedisCacheConfig.class);

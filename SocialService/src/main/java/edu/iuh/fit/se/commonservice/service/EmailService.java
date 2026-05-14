@@ -18,7 +18,7 @@ public class EmailService {
     @Value("${resend.from-email:onboarding@resend.dev}")
     private String fromEmail;
 
-    @Value("${app.base-url:http://localhost:5173}")
+    @Value("${app.base-url:http://localhost:5311}")
     private String baseUrl;
 
     public void sendPasswordResetEmail(String toEmail, String resetToken, String userName) {
