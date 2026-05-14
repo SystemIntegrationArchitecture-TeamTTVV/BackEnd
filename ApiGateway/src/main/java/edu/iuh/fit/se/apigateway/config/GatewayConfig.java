@@ -71,24 +71,17 @@ public class GatewayConfig {
             }
 
             String path = exchange.getRequest().getURI().getPath();
-<<<<<<< Updated upstream
-=======
             String method = exchange.getRequest().getMethod() != null
                     ? exchange.getRequest().getMethod().name()
                     : "";
->>>>>>> Stashed changes
             log.info("🔒 Gateway filter: path={}", path);
 
             // For WebSocket paths: try to extract JWT from query param and inject
             // identity headers, but don't block if token is missing.
-<<<<<<< Updated upstream
-=======
             if (isPublicGetPath(method, path)) {
                 log.info("🔓 Public GET path detected, bypassing JWT check: {}", path);
                 return chain.filter(exchange);
             }
-
->>>>>>> Stashed changes
             boolean isWsPath = path.startsWith("/api/common/ws") || path.startsWith("/api/social/ws");
             if (isWsPath) {
                 log.info("🔌 WS path detected: {}", path);
@@ -111,10 +104,6 @@ public class GatewayConfig {
                 }
                 return chain.filter(exchange);
             }
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
             for (String prefix : PUBLIC_PATH_PREFIXES) {
                 if (path.startsWith(prefix)) {
                     return chain.filter(exchange);

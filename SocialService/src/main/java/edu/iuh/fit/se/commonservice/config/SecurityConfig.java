@@ -94,10 +94,7 @@ public class SecurityConfig {
                 .requestMatchers("/ws").permitAll()
                 .requestMatchers("/ws/info/**").permitAll()
                 .requestMatchers("/ws/info").permitAll()
-<<<<<<< Updated upstream:SocialService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java
-=======
                 .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/**").permitAll()
->>>>>>> Stashed changes:CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java
                 
                 // Admin-only endpoints - require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
