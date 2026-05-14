@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import java.util.Arrays;
 
@@ -93,6 +94,10 @@ public class SecurityConfig {
                 .requestMatchers("/ws").permitAll()
                 .requestMatchers("/ws/info/**").permitAll()
                 .requestMatchers("/ws/info").permitAll()
+<<<<<<< Updated upstream:SocialService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java
+=======
+                .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/**").permitAll()
+>>>>>>> Stashed changes:CommonService/src/main/java/edu/iuh/fit/se/commonservice/config/SecurityConfig.java
                 
                 // Admin-only endpoints - require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
