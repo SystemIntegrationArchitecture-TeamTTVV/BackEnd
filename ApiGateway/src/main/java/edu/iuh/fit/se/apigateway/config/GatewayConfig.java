@@ -43,6 +43,20 @@ public class GatewayConfig {
             "/api/social/ws"
     );
 
+    private boolean isPublicGetPath(String method, String path) {
+        if (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)) {
+            return false;
+        }
+
+        String normalizedPath = path == null ? "" : path.trim();
+        return normalizedPath.equals("/api/social/posts")
+                || normalizedPath.startsWith("/api/social/posts/")
+                || normalizedPath.equals("/api/common/posts")
+                || normalizedPath.startsWith("/api/common/posts/")
+                || normalizedPath.equals("/api/posts")
+                || normalizedPath.startsWith("/api/posts/");
+    }
+
     @Bean
     @Order(-2)
     public GlobalFilter jwtAuthFilter(JwtTokenVerifier jwtTokenVerifier) {
@@ -57,10 +71,17 @@ public class GatewayConfig {
             }
 
             String path = exchange.getRequest().getURI().getPath();
+            String method = exchange.getRequest().getMethod() != null
+                    ? exchange.getRequest().getMethod().name()
+                    : "";
             log.info("🔒 Gateway filter: path={}", path);
 
             // For WebSocket paths: try to extract JWT from query param and inject
             // identity headers, but don't block if token is missing.
+            if (isPublicGetPath(method, path)) {
+                log.info("🔓 Public GET path detected, bypassing JWT check: {}", path);
+                return chain.filter(exchange);
+            }
             boolean isWsPath = path.startsWith("/api/common/ws") || path.startsWith("/api/social/ws");
             if (isWsPath) {
                 log.info("🔌 WS path detected: {}", path);
@@ -83,7 +104,6 @@ public class GatewayConfig {
                 }
                 return chain.filter(exchange);
             }
-
             for (String prefix : PUBLIC_PATH_PREFIXES) {
                 if (path.startsWith(prefix)) {
                     return chain.filter(exchange);

@@ -191,6 +191,8 @@ public class CommentService {
         dto.setImages(comment.getImages());
         if (comment.getParentComment() != null) {
             dto.setParentCommentId(comment.getParentComment().getId());
+        } else if (comment.getParentCommentId() != null) {
+            dto.setParentCommentId(comment.getParentCommentId());
         }
         dto.setMentionedUserIds(comment.getMentionedUserIds());
         dto.setLikeCount(comment.getLikeCount());
@@ -217,6 +219,7 @@ public class CommentService {
             Comment parent = commentRepository.findById(dto.getParentCommentId())
                     .orElseThrow(() -> new RuntimeException("Parent comment not found"));
             comment.setParentComment(parent);
+            comment.setParentCommentId(dto.getParentCommentId());
         }
         if (dto.getVideoId() != null) {  // ✨ THÊM MỚI
             Video video = videoRepository.findById(dto.getVideoId())
