@@ -3,12 +3,8 @@ package edu.iuh.fit.se.messegeservice.service;
 import edu.iuh.fit.se.messegeservice.config.socket.SocketEventTypes;
 import edu.iuh.fit.se.messegeservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.messegeservice.exception.ResourceNotFoundException;
-import edu.iuh.fit.se.messegeservice.model.Gift;
-import edu.iuh.fit.se.messegeservice.model.Transaction;
-import edu.iuh.fit.se.messegeservice.model.Wallet;
-import edu.iuh.fit.se.messegeservice.repository.GiftRepository;
-import edu.iuh.fit.se.messegeservice.repository.TransactionRepository;
-import edu.iuh.fit.se.messegeservice.repository.WalletRepository;
+import edu.iuh.fit.se.messegeservice.model.*;
+import edu.iuh.fit.se.messegeservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -18,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -28,10 +25,14 @@ public class BillingService {
     private final WalletRepository walletRepository;
     private final GiftRepository giftRepository;
     private final TransactionRepository transactionRepository;
+    private final CoinPackageRepository coinPackageRepository;
+    private final PaymentTransactionRepository paymentTransactionRepository;
     private final MongoTemplate mongoTemplate;
     private final SocketEmitterService socketEmitterService;
 
-    // ── Wallet ──────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Wallet ────────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     public Wallet getOrCreateWallet(String userId) {
         return walletRepository.findByUserId(userId).orElseGet(() -> {
@@ -44,20 +45,277 @@ public class BillingService {
         });
     }
 
-    // ── Gifts ───────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Coin Packages ─────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Get active coin packages for users */
+    public List<CoinPackage> getActiveCoinPackages() {
+        List<CoinPackage> packages = coinPackageRepository.findByActiveTrueOrderBySortOrderAsc();
+        if (!packages.isEmpty()) {
+            return packages;
+        }
+        // Seed defaults if empty
+        seedDefaultCoinPackages();
+        return coinPackageRepository.findByActiveTrueOrderBySortOrderAsc();
+    }
+
+    /** Get ALL coin packages for admin */
+    public List<CoinPackage> getAllCoinPackages() {
+        List<CoinPackage> packages = coinPackageRepository.findAllByOrderBySortOrderAsc();
+        if (packages.isEmpty()) {
+            seedDefaultCoinPackages();
+            return coinPackageRepository.findAllByOrderBySortOrderAsc();
+        }
+        return packages;
+    }
+
+    public CoinPackage createCoinPackage(CoinPackage pkg) {
+        pkg.setCreatedAt(LocalDateTime.now());
+        pkg.setUpdatedAt(LocalDateTime.now());
+        log.info("📦 Created coin package: {} ({} coins, {} VND)", pkg.getName(), pkg.getCoins(), pkg.getPriceVnd());
+        return coinPackageRepository.save(pkg);
+    }
+
+    public CoinPackage updateCoinPackage(String id, CoinPackage updates) {
+        CoinPackage pkg = coinPackageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CoinPackage not found: " + id));
+        if (updates.getName() != null) pkg.setName(updates.getName());
+        if (updates.getCoins() > 0) pkg.setCoins(updates.getCoins());
+        pkg.setBonusCoins(updates.getBonusCoins());
+        if (updates.getPriceVnd() > 0) pkg.setPriceVnd(updates.getPriceVnd());
+        if (updates.getDescription() != null) pkg.setDescription(updates.getDescription());
+        pkg.setActive(updates.isActive());
+        pkg.setSortOrder(updates.getSortOrder());
+        pkg.setUpdatedAt(LocalDateTime.now());
+        return coinPackageRepository.save(pkg);
+    }
+
+    public void toggleCoinPackage(String id, boolean active) {
+        CoinPackage pkg = coinPackageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CoinPackage not found: " + id));
+        pkg.setActive(active);
+        pkg.setUpdatedAt(LocalDateTime.now());
+        coinPackageRepository.save(pkg);
+    }
+
+    public void deleteCoinPackage(String id) {
+        coinPackageRepository.deleteById(id);
+    }
+
+    private void seedDefaultCoinPackages() {
+        List<CoinPackage> defaults = List.of(
+                new CoinPackage(null, "Gói Tiết Kiệm", 100, 0, 10000, "100 xu", true, 1, null, null),
+                new CoinPackage(null, "Gói Phổ Thông", 500, 50, 50000, "500 xu + 50 xu bonus", true, 2, null, null),
+                new CoinPackage(null, "Gói Cao Cấp", 1000, 150, 100000, "1000 xu + 150 xu bonus", true, 3, null, null),
+                new CoinPackage(null, "Gói VIP", 5000, 1000, 500000, "5000 xu + 1000 xu bonus", true, 4, null, null)
+        );
+        LocalDateTime now = LocalDateTime.now();
+        defaults.forEach(p -> { p.setCreatedAt(now); p.setUpdatedAt(now); });
+        coinPackageRepository.saveAll(defaults);
+        log.info("📦 Seeded {} default coin packages", defaults.size());
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── VNPAY Payment Flow ────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Step 1: Create a payment order for a coin package.
+     * Returns a PaymentTransaction in PENDING status.
+     * Frontend will use the orderCode to call VNPAY service.
+     */
+    public PaymentTransaction createPaymentOrder(String userId, String coinPackageId, String ipAddress) {
+        CoinPackage pkg = coinPackageRepository.findById(coinPackageId)
+                .orElseThrow(() -> new ResourceNotFoundException("CoinPackage not found: " + coinPackageId));
+
+        if (!pkg.isActive()) {
+            throw new IllegalStateException("Gói xu này hiện không khả dụng");
+        }
+
+        // Generate unique order code: COIN + timestamp + random
+        String orderCode = "COIN" + System.currentTimeMillis() + (int)(Math.random() * 1000);
+
+        PaymentTransaction pt = new PaymentTransaction();
+        pt.setOrderCode(orderCode);
+        pt.setUserId(userId);
+        pt.setCoinPackageId(coinPackageId);
+        pt.setCoinPackageName(pkg.getName());
+        pt.setCoinAmount(pkg.getCoins() + pkg.getBonusCoins());
+        pt.setAmountVnd(pkg.getPriceVnd());
+        pt.setPaymentProvider("VNPAY");
+        pt.setStatus("PENDING");
+        pt.setCoinsCredited(false);
+        pt.setIpAddress(ipAddress);
+        pt.setCreatedAt(LocalDateTime.now());
+        pt.setUpdatedAt(LocalDateTime.now());
+
+        PaymentTransaction saved = paymentTransactionRepository.save(pt);
+        log.info("💳 Payment order created: orderCode={}, userId={}, amount={} VND, coins={}",
+                orderCode, userId, pkg.getPriceVnd(), pt.getCoinAmount());
+        return saved;
+    }
+
+    /**
+     * Step 2: Process VNPAY callback (IPN or Return URL verification).
+     * Idempotent — will NOT credit coins twice.
+     */
+    public PaymentTransaction processVnpayCallback(String orderCode, String vnpResponseCode,
+                                                    String vnpTransactionNo, String vnpBankCode,
+                                                    String vnpCardType, String vnpPayDate) {
+        PaymentTransaction pt = paymentTransactionRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found: " + orderCode));
+
+        // Idempotency: if already processed, skip
+        if (pt.isCoinsCredited()) {
+            log.warn("⚠️ Payment already processed (idempotent skip): orderCode={}", orderCode);
+            return pt;
+        }
+
+        // If already in terminal state (not PENDING), skip
+        if (!"PENDING".equals(pt.getStatus())) {
+            log.warn("⚠️ Payment already in terminal state {}: orderCode={}", pt.getStatus(), orderCode);
+            return pt;
+        }
+
+        pt.setVnpResponseCode(vnpResponseCode);
+        pt.setVnpTransactionNo(vnpTransactionNo);
+        pt.setVnpBankCode(vnpBankCode);
+        pt.setVnpCardType(vnpCardType);
+        pt.setVnpPayDate(vnpPayDate);
+        pt.setUpdatedAt(LocalDateTime.now());
+        pt.setCompletedAt(LocalDateTime.now());
+
+        if ("00".equals(vnpResponseCode)) {
+            // ── SUCCESS ──
+            pt.setStatus("SUCCESS");
+            pt.setCoinsCredited(true);
+
+            // Credit coins to wallet
+            Wallet wallet = getOrCreateWallet(pt.getUserId());
+            wallet.setBalance(wallet.getBalance() + pt.getCoinAmount());
+            wallet.setUpdatedAt(LocalDateTime.now());
+            walletRepository.save(wallet);
+
+            // Record transaction
+            Transaction tx = new Transaction();
+            tx.setUserId(pt.getUserId());
+            tx.setType("deposit");
+            tx.setAmount(pt.getCoinAmount());
+            tx.setStatus("success");
+            tx.setCreatedAt(LocalDateTime.now());
+            transactionRepository.save(tx);
+
+            log.info("✅ VNPAY payment SUCCESS: orderCode={}, userId={}, coins={}, newBalance={}",
+                    orderCode, pt.getUserId(), pt.getCoinAmount(), wallet.getBalance());
+
+            // Emit socket event
+            try {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("balance", wallet.getBalance());
+                payload.put("coinAmount", pt.getCoinAmount());
+                payload.put("packageName", pt.getCoinPackageName());
+                payload.put("orderCode", orderCode);
+
+                SocketEventDTO event = SocketEventDTO.of(
+                        SocketEventTypes.COIN_DEPOSITED, pt.getUserId(), payload);
+                socketEmitterService.emitToUserById(pt.getUserId(), event);
+            } catch (Exception e) {
+                log.error("Failed to emit COIN_DEPOSITED: {}", e.getMessage());
+            }
+        } else if ("24".equals(vnpResponseCode)) {
+            // ── CANCELLED ──
+            pt.setStatus("CANCELLED");
+            log.info("❌ VNPAY payment CANCELLED: orderCode={}", orderCode);
+        } else {
+            // ── FAILED ──
+            pt.setStatus("FAILED");
+            log.info("❌ VNPAY payment FAILED: orderCode={}, responseCode={}", orderCode, vnpResponseCode);
+        }
+
+        return paymentTransactionRepository.save(pt);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Transaction History ───────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** All transactions for a user (deposit, donate, receive) */
+    public List<Transaction> getUserTransactions(String userId) {
+        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    /** Deposit-only transactions */
+    public List<Transaction> getUserDeposits(String userId) {
+        return transactionRepository.findByUserIdAndTypeOrderByCreatedAtDesc(userId, "deposit");
+    }
+
+    /** Gift-sending transactions */
+    public List<Transaction> getUserDonations(String userId) {
+        return transactionRepository.findByUserIdAndTypeOrderByCreatedAtDesc(userId, "donate");
+    }
+
+    /** Payment transactions for a user */
+    public List<PaymentTransaction> getUserPayments(String userId) {
+        return paymentTransactionRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Gifts ─────────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     public List<Gift> getAllGifts() {
-        List<Gift> gifts = giftRepository.findAll();
+        List<Gift> gifts = giftRepository.findByActiveTrueOrderBySortOrderAsc();
         if (!gifts.isEmpty()) {
             return gifts;
         }
         List<Gift> defaults = createDefaultGifts();
         giftRepository.saveAll(defaults);
         log.info("Seeded {} default gifts for livestream donate testing", defaults.size());
-        return giftRepository.findAll();
+        return giftRepository.findByActiveTrueOrderBySortOrderAsc();
     }
 
-    // ── Donate ──────────────────────────────────────────────────────────────
+    /** Admin: Get all gifts including inactive */
+    public List<Gift> getAllGiftsAdmin() {
+        List<Gift> gifts = giftRepository.findAllByOrderBySortOrderAsc();
+        if (gifts.isEmpty()) {
+            giftRepository.saveAll(createDefaultGifts());
+            return giftRepository.findAllByOrderBySortOrderAsc();
+        }
+        return gifts;
+    }
+
+    public Gift createGift(Gift gift) {
+        gift.setCreatedAt(LocalDateTime.now());
+        gift.setUpdatedAt(LocalDateTime.now());
+        return giftRepository.save(gift);
+    }
+
+    public Gift updateGift(String id, Gift updates) {
+        Gift gift = giftRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Gift not found: " + id));
+        if (updates.getName() != null) gift.setName(updates.getName());
+        if (updates.getPrice() > 0) gift.setPrice(updates.getPrice());
+        if (updates.getEmoji() != null) gift.setEmoji(updates.getEmoji());
+        if (updates.getImageUrl() != null) gift.setImageUrl(updates.getImageUrl());
+        if (updates.getCategory() != null) gift.setCategory(updates.getCategory());
+        gift.setActive(updates.isActive());
+        gift.setSortOrder(updates.getSortOrder());
+        gift.setUpdatedAt(LocalDateTime.now());
+        return giftRepository.save(gift);
+    }
+
+    public void toggleGift(String id, boolean active) {
+        Gift gift = giftRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Gift not found: " + id));
+        gift.setActive(active);
+        gift.setUpdatedAt(LocalDateTime.now());
+        giftRepository.save(gift);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Donate ────────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     public Map<String, Object> donate(String senderId, String senderName,
                                        String receiverId, String receiverName,
@@ -69,6 +327,10 @@ public class BillingService {
 
         Gift gift = giftRepository.findById(giftId)
                 .orElseThrow(() -> new ResourceNotFoundException("Gift not found: " + giftId));
+
+        if (!gift.isActive()) {
+            throw new IllegalStateException("Quà tặng này hiện không khả dụng");
+        }
 
         Wallet senderWallet = getOrCreateWallet(senderId);
         if (senderWallet.getBalance() < gift.getPrice()) {
@@ -86,6 +348,8 @@ public class BillingService {
         walletRepository.save(receiverWallet);
 
         // Create transactions
+        LocalDateTime now = LocalDateTime.now();
+
         Transaction senderTx = new Transaction();
         senderTx.setUserId(senderId);
         senderTx.setType("donate");
@@ -97,7 +361,8 @@ public class BillingService {
         senderTx.setSenderName(senderName);
         senderTx.setReceiverId(receiverId);
         senderTx.setReceiverName(receiverName);
-        senderTx.setCreatedAt(LocalDateTime.now());
+        senderTx.setGiftMessage(giftMessage);
+        senderTx.setCreatedAt(now);
         transactionRepository.save(senderTx);
 
         Transaction receiverTx = new Transaction();
@@ -111,7 +376,8 @@ public class BillingService {
         receiverTx.setSenderName(senderName);
         receiverTx.setReceiverId(receiverId);
         receiverTx.setReceiverName(receiverName);
-        receiverTx.setCreatedAt(LocalDateTime.now());
+        receiverTx.setGiftMessage(giftMessage);
+        receiverTx.setCreatedAt(now);
         transactionRepository.save(receiverTx);
 
         log.info("🎁 Donate: {} → {} | gift={} price={}", senderName, receiverName, gift.getName(), gift.getPrice());
@@ -143,7 +409,9 @@ public class BillingService {
         return result;
     }
 
-    // ── Top Donors ──────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Top Donors ────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     public List<Map<String, Object>> getTopDonors(String receiverId) {
         MatchOperation match = Aggregation.match(
@@ -171,7 +439,9 @@ public class BillingService {
         return donors;
     }
 
-    // ── Deposit (mock for demo) ─────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Deposit (mock for demo / fallback) ────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     public Wallet depositCoins(String userId, int amount) {
         if (amount <= 0) {
@@ -208,16 +478,117 @@ public class BillingService {
         return wallet;
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Admin Reports ─────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Generate admin billing report.
+     */
+    public Map<String, Object> getAdminReport() {
+        Map<String, Object> report = new HashMap<>();
+
+        // Total revenue from successful payments
+        List<PaymentTransaction> allSuccess = paymentTransactionRepository
+                .findByUserId(null, Sort.unsorted()); // we'll use aggregation instead
+
+        // Use aggregation for total revenue
+        try {
+            MatchOperation matchSuccess = Aggregation.match(Criteria.where("status").is("SUCCESS"));
+            GroupOperation groupTotal = Aggregation.group()
+                    .sum("amountVnd").as("totalRevenue")
+                    .count().as("totalTransactions");
+            Aggregation revenueAgg = Aggregation.newAggregation(matchSuccess, groupTotal);
+            AggregationResults<Map> revenueResults = mongoTemplate.aggregate(revenueAgg, "payment_transactions", Map.class);
+            if (!revenueResults.getMappedResults().isEmpty()) {
+                Map raw = revenueResults.getMappedResults().get(0);
+                report.put("totalRevenue", raw.get("totalRevenue"));
+                report.put("totalSuccessPayments", raw.get("totalTransactions"));
+            } else {
+                report.put("totalRevenue", 0);
+                report.put("totalSuccessPayments", 0);
+            }
+        } catch (Exception e) {
+            report.put("totalRevenue", 0);
+            report.put("totalSuccessPayments", 0);
+        }
+
+        // Total transactions (all types)
+        report.put("totalPayments", paymentTransactionRepository.count());
+
+        // Total gift transactions
+        report.put("totalGiftTransactions", transactionRepository.countByType("donate"));
+
+        // Top depositors
+        try {
+            MatchOperation matchDeposit = Aggregation.match(Criteria.where("status").is("SUCCESS"));
+            GroupOperation groupDeposit = Aggregation.group("userId")
+                    .sum("amountVnd").as("totalSpent")
+                    .count().as("count");
+            SortOperation sortDeposit = Aggregation.sort(Sort.Direction.DESC, "totalSpent");
+            LimitOperation limitDeposit = Aggregation.limit(10);
+            Aggregation depositAgg = Aggregation.newAggregation(matchDeposit, groupDeposit, sortDeposit, limitDeposit);
+            AggregationResults<Map> depositResults = mongoTemplate.aggregate(depositAgg, "payment_transactions", Map.class);
+
+            List<Map<String, Object>> topDepositors = new ArrayList<>();
+            for (Map raw : depositResults.getMappedResults()) {
+                Map<String, Object> depositor = new HashMap<>();
+                depositor.put("userId", raw.get("_id"));
+                depositor.put("totalSpent", raw.get("totalSpent"));
+                depositor.put("count", raw.get("count"));
+                topDepositors.add(depositor);
+            }
+            report.put("topDepositors", topDepositors);
+        } catch (Exception e) {
+            report.put("topDepositors", List.of());
+        }
+
+        // Top streamers receiving gifts
+        try {
+            MatchOperation matchReceive = Aggregation.match(
+                    Criteria.where("type").is("receive").and("status").is("success"));
+            GroupOperation groupReceive = Aggregation.group("receiverId")
+                    .first("receiverName").as("receiverName")
+                    .sum("amount").as("totalCoins")
+                    .count().as("giftCount");
+            SortOperation sortReceive = Aggregation.sort(Sort.Direction.DESC, "totalCoins");
+            LimitOperation limitReceive = Aggregation.limit(10);
+            Aggregation receiveAgg = Aggregation.newAggregation(matchReceive, groupReceive, sortReceive, limitReceive);
+            AggregationResults<Map> receiveResults = mongoTemplate.aggregate(receiveAgg, "transactions", Map.class);
+
+            List<Map<String, Object>> topStreamers = new ArrayList<>();
+            for (Map raw : receiveResults.getMappedResults()) {
+                Map<String, Object> streamer = new HashMap<>();
+                streamer.put("receiverId", raw.get("_id"));
+                streamer.put("receiverName", raw.get("receiverName"));
+                streamer.put("totalCoins", raw.get("totalCoins"));
+                streamer.put("giftCount", raw.get("giftCount"));
+                topStreamers.add(streamer);
+            }
+            report.put("topStreamers", topStreamers);
+        } catch (Exception e) {
+            report.put("topStreamers", List.of());
+        }
+
+        return report;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Default Gifts Seed ────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
     private List<Gift> createDefaultGifts() {
-        return List.of(
-                new Gift(null, "Hoa hồng", 10, "🌹", null, "popular"),
-                new Gift(null, "Cà phê", 20, "☕", null, "popular"),
-                new Gift(null, "Trà sữa", 30, "🧋", null, "popular"),
-                new Gift(null, "Ngôi sao", 50, "⭐", null, "popular"),
-                new Gift(null, "Kim cương", 100, "💎", null, "premium"),
-                new Gift(null, "Siêu xe", 500, "🏎️", null, "premium"),
-                new Gift(null, "Tên lửa", 1000, "🚀", null, "premium"),
-                new Gift(null, "Lâu đài", 5000, "🏰", null, "premium")
+        LocalDateTime now = LocalDateTime.now();
+        List<Gift> gifts = List.of(
+                new Gift(null, "Hoa hồng", 10, "🌹", null, "popular", true, 1, now, now),
+                new Gift(null, "Cà phê", 20, "☕", null, "popular", true, 2, now, now),
+                new Gift(null, "Trà sữa", 30, "🧋", null, "popular", true, 3, now, now),
+                new Gift(null, "Ngôi sao", 50, "⭐", null, "popular", true, 4, now, now),
+                new Gift(null, "Kim cương", 100, "💎", null, "premium", true, 5, now, now),
+                new Gift(null, "Siêu xe", 500, "🏎️", null, "premium", true, 6, now, now),
+                new Gift(null, "Tên lửa", 1000, "🚀", null, "premium", true, 7, now, now),
+                new Gift(null, "Lâu đài", 5000, "🏰", null, "premium", true, 8, now, now)
         );
+        return gifts;
     }
 }

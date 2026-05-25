@@ -18,4 +18,9 @@ public class Gift {
     private String emoji;    // emoji icon e.g. 🌹
     private String imageUrl; // optional image URL
     private String category; // e.g. "popular", "premium"
+    private boolean active = true;  // admin can hide/show gifts
+    private int sortOrder = 0;      // display ordering
+
+    private java.time.LocalDateTime createdAt;
+    private java.time.LocalDateTime updatedAt;
 }
