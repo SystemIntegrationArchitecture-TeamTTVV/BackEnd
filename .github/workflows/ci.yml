@@ -19,8 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - EurekaServer
-          - CommonService
+          - AuthService
+          - SocialService
           - MessegeService
           - ApiGateway
 
