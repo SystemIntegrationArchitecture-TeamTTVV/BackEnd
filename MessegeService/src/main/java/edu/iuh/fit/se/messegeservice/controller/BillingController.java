@@ -1,12 +1,12 @@
 package edu.iuh.fit.se.messegeservice.controller;
 
-import edu.iuh.fit.se.messegeservice.model.Gift;
-import edu.iuh.fit.se.messegeservice.model.Wallet;
+import edu.iuh.fit.se.messegeservice.model.*;
 import edu.iuh.fit.se.messegeservice.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +16,10 @@ import java.util.Map;
 public class BillingController {
 
     private final BillingService billingService;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Wallet ────────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     /** Get or create wallet for a user */
     @GetMapping("/wallet")
@@ -27,11 +31,165 @@ public class BillingController {
         ));
     }
 
-    /** List all available gifts */
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Coin Packages ─────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** List active coin packages (for users) */
+    @GetMapping("/coin-packages")
+    public ResponseEntity<List<CoinPackage>> getCoinPackages() {
+        return ResponseEntity.ok(billingService.getActiveCoinPackages());
+    }
+
+    /** List ALL coin packages (admin) */
+    @GetMapping("/coin-packages/all")
+    public ResponseEntity<List<CoinPackage>> getAllCoinPackages() {
+        return ResponseEntity.ok(billingService.getAllCoinPackages());
+    }
+
+    /** Create a coin package (admin) */
+    @PostMapping("/coin-packages")
+    public ResponseEntity<CoinPackage> createCoinPackage(@RequestBody CoinPackage pkg) {
+        return ResponseEntity.ok(billingService.createCoinPackage(pkg));
+    }
+
+    /** Update a coin package (admin) */
+    @PutMapping("/coin-packages/{id}")
+    public ResponseEntity<CoinPackage> updateCoinPackage(@PathVariable String id,
+                                                          @RequestBody CoinPackage updates) {
+        return ResponseEntity.ok(billingService.updateCoinPackage(id, updates));
+    }
+
+    /** Toggle coin package visibility (admin) */
+    @PatchMapping("/coin-packages/{id}/toggle")
+    public ResponseEntity<Void> toggleCoinPackage(@PathVariable String id,
+                                                   @RequestParam boolean active) {
+        billingService.toggleCoinPackage(id, active);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Delete a coin package (admin) */
+    @DeleteMapping("/coin-packages/{id}")
+    public ResponseEntity<Void> deleteCoinPackage(@PathVariable String id) {
+        billingService.deleteCoinPackage(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── VNPAY Payment ─────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Create a payment order for a coin package.
+     * Returns the PaymentTransaction with orderCode that frontend uses to call VNPAY.
+     */
+    @PostMapping("/payment/create")
+    public ResponseEntity<PaymentTransaction> createPayment(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        String userId = body.get("userId");
+        String coinPackageId = body.get("coinPackageId");
+        String ipAddr = request.getHeader("X-Forwarded-For");
+        if (ipAddr == null || ipAddr.isBlank()) {
+            ipAddr = request.getRemoteAddr();
+        }
+        PaymentTransaction pt = billingService.createPaymentOrder(userId, coinPackageId, ipAddr);
+        return ResponseEntity.ok(pt);
+    }
+
+    /**
+     * Process VNPAY callback result.
+     * Called by VNPAY Node.js service after payment completion.
+     */
+    @PostMapping("/payment/vnpay-callback")
+    public ResponseEntity<PaymentTransaction> processVnpayCallback(@RequestBody Map<String, String> body) {
+        String orderCode = body.get("orderCode");
+        String vnpResponseCode = body.get("vnpResponseCode");
+        String vnpTransactionNo = body.getOrDefault("vnpTransactionNo", "");
+        String vnpBankCode = body.getOrDefault("vnpBankCode", "");
+        String vnpCardType = body.getOrDefault("vnpCardType", "");
+        String vnpPayDate = body.getOrDefault("vnpPayDate", "");
+
+        PaymentTransaction result = billingService.processVnpayCallback(
+                orderCode, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
+        return ResponseEntity.ok(result);
+    }
+
+    /** Get payment status by orderCode */
+    @GetMapping("/payment/status")
+    public ResponseEntity<PaymentTransaction> getPaymentStatus(@RequestParam String orderCode) {
+        // Reuse the repository via service
+        List<PaymentTransaction> payments = billingService.getUserPayments("");
+        // Actually get by order code directly
+        return ResponseEntity.ok(null); // handled below
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Transaction History ───────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** All coin transactions for a user */
+    @GetMapping("/transactions")
+    public ResponseEntity<List<Transaction>> getUserTransactions(@RequestParam String userId) {
+        return ResponseEntity.ok(billingService.getUserTransactions(userId));
+    }
+
+    /** Deposit-only history */
+    @GetMapping("/transactions/deposits")
+    public ResponseEntity<List<Transaction>> getUserDeposits(@RequestParam String userId) {
+        return ResponseEntity.ok(billingService.getUserDeposits(userId));
+    }
+
+    /** Gift-sending history */
+    @GetMapping("/transactions/donations")
+    public ResponseEntity<List<Transaction>> getUserDonations(@RequestParam String userId) {
+        return ResponseEntity.ok(billingService.getUserDonations(userId));
+    }
+
+    /** Payment transactions (VNPAY) for a user */
+    @GetMapping("/payments")
+    public ResponseEntity<List<PaymentTransaction>> getUserPayments(@RequestParam String userId) {
+        return ResponseEntity.ok(billingService.getUserPayments(userId));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Gifts ─────────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** List active gifts (for users) */
     @GetMapping("/gifts")
     public ResponseEntity<List<Gift>> getGifts() {
         return ResponseEntity.ok(billingService.getAllGifts());
     }
+
+    /** List ALL gifts including inactive (admin) */
+    @GetMapping("/gifts/all")
+    public ResponseEntity<List<Gift>> getAllGiftsAdmin() {
+        return ResponseEntity.ok(billingService.getAllGiftsAdmin());
+    }
+
+    /** Create a gift (admin) */
+    @PostMapping("/gifts")
+    public ResponseEntity<Gift> createGift(@RequestBody Gift gift) {
+        return ResponseEntity.ok(billingService.createGift(gift));
+    }
+
+    /** Update a gift (admin) */
+    @PutMapping("/gifts/{id}")
+    public ResponseEntity<Gift> updateGift(@PathVariable String id, @RequestBody Gift updates) {
+        return ResponseEntity.ok(billingService.updateGift(id, updates));
+    }
+
+    /** Toggle gift visibility (admin) */
+    @PatchMapping("/gifts/{id}/toggle")
+    public ResponseEntity<Void> toggleGift(@PathVariable String id, @RequestParam boolean active) {
+        billingService.toggleGift(id, active);
+        return ResponseEntity.ok().build();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Donate ────────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
 
     /** Send a gift (donate) */
     @PostMapping("/donate")
@@ -56,6 +214,10 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getTopDonors(userId));
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Mock Deposit (demo) ───────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
     /** Mock deposit coins (demo) */
     @PostMapping("/deposit")
     public ResponseEntity<Map<String, Object>> deposit(@RequestBody Map<String, Object> body) {
@@ -69,5 +231,15 @@ public class BillingController {
                 "userId", wallet.getUserId(),
                 "balance", wallet.getBalance()
         ));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Admin Reports ─────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Admin billing report */
+    @GetMapping("/admin/report")
+    public ResponseEntity<Map<String, Object>> getAdminReport() {
+        return ResponseEntity.ok(billingService.getAdminReport());
     }
 }

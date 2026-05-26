@@ -33,5 +33,7 @@ public class Transaction {
     private String receiverName;
 
     private String status = "success";
+    private String giftMessage;    // optional message with gift
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
