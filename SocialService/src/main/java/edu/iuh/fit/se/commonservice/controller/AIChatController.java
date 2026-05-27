@@ -17,6 +17,7 @@ import edu.iuh.fit.se.commonservice.dto.AIDailySummaryRequestDTO;
 import edu.iuh.fit.se.commonservice.dto.AIDailySummaryResponseDTO;
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.service.AIChatService;
+import edu.iuh.fit.se.commonservice.service.DataQueryService;
 import edu.iuh.fit.se.commonservice.service.PostService;
 import lombok.RequiredArgsConstructor;
 
@@ -26,18 +27,47 @@ import lombok.RequiredArgsConstructor;
 public class AIChatController {
 
     private final AIChatService aiChatService;
+    private final DataQueryService dataQueryService;
     private final PostService postService;
 
     @PostMapping("/chat")
     public ResponseEntity<AIChatResponseDTO> chat(@RequestBody AIChatRequestDTO request) {
         try {
+            String msg = request.getMessage() != null ? request.getMessage().toLowerCase() : "";
+            boolean isDataQueryRequest = false;
+
+            // Check if the message contains data query keywords
+            if (msg.contains("bao nhiêu") || msg.contains("mấy") || msg.contains("đếm") || msg.contains("liệt kê") 
+                || msg.contains("danh sách") || msg.contains("thông báo") || msg.contains("bài viết") 
+                || msg.contains("bài post") || msg.contains("bài đăng") || msg.contains("post")
+                || msg.contains("bạn bè") || msg.contains("sản phẩm") || msg.contains("bình luận") 
+                || msg.contains("comment") || msg.contains("like") || msg.contains("thích") || msg.contains("tương tác") 
+                || msg.contains("lưu") || msg.contains("tin nhắn") || msg.contains("group") 
+                || msg.contains("nhóm") || msg.contains("react") || msg.contains("story")
+                || msg.contains("tin đăng") || msg.contains("chợ") || msg.contains("đăng bán")
+                || msg.contains("notification") || msg.contains("friend")) {
+                isDataQueryRequest = true;
+            }
+
+            if (isDataQueryRequest || "DATA_QUERY".equalsIgnoreCase(request.getMode())) {
+                AIChatResponseDTO queryResponse = dataQueryService.processDataQuery(
+                        request.getMessage(), request.getUserId()
+                );
+                
+                // If it successfully generated query and retrieved data, return it
+                if (queryResponse.getData() != null || queryResponse.getGeneratedQuery() != null) {
+                    return ResponseEntity.ok(queryResponse);
+                }
+            }
+
+            // Otherwise, fall back to standard CHAT mode (Gemini)
             AIChatResponseDTO response = aiChatService.chat(request);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             // Return error response
             AIChatResponseDTO errorResponse = new AIChatResponseDTO(
                     "Xin lỗi, đã xảy ra lỗi: " + e.getMessage(),
-                    null
+                    null, null, null, null
             );
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
