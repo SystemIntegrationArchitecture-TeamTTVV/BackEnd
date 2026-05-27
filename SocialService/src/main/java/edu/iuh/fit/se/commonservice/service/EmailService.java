@@ -103,4 +103,73 @@ public class EmailService {
             </html>
             """.formatted(userName, resetLink, resetLink, resetLink);
     }
+
+    public void sendLivestreamQuotationEmail(String toEmail, String userName, String packageName) {
+        if (resendApiKey == null || resendApiKey.isEmpty()) {
+            log.warn("⚠️ Resend API key not configured. Quotation email not sent.");
+            return;
+        }
+
+        try {
+            Resend resend = new Resend(resendApiKey);
+            String htmlContent = buildLivestreamQuotationEmailHtml(userName, packageName);
+
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                    .from(fromEmail)
+                    .to(toEmail)
+                    .subject("Xác nhận đăng ký dịch vụ Livestream - TTVV")
+                    .html(htmlContent)
+                    .build();
+
+            CreateEmailResponse data = resend.emails().send(params);
+            log.info("✅ Livestream quotation email sent successfully. Email ID: {}", data.getId());
+
+        } catch (ResendException e) {
+            log.error("❌ Failed to send livestream quotation email: {}", e.getMessage());
+        }
+    }
+
+    private String buildLivestreamQuotationEmailHtml(String userName, String packageName) {
+        String price = packageName != null && packageName.toLowerCase().contains("cơ bản") ? "1.500.000đ/tháng" : "3.500.000đ/tháng";
+        
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: %%23333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, %%23667eea 0%%, %%23764ba2 100%%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: %%23ffffff; padding: 30px; border: 1px solid %%23e0e0e0; }
+                    .button { display: inline-block; padding: 12px 30px; background: %%23667eea; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2 style="margin: 0;">🎉 Xác nhận đăng ký dịch vụ Livestream</h2>
+                    </div>
+                    <div class="content">
+                        <p>Xin chào <strong>%s</strong>,</p>
+                        <p>Cảm ơn bạn đã quan tâm và đăng ký dịch vụ Livestream của hệ thống TTVV.</p>
+                        <p>Dưới đây là thông tin gói dịch vụ bạn đã chọn qua cuộc gọi AI tư vấn:</p>
+                        <ul style="background: %%23f9f9f9; padding: 15px 30px; border-radius: 5px;">
+                            <li><strong>Tên gói:</strong> %s</li>
+                            <li><strong>Chi phí:</strong> %s</li>
+                        </ul>
+                        <p>Để hoàn tất đăng ký và kích hoạt dịch vụ, vui lòng thanh toán và điền thông tin tại liên kết dưới đây:</p>
+                        <div style="text-align: center;">
+                            <a href="%s" class="button">Thanh toán & Kích hoạt ngay</a>
+                        </div>
+                        <p>Nếu bạn có bất kỳ câu hỏi nào, vui lòng trả lời trực tiếp email này.</p>
+                        <p>Trân trọng,<br>Đội ngũ TTVV.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(userName != null ? userName : "Quý khách", 
+                          packageName != null ? packageName : "Gói Livestream", 
+                          price, baseUrl + "/livestream/checkout");
+    }
 }
