@@ -5,10 +5,8 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
-# Copy Maven descriptor and wrapper (if any) first to leverage Docker layer cache
+# Copy Maven descriptor first to leverage Docker layer cache
 COPY pom.xml ./
-COPY mvnw mvnw.cmd* . || true
-COPY .mvn .mvn || true
 
 # Download dependencies (will be cached if pom.xml does not change)
 RUN mvn -q -B dependency:go-offline
