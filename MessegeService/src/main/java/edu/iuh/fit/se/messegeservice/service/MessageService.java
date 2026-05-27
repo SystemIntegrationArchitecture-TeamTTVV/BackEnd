@@ -50,6 +50,7 @@ public class MessageService {
     private final HiddenConversationRepository hiddenConversationRepository;
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
+    private final ModerationService moderationService;
 
     @Value("${chat.message.recall-window-seconds:120}")
     private long recallWindowSeconds;
@@ -263,6 +264,16 @@ public class MessageService {
 
         ensureCanSend(conversation, messageDTO.getSenderId());
 
+        // 🛡️ BƯỚC KIỂM DUYỆT TIN NHẮN (MODERATION)
+        String rawContent = messageDTO.getContent();
+        if (rawContent != null && !rawContent.trim().isBlank()) {
+            ModerationService.ModerationResult modResult = moderationService.moderate(rawContent);
+            if (modResult.violate()) {
+                log.warn("🚨 [Moderation] Message blocked! Sender: {}, Reason: {}", messageDTO.getSenderId(), modResult.reason());
+                throw new IllegalArgumentException("Tin nhắn vi phạm tiêu chuẩn cộng đồng: " + modResult.reason());
+            }
+        }
+
         Message message = toEntity(messageDTO, conversation);
         message.setMessageType(TYPE_TEXT);
         message.setSystemAction(null);
@@ -347,6 +358,15 @@ public class MessageService {
             throw new IllegalArgumentException("Edited message cannot be empty");
         }
         
+        // 🛡️ BƯỚC KIỂM DUYỆT TIN NHẮN (MODERATION) KHI UPDATE
+        if (!nextContent.isBlank()) {
+            ModerationService.ModerationResult modResult = moderationService.moderate(nextContent);
+            if (modResult.violate()) {
+                log.warn("🚨 [Moderation] Edited message blocked! Sender: {}, Reason: {}", messageDTO.getSenderId(), modResult.reason());
+                throw new IllegalArgumentException("Tin nhắn vi phạm tiêu chuẩn cộng đồng: " + modResult.reason());
+            }
+        }
+
         message.setContent(nextContent);
         message.setAttachments(messageDTO.getAttachments());
         message.setMentionUserIds(resolveMentionUserIds(messageDTO, conversation));

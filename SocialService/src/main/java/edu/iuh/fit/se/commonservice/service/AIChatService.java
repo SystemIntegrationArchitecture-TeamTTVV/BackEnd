@@ -51,6 +51,57 @@ public class AIChatService {
     @Value("${ai.gemini.api-key:}")
     private String geminiApiKey;
 
+    // Quản lý ngữ cảnh hội thoại thông minh lưu trong bộ nhớ tạm (In-memory Session Cache)
+    private final java.util.concurrent.ConcurrentHashMap<String, ConversationContext> activeSessions = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static class ChatMessage {
+        private final String role;
+        private final String text;
+
+        public ChatMessage(String role, String text) {
+            this.role = role;
+            this.text = text;
+        }
+
+        public String getRole() { return role; }
+        public String getText() { return text; }
+    }
+
+    private static class ConversationContext {
+        private final List<ChatMessage> history = new java.util.ArrayList<>();
+        private java.time.Instant lastActivityTime = java.time.Instant.now();
+
+        public List<ChatMessage> getHistory() { return history; }
+        public java.time.Instant getLastActivityTime() { return lastActivityTime; }
+        public void updateLastActivityTime() { this.lastActivityTime = java.time.Instant.now(); }
+    }
+
+    private String checkGreetingOrGoodbye(String message) {
+        if (message == null) return null;
+        String clean = message.trim().toLowerCase()
+            .replaceAll("[.,!?~;:\\-]", "");
+        
+        // Nhận diện nhanh các câu chào hỏi tiếng Việt / tiếng Anh phổ biến
+        if (clean.equals("chào") || clean.equals("hi") || clean.equals("hello") || 
+            clean.equals("xin chào") || clean.equals("chào em") || clean.equals("chào bạn") || 
+            clean.equals("chào ad") || clean.equals("chào anh") || clean.equals("chào chị") || 
+            clean.equals("chào trợ lý") || clean.equals("chào robot") || clean.startsWith("chào em ") ||
+            clean.startsWith("chào bạn ") || clean.startsWith("chào anh ") || clean.startsWith("chào chị ") ||
+            clean.startsWith("chào ad ") || clean.startsWith("xin chào ")) {
+            return "Chào bạn! Tôi là trợ lý AI của TTVV.";
+        }
+        
+        // Nhận diện nhanh các câu tạm biệt phổ biến
+        if (clean.equals("tạm biệt") || clean.equals("bye") || clean.equals("tạm biệt bạn") || 
+            clean.equals("tạm biệt em") || clean.equals("tạm biệt ad") || clean.equals("tạm biệt trợ lý") || 
+            clean.equals("tạm biệt robot") || clean.equals("goodbye") || clean.startsWith("tạm biệt ") ||
+            clean.startsWith("bye ")) {
+            return "Tạm biệt bạn!";
+        }
+        
+        return null;
+    }
+
     // Sử dụng gemini-2.5-flash-lite như user yêu cầu (model nhẹ)
     private static final String GEMINI_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
@@ -85,7 +136,7 @@ public class AIChatService {
                 + "Không thêm lời dẫn kiểu AI, không markdown, không tiêu đề phụ. "
                 + "Giữ dưới 180 từ. Ý tưởng người dùng: " + idea;
 
-        AIChatRequestDTO request = new AIChatRequestDTO(prompt, userId, null);
+        AIChatRequestDTO request = new AIChatRequestDTO(prompt, userId, null, "CHAT");
         AIChatResponseDTO response = chat(request);
         return response.getResponse();
     }
@@ -128,7 +179,7 @@ public class AIChatService {
         List<Map<String, Object>> incomingMessagesForPrompt = collectIncomingMessagesToday(userId, startOfDay, maxItems);
 
         String prompt = buildDailySummaryPrompt(userId, notificationsForPrompt, friendPostsForPrompt, incomingMessagesForPrompt);
-        String aiSummary = chat(new AIChatRequestDTO(prompt, userId, null)).getResponse();
+        String aiSummary = chat(new AIChatRequestDTO(prompt, userId, null, "CHAT")).getResponse();
 
         if (aiSummary == null || aiSummary.isBlank()) {
             aiSummary = "Hôm nay chưa có nhiều hoạt động mới để tóm tắt.";
@@ -157,18 +208,102 @@ public class AIChatService {
                 throw new RuntimeException("Thiếu cấu hình ai.gemini.api-key. Vui lòng cấu hình API key mới.");
             }
 
-            // Build request body for Gemini API
+            // 1. Phản hồi nhanh các câu chào và tạm biệt (Không tốn token, phản hồi tức thì 1ms)
+            String directAnswer = checkGreetingOrGoodbye(request.getMessage());
+            if (directAnswer != null) {
+                log.info("⚡ [AIChat] Fast-local bypass triggered for greeting/goodbye: '{}'", request.getMessage());
+                String sessionKey = request.getConversationId();
+                if (sessionKey == null || sessionKey.isBlank()) {
+                    sessionKey = request.getUserId();
+                }
+                if (sessionKey != null) {
+                    ConversationContext context = activeSessions.computeIfAbsent(sessionKey, k -> new ConversationContext());
+                    context.updateLastActivityTime();
+                }
+                return new AIChatResponseDTO(
+                        directAnswer,
+                        request.getConversationId() != null ? request.getConversationId() : generateConversationId(request.getUserId()),
+                        null,
+                        null,
+                        "CHAT"
+                );
+            }
+
+            // 2. Quản lý ngữ cảnh thông minh (Context History)
+            String sessionKey = request.getConversationId();
+            if (sessionKey == null || sessionKey.isBlank()) {
+                sessionKey = request.getUserId();
+            }
+
+            ConversationContext context = activeSessions.computeIfAbsent(sessionKey, k -> new ConversationContext());
+            java.time.Instant now = java.time.Instant.now();
+
+            // Nếu không hoạt động trong 60 giây (1 phút), tự động đóng/xoá context cũ
+            if (java.time.Duration.between(context.getLastActivityTime(), now).getSeconds() > 60) {
+                log.info("⏰ [AIChat] Context timeout (>60s) for session {}. Cleared previous history.", sessionKey);
+                context.getHistory().clear();
+            }
+
+            // Thêm tin nhắn của người dùng vào context
+            context.getHistory().add(new ChatMessage("user", request.getMessage()));
+            context.updateLastActivityTime();
+
+            // Giới hạn tối đa 14 tin nhắn (7 lượt đối thoại) để tránh lag và tối ưu token
+            while (context.getHistory().size() > 14) {
+                context.getHistory().remove(0);
+            }
+
+            // Xây dựng request body chứa toàn bộ lịch sử ngữ cảnh
             Map<String, Object> requestBody = new HashMap<>();
+
+            // System Instruction — định danh vai trò + giới hạn phạm vi trả lời (QUAN TRỌNG!)
+            Map<String, Object> sysTextPart = new HashMap<>();
+            sysTextPart.put("text",
+                "Bạn là Trợ lý TTVV — chatbot hỗ trợ chính thức của mạng xã hội TTVV. " +
+                "Luôn trả lời bằng tiếng Việt tự nhiên, thân thiện, ngắn gọn và dễ hiểu. " +
+                "Không bao giờ tự xưng là 'mô hình ngôn ngữ', 'AI của Google', hay bất kỳ tên nào khác ngoài 'Trợ lý TTVV'. " +
+
+                "PHẠM VI HỖ TRỢ (CHỈ trả lời những câu hỏi thuộc các chủ đề sau): " +
+                "1. Hướng dẫn sử dụng các tính năng của TTVV: đăng bài, bình luận, thích, chia sẻ, stories, livestream, nhắn tin, gọi video, tìm kiếm. " +
+                "2. Quản lý tài khoản: đổi mật khẩu, cập nhật thông tin cá nhân, ảnh đại diện, quyền riêng tư, bảo mật. " +
+                "3. Kết bạn, quản lý bạn bè, chặn người dùng, báo cáo vi phạm. " +
+                "4. Đăng bán sản phẩm trên Chợ TTVV, quản lý đơn hàng. " +
+                "5. Thông báo, cài đặt thông báo, quản lý thông báo. " +
+                "6. Nhóm (Group): tạo nhóm, quản lý nhóm, đăng bài trong nhóm. " +
+                "7. Mini Games, âm nhạc, và các tính năng giải trí trên TTVV. " +
+                "8. Giải đáp lỗi thường gặp khi sử dụng ứng dụng TTVV (ví dụ: không tải được ảnh, không gửi được tin nhắn). " +
+                "9. Câu hỏi chung về nền tảng TTVV: chính sách, điều khoản sử dụng, tiêu chuẩn cộng đồng. " +
+
+                "NGOÀI PHẠM VI (BẮT BUỘC từ chối lịch sự nếu câu hỏi thuộc các chủ đề sau): " +
+                "- Lập trình, code, kiến trúc phần mềm, API, database, backend, frontend, framework. " +
+                "- Toán học, vật lý, hóa học, bài tập, luận văn, nghiên cứu khoa học. " +
+                "- Tư vấn y tế, pháp lý, tài chính, đầu tư. " +
+                "- Chính trị, tôn giáo, nội dung nhạy cảm, bạo lực. " +
+                "- Bất kỳ chủ đề nào KHÔNG liên quan đến việc sử dụng mạng xã hội TTVV. " +
+                "Khi từ chối, trả lời theo mẫu: 'Xin lỗi bạn, Trợ lý TTVV hiện chỉ hỗ trợ các câu hỏi liên quan đến việc sử dụng mạng xã hội TTVV " +
+                "(đăng bài, kết bạn, nhắn tin, cài đặt tài khoản, v.v.). Bạn có thể hỏi mình về cách sử dụng TTVV nhé!' " +
+
+                "QUY TẮC TRẢ LỜI: " +
+                "- Ngắn gọn, tối đa 3-4 câu trừ khi cần hướng dẫn chi tiết từng bước. " +
+                "- Khi hướng dẫn từng bước, đánh số rõ ràng (1, 2, 3...). " +
+                "- Không dùng markdown, không dùng ký tự đặc biệt phức tạp. " +
+                "- Thân thiện, gần gũi như đang trò chuyện với bạn bè.");
+            Map<String, Object> sysInstruction = new HashMap<>();
+            sysInstruction.put("parts", new Object[]{sysTextPart});
+            requestBody.put("systemInstruction", sysInstruction);
+
+            List<Map<String, Object>> contentsList = new ArrayList<>();
             
-            // Contents array
-            Map<String, Object> part = new HashMap<>();
-            part.put("text", request.getMessage());
-            
-            Map<String, Object> role = new HashMap<>();
-            role.put("parts", new Object[]{part});
-            role.put("role", "user");
-            
-            requestBody.put("contents", new Object[]{role});
+            for (ChatMessage msg : context.getHistory()) {
+                Map<String, Object> part = new HashMap<>();
+                part.put("text", msg.getText());
+                
+                Map<String, Object> contentObj = new HashMap<>();
+                contentObj.put("parts", new Object[]{part});
+                contentObj.put("role", msg.getRole());
+                contentsList.add(contentObj);
+            }
+            requestBody.put("contents", contentsList);
 
             // Build HTTP request
             HttpHeaders headers = new HttpHeaders();
@@ -178,7 +313,7 @@ public class AIChatService {
             
             HttpEntity<Map<String, Object>> httpEntity = new HttpEntity<>(requestBody, headers);
             
-            log.debug("🤖 [AIChat] Calling Gemini API: {}", url);
+            log.debug("🤖 [AIChat] Calling Gemini API with context history: {}", url);
             
             ResponseEntity<String> response = restTemplate.exchange(
                     url,
@@ -194,11 +329,18 @@ public class AIChatService {
                 // Extract text from response
                 String aiResponse = extractTextFromResponse(jsonResponse);
                 
-                log.info("✅ [AIChat] Successfully got response from Gemini");
+                // Lưu phản hồi của AI vào lịch sử ngữ cảnh
+                context.getHistory().add(new ChatMessage("model", aiResponse));
+                context.updateLastActivityTime();
+
+                log.info("✅ [AIChat] Successfully got response from Gemini with history context");
                 
                 return new AIChatResponseDTO(
                         aiResponse,
-                        request.getConversationId() != null ? request.getConversationId() : generateConversationId(request.getUserId())
+                        request.getConversationId() != null ? request.getConversationId() : generateConversationId(request.getUserId()),
+                        null,
+                        null,
+                        "CHAT"
                 );
             } else {
                 log.error("❌ [AIChat] Gemini API returned error: {}", response.getStatusCode());
@@ -234,7 +376,7 @@ public class AIChatService {
         String conversationId = request.getConversationId() != null
                 ? request.getConversationId()
                 : generateConversationId(request.getUserId());
-        return CompletableFuture.completedFuture(new AIChatResponseDTO(fallbackMessage, conversationId));
+        return CompletableFuture.completedFuture(new AIChatResponseDTO(fallbackMessage, conversationId, null, null, "CHAT"));
     }
 
     private List<Map<String, Object>> collectIncomingMessagesToday(String userId, LocalDateTime startOfDay, int maxItems) {
