@@ -24,6 +24,7 @@ COPY --from=build /app/target/AuthService-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8083
 
 ENV PORT=8083
-ENV SPRING_PROFILES_ACTIVE=docker
+# Profile set via env var on deployment platform
+# ENV SPRING_PROFILES_ACTIVE=docker
 
 CMD ["sh", "-c", "java -Dserver.port=${PORT} -jar app.jar"]
