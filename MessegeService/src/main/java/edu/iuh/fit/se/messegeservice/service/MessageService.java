@@ -264,9 +264,10 @@ public class MessageService {
 
         ensureCanSend(conversation, messageDTO.getSenderId());
 
-        // 🛡️ BƯỚC KIỂM DUYỆT TIN NHẮN (MODERATION)
+        // 🛡️ BƯỚC KIỂM DUYỆT TIN NHẮN (MODERATION) - Chỉ kiểm duyệt khi gửi kèm file (attachments)
+        boolean hasFiles = messageDTO.getAttachments() != null && !messageDTO.getAttachments().isEmpty();
         String rawContent = messageDTO.getContent();
-        if (rawContent != null && !rawContent.trim().isBlank()) {
+        if (hasFiles && rawContent != null && !rawContent.trim().isBlank()) {
             ModerationService.ModerationResult modResult = moderationService.moderate(rawContent);
             if (modResult.violate()) {
                 log.warn("🚨 [Moderation] Message blocked! Sender: {}, Reason: {}", messageDTO.getSenderId(), modResult.reason());
@@ -358,8 +359,9 @@ public class MessageService {
             throw new IllegalArgumentException("Edited message cannot be empty");
         }
         
-        // 🛡️ BƯỚC KIỂM DUYỆT TIN NHẮN (MODERATION) KHI UPDATE
-        if (!nextContent.isBlank()) {
+        // 🛡️ BƯỚC KIỂM DUYỆT TIN NHẮN (MODERATION) KHI UPDATE - Chỉ kiểm duyệt khi gửi kèm file (attachments)
+        boolean hasFiles = messageDTO.getAttachments() != null && !messageDTO.getAttachments().isEmpty();
+        if (hasFiles && !nextContent.isBlank()) {
             ModerationService.ModerationResult modResult = moderationService.moderate(nextContent);
             if (modResult.violate()) {
                 log.warn("🚨 [Moderation] Edited message blocked! Sender: {}, Reason: {}", messageDTO.getSenderId(), modResult.reason());
