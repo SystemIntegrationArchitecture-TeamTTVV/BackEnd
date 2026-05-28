@@ -24,6 +24,7 @@ COPY --from=build /app/target/MessegeService-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8082
 
 ENV PORT=8082
-ENV SPRING_PROFILES_ACTIVE=docker
+# Profile set via env var on deployment platform
+# ENV SPRING_PROFILES_ACTIVE=docker
 
 CMD ["sh", "-c", "java -Dserver.port=${PORT} -jar app.jar"]

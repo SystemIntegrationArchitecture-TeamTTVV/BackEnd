@@ -30,21 +30,15 @@ public class FriendRequestService {
     private final NotificationService notificationService;
 
     public List<FriendRequestDTO> getFriendRequestsBySenderId(String senderId) {
-        return friendRequestRepository.findBySenderId(senderId).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(friendRequestRepository.findBySenderId(senderId));
     }
 
     public List<FriendRequestDTO> getFriendRequestsByReceiverId(String receiverId) {
-        return friendRequestRepository.findByReceiverId(receiverId).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(friendRequestRepository.findByReceiverId(receiverId));
     }
 
     public List<FriendRequestDTO> getPendingFriendRequestsByReceiverId(String receiverId) {
-        return friendRequestRepository.findByReceiverIdAndStatus(receiverId, "PENDING").stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(friendRequestRepository.findByReceiverIdAndStatus(receiverId, "PENDING"));
     }
 
     public FriendRequestDTO getFriendRequestById(String id) {
@@ -403,6 +397,66 @@ public class FriendRequestService {
             friendRequest.setReceiverId(dto.getReceiverId());
         }
         return friendRequest;
+    }
+
+    private List<FriendRequestDTO> toDTOs(List<FriendRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        java.util.Set<String> userIds = requests.stream()
+                .flatMap(r -> java.util.stream.Stream.of(r.getSenderId(), r.getReceiverId()))
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+
+        java.util.Map<String, UserDTO> userMap = new java.util.HashMap<>();
+        if (!userIds.isEmpty()) {
+            try {
+                List<UserDTO> users = authServiceClient.batchLookup(new java.util.ArrayList<>(userIds));
+                if (users != null) {
+                    for (UserDTO user : users) {
+                        if (user != null && user.getId() != null) {
+                            userMap.put(user.getId(), user);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in batch lookup users in FriendRequestService: {}", e.getMessage());
+            }
+        }
+
+        return requests.stream()
+                .map(r -> toDTOWithCache(r, userMap))
+                .collect(Collectors.toList());
+    }
+
+    private FriendRequestDTO toDTOWithCache(FriendRequest friendRequest, java.util.Map<String, UserDTO> userMap) {
+        FriendRequestDTO dto = new FriendRequestDTO();
+        dto.setId(friendRequest.getId());
+        dto.setSenderId(friendRequest.getSenderId());
+        if (friendRequest.getSenderId() != null) {
+            UserDTO sender = userMap.get(friendRequest.getSenderId());
+            if (sender != null) {
+                dto.setSenderName(sender.getFullName() != null ? sender.getFullName() : sender.getUsername());
+                dto.setSenderAvatar(sender.getAvatar());
+            } else {
+                dto.setSenderName("Unknown");
+            }
+        }
+        dto.setReceiverId(friendRequest.getReceiverId());
+        if (friendRequest.getReceiverId() != null) {
+            UserDTO receiver = userMap.get(friendRequest.getReceiverId());
+            if (receiver != null) {
+                dto.setReceiverName(receiver.getFullName() != null ? receiver.getFullName() : receiver.getUsername());
+                dto.setReceiverAvatar(receiver.getAvatar());
+            } else {
+                dto.setReceiverName("Unknown");
+            }
+        }
+        dto.setStatus(friendRequest.getStatus());
+        dto.setCreatedAt(friendRequest.getCreatedAt());
+        dto.setUpdatedAt(friendRequest.getUpdatedAt());
+        return dto;
     }
 }
 

@@ -30,7 +30,7 @@ EXPOSE 8088
 
 ENV PORT=8088
 
-# Activate 'docker' profile by default inside containers
-ENV SPRING_PROFILES_ACTIVE=docker
+# Profile set via env var on deployment platform
+# ENV SPRING_PROFILES_ACTIVE=docker
 
 CMD ["sh", "-c", "java -Dserver.port=${PORT} -jar app.jar"]

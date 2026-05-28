@@ -7,6 +7,7 @@ import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 // is silently dropped to prevent spam notifications.
 // Value must be kept short enough not to suppress legitimate repeated actions (e.g. 30 s).
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -28,15 +30,11 @@ public class NotificationService {
     private final SocketService socketService;
 
     public List<NotificationDTO> getNotificationsByRecipientId(String recipientId) {
-        return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId));
     }
 
     public List<NotificationDTO> getUnreadNotificationsByRecipientId(String recipientId) {
-        return notificationRepository.findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(recipientId).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(notificationRepository.findByRecipientIdAndIsReadFalseOrderByCreatedAtDesc(recipientId));
     }
 
     public long getUnreadNotificationCount(String recipientId) {
@@ -50,15 +48,11 @@ public class NotificationService {
     }
 
     public List<NotificationDTO> getNotificationsByRecipientIdAndType(String recipientId, String type) {
-        return notificationRepository.findByRecipientIdAndTypeOrderByCreatedAtDesc(recipientId, type).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(notificationRepository.findByRecipientIdAndTypeOrderByCreatedAtDesc(recipientId, type));
     }
 
     public List<NotificationDTO> getNotificationsByRecipientIdAndTypes(String recipientId, List<String> types) {
-        return notificationRepository.findByRecipientIdAndTypeInOrderByCreatedAtDesc(recipientId, types).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOs(notificationRepository.findByRecipientIdAndTypeInOrderByCreatedAtDesc(recipientId, types));
     }
 
     public NotificationDTO createNotification(NotificationDTO notificationDTO) {
@@ -181,6 +175,70 @@ public class NotificationService {
         notification.setRelatedId(dto.getRelatedId());
         notification.setRelatedType(dto.getRelatedType());
         return notification;
+    }
+
+    private List<NotificationDTO> toDTOs(List<Notification> notifications) {
+        if (notifications == null || notifications.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        java.util.Set<String> userIds = notifications.stream()
+                .flatMap(n -> java.util.stream.Stream.of(n.getRecipientId(), n.getActorId()))
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+
+        java.util.Map<String, UserDTO> userMap = new java.util.HashMap<>();
+        if (!userIds.isEmpty()) {
+            try {
+                List<UserDTO> users = authServiceClient.batchLookup(new java.util.ArrayList<>(userIds));
+                if (users != null) {
+                    for (UserDTO user : users) {
+                        if (user != null && user.getId() != null) {
+                            userMap.put(user.getId(), user);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in batch lookup users: {}", e.getMessage());
+            }
+        }
+
+        return notifications.stream()
+                .map(n -> toDTOWithCache(n, userMap))
+                .collect(Collectors.toList());
+    }
+
+    private NotificationDTO toDTOWithCache(Notification notification, java.util.Map<String, UserDTO> userMap) {
+        NotificationDTO dto = new NotificationDTO();
+        dto.setId(notification.getId());
+        dto.setRecipientId(notification.getRecipientId());
+        if (notification.getRecipientId() != null) {
+            UserDTO recipient = userMap.get(notification.getRecipientId());
+            if (recipient != null) {
+                dto.setRecipientName(recipient.getFullName() != null ? recipient.getFullName() : recipient.getUsername());
+            } else {
+                dto.setRecipientName("Unknown");
+            }
+        }
+        dto.setActorId(notification.getActorId());
+        if (notification.getActorId() != null) {
+            UserDTO actor = userMap.get(notification.getActorId());
+            if (actor != null) {
+                dto.setActorName(actor.getFullName() != null ? actor.getFullName() : actor.getUsername());
+                dto.setActorAvatar(actor.getAvatar());
+            } else {
+                dto.setActorName("Unknown");
+            }
+        }
+        dto.setType(notification.getType());
+        dto.setTitle(notification.getTitle());
+        dto.setContent(notification.getContent());
+        dto.setImage(notification.getImage());
+        dto.setRelatedId(notification.getRelatedId());
+        dto.setRelatedType(notification.getRelatedType());
+        dto.setRead(notification.isRead());
+        dto.setCreatedAt(notification.getCreatedAt());
+        return dto;
     }
 }
 
