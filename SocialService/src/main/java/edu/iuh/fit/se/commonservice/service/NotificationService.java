@@ -2,12 +2,15 @@ package edu.iuh.fit.se.commonservice.service;
 
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
+import edu.iuh.fit.se.commonservice.event.NotificationCreatedEvent;
 import edu.iuh.fit.se.commonservice.model.Notification;
 import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,6 +31,10 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    @Value("${app.kafka.enabled:true}")
+    private boolean kafkaEnabled;
 
     public List<NotificationDTO> getNotificationsByRecipientId(String recipientId) {
         return toDTOs(notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId));
@@ -93,7 +100,25 @@ public class NotificationService {
                 }
             } catch (Exception e) {}
         }
-        
+
+        // Publish event to Kafka for cross-service awareness
+        if (kafkaEnabled) {
+            try {
+                kafkaTemplate.send("ttvv.notification.created", savedDTO.getRecipientId(),
+                        new NotificationCreatedEvent(
+                                savedDTO.getRecipientId(),
+                                savedDTO.getActorId(),
+                                savedDTO.getType(),
+                                savedDTO.getTitle(),
+                                savedDTO.getContent(),
+                                savedDTO.getRelatedId(),
+                                java.time.Instant.now()
+                        ));
+            } catch (Exception e) {
+                log.warn("[Kafka] Failed to publish notification event: {}", e.getMessage());
+            }
+        }
+
         return savedDTO;
     }
 

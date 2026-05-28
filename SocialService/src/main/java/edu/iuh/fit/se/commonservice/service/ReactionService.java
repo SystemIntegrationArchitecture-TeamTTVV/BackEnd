@@ -16,9 +16,13 @@ import edu.iuh.fit.se.commonservice.repository.CommentRepository;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.repository.ReactionRepository;
 import edu.iuh.fit.se.commonservice.repository.VideoRepository;
+import edu.iuh.fit.se.commonservice.event.PostLikedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReactionService {
@@ -30,6 +34,7 @@ public class ReactionService {
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final VideoRepository videoRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public List<ReactionDTO> getReactionsByPostId(String postId) {
         return reactionRepository.findByPostId(postId).stream()
@@ -71,7 +76,10 @@ public class ReactionService {
         if (existingReaction != null) {
             existingReaction.setType(reactionDTO.getType());
             Reaction updated = reactionRepository.save(existingReaction);
-            updateReactionCounts(reactionDTO);
+            
+            // Publish Liked Event asynchronously instead of blocking DB count
+            publishLikeEvent(reactionDTO.getPostId(), reactionDTO.getUserId(), true);
+
             ReactionDTO updatedDTO = toDTO(updated);
             sendReactionEvent(reactionDTO, updatedDTO);
             return updatedDTO;
@@ -80,10 +88,24 @@ public class ReactionService {
         Reaction reaction = toEntity(reactionDTO);
         reaction.setCreatedAt(LocalDateTime.now());
         Reaction saved = reactionRepository.save(reaction);
-        updateReactionCounts(reactionDTO);
+        
+        // Publish Liked Event asynchronously instead of blocking DB count
+        publishLikeEvent(reactionDTO.getPostId(), reactionDTO.getUserId(), true);
+
         ReactionDTO savedDTO = toDTO(saved);
         sendReactionEvent(reactionDTO, savedDTO);
         return savedDTO;
+    }
+
+    private void publishLikeEvent(String postId, String userId, boolean liked) {
+        if (postId == null) return;
+        try {
+            kafkaTemplate.send("ttvv.post.liked", postId,
+                    new PostLikedEvent(postId, userId, liked, java.time.Instant.now()));
+            log.info("[Kafka] Published ttvv.post.liked event for postId={}, liked={}", postId, liked);
+        } catch (Exception e) {
+            log.warn("[Kafka] Failed to publish post liked event: {}", e.getMessage());
+        }
     }
 
     private void sendReactionEvent(ReactionDTO reactionDTO, ReactionDTO savedDTO) {
@@ -159,7 +181,7 @@ public class ReactionService {
                 .orElseThrow(() -> new RuntimeException("Reaction not found with id: " + id));
         ReactionDTO dto = toDTO(reaction);
         reactionRepository.deleteById(id);
-        decreaseReactionCounts(dto);
+        publishLikeEvent(dto.getPostId(), dto.getUserId(), false);
     }
 
     public void deleteReactionByPostIdAndUserId(String postId, String userId) {
@@ -167,7 +189,7 @@ public class ReactionService {
                 .ifPresent(reaction -> {
                     ReactionDTO dto = toDTO(reaction);
                     reactionRepository.delete(reaction);
-                    decreaseReactionCounts(dto);
+                    publishLikeEvent(dto.getPostId(), dto.getUserId(), false);
                 });
     }
 

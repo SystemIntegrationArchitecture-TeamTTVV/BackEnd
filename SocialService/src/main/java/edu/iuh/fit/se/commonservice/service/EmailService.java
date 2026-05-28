@@ -18,7 +18,7 @@ public class EmailService {
     @Value("${resend.from-email:onboarding@resend.dev}")
     private String fromEmail;
 
-    @Value("${app.base-url:http://localhost:5311}")
+    @Value("${app.base-url:https://www.websitedev.software}")
     private String baseUrl;
 
     public void sendPasswordResetEmail(String toEmail, String resetToken, String userName) {
@@ -104,7 +104,7 @@ public class EmailService {
             """.formatted(userName, resetLink, resetLink, resetLink);
     }
 
-    public void sendLivestreamQuotationEmail(String toEmail, String userName, String packageName) {
+    public void sendLivestreamQuotationEmail(String toEmail, String userName, String packageName, String userId) {
         if (resendApiKey == null || resendApiKey.isEmpty()) {
             log.warn("⚠️ Resend API key not configured. Quotation email not sent.");
             return;
@@ -112,7 +112,7 @@ public class EmailService {
 
         try {
             Resend resend = new Resend(resendApiKey);
-            String htmlContent = buildLivestreamQuotationEmailHtml(userName, packageName);
+            String htmlContent = buildLivestreamQuotationEmailHtml(userName, packageName, userId);
 
             CreateEmailOptions params = CreateEmailOptions.builder()
                     .from(fromEmail)
@@ -129,8 +129,15 @@ public class EmailService {
         }
     }
 
-    private String buildLivestreamQuotationEmailHtml(String userName, String packageName) {
-        String price = packageName != null && packageName.toLowerCase().contains("cơ bản") ? "1.500.000đ/tháng" : "3.500.000đ/tháng";
+    private String buildLivestreamQuotationEmailHtml(String userName, String packageName, String userId) {
+        String price = "3.500.000đ/tháng";
+        if (packageName != null) {
+            String lower = packageName.toLowerCase();
+            if (lower.contains("cơ bản")) price = "1.500.000đ/tháng";
+            else if (lower.contains("doanh nghiệp")) price = "8.000.000đ/tháng";
+        }
+        
+        String checkoutUrl = baseUrl + "/livestream/vip-packages?userId=" + (userId != null ? userId : "");
         
         return """
             <!DOCTYPE html>
@@ -170,6 +177,6 @@ public class EmailService {
             </html>
             """.formatted(userName != null ? userName : "Quý khách", 
                           packageName != null ? packageName : "Gói Livestream", 
-                          price, baseUrl + "/livestream/checkout");
+                          price, checkoutUrl);
     }
 }

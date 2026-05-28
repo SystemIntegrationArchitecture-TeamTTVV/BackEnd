@@ -20,17 +20,22 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
 import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.event.ContentModerationRequestEvent;
+import edu.iuh.fit.se.commonservice.event.PostCreatedEvent;
 import edu.iuh.fit.se.commonservice.model.Post;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PostService {
@@ -44,6 +49,7 @@ public class PostService {
     private final FriendService friendService;
     private final AIViolationCheckService aiViolationCheckService;
     private final ReportRepository reportRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public List<PostDTO> getAdminPosts(String status, String sortBy, LocalDateTime startDate, LocalDateTime endDate) {
         List<Criteria> criteriaList = new ArrayList<>();
@@ -232,8 +238,6 @@ public class PostService {
     }
 
     public PostDTO createPost(PostDTO postDTO) {
-        aiViolationCheckService.checkOrThrow(postDTO.getContent(), "POST");
-
         Post post = toEntity(postDTO);
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
@@ -246,7 +250,40 @@ public class PostService {
                     savedDTO.getAuthorId(),
                     SocketEventDTO.postCreated(savedDTO.getAuthorId(), savedDTO)
             );
-            notifyFriendsAboutPost(savedDTO);
+
+            // Async: notify friends via Kafka (instead of synchronous loop)
+            try {
+                String preview = savedDTO.getContent() != null
+                        ? savedDTO.getContent().substring(0, Math.min(100, savedDTO.getContent().length()))
+                        : "";
+                kafkaTemplate.send("ttvv.post.created", savedDTO.getId(),
+                        new PostCreatedEvent(
+                                savedDTO.getId(),
+                                savedDTO.getAuthorId(),
+                                savedDTO.getAuthorName(),
+                                savedDTO.getVisibility(),
+                                preview,
+                                java.time.Instant.now()
+                        ));
+            } catch (Exception e) {
+                log.warn("[Kafka] Failed to publish post.created event: {}", e.getMessage());
+            }
+
+            // Async: AI content moderation via Kafka (instead of blocking checkOrThrow)
+            if (savedDTO.getContent() != null && !savedDTO.getContent().isBlank()) {
+                try {
+                    kafkaTemplate.send("ttvv.content.moderation.request", savedDTO.getId(),
+                            new ContentModerationRequestEvent(
+                                    savedDTO.getId(),
+                                    "POST",
+                                    savedDTO.getAuthorId(),
+                                    savedDTO.getContent(),
+                                    java.time.Instant.now()
+                            ));
+                } catch (Exception e) {
+                    log.warn("[Kafka] Failed to publish moderation request: {}", e.getMessage());
+                }
+            }
         }
 
         return savedDTO;
@@ -317,6 +354,13 @@ public class PostService {
         post.setDeleted(true);
         post.setDeletedAt(LocalDateTime.now());
         postRepository.save(post);
+
+        try {
+            kafkaTemplate.send("ttvv.post.deleted", id);
+            log.info("[Kafka] Published ttvv.post.deleted for postId={}", id);
+        } catch (Exception e) {
+            log.warn("[Kafka] Failed to publish post deleted event: {}", e.getMessage());
+        }
     }
 
     public PostDTO sharePost(String postId, PostDTO shareDTO) {
