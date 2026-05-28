@@ -26,5 +26,13 @@ public class JwtTokenVerifier {
                 .parseSignedClaims(token)
                 .getPayload();
     }
+
+    /**
+     * Extract the JTI (JWT ID) from already-parsed claims.
+     * Used for blacklist lookup at the Gateway.
+     */
+    public String extractJti(Claims claims) {
+        return claims.get("jti", String.class);
+    }
 }
 

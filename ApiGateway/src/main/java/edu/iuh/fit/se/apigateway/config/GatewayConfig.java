@@ -12,11 +12,22 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import edu.iuh.fit.se.apigateway.security.JwtTokenVerifier;
+import edu.iuh.fit.se.apigateway.security.TokenBlacklistChecker;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+/**
+ * Gateway JWT authentication filter with Hybrid Token Management.
+ *
+ * <h3>Flow for each request:</h3>
+ * <ol>
+ *   <li><b>Step 1 (Offline)</b>: Verify JWT signature — pure math, no I/O, 0ms latency</li>
+ *   <li><b>Step 2 (Redis)</b>: Check blacklist — tiny lookup for JTI or userId</li>
+ *   <li><b>Step 3</b>: Forward to downstream service with identity headers</li>
+ * </ol>
+ */
 @Slf4j
 @Configuration
 public class GatewayConfig {
@@ -59,7 +70,8 @@ public class GatewayConfig {
 
     @Bean
     @Order(-2)
-    public GlobalFilter jwtAuthFilter(JwtTokenVerifier jwtTokenVerifier) {
+    public GlobalFilter jwtAuthFilter(JwtTokenVerifier jwtTokenVerifier,
+                                       TokenBlacklistChecker tokenBlacklistChecker) {
         return (exchange, chain) -> {
             if (!securityEnabled) {
                 return chain.filter(exchange);
@@ -117,17 +129,31 @@ public class GatewayConfig {
 
             String token = authHeader.substring("Bearer ".length()).trim();
             try {
+                // ── Step 1: Verify JWT Signature (offline, 0ms) ─────────────────
                 var claims = jwtTokenVerifier.parseAndValidate(token);
                 String username = claims.getSubject();
                 String role = claims.get("role", String.class);
                 String userId = claims.get("userId", String.class);
+                String jti = jwtTokenVerifier.extractJti(claims);
 
-                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                        .header("X-User-Id", userId != null ? userId : "")
-                        .header("X-Username", username != null ? username : "")
-                        .header("X-Role", role != null ? role : "")
-                        .build();
-                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                // ── Step 2: Check Blacklist in Redis ────────────────────────────
+                // Checks both token-level (logout) and user-level (admin lock)
+                return tokenBlacklistChecker.isBlacklisted(jti, userId)
+                        .flatMap(blacklisted -> {
+                            if (blacklisted) {
+                                log.warn("🚫 Token rejected (blacklisted): jti={}, userId={}, path={}",
+                                        jti, userId, path);
+                                return unauthorized(exchange, "Token has been revoked");
+                            }
+
+                            // ── Step 3: Forward with identity headers ───────────
+                            ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                                    .header("X-User-Id", userId != null ? userId : "")
+                                    .header("X-Username", username != null ? username : "")
+                                    .header("X-Role", role != null ? role : "")
+                                    .build();
+                            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                        });
             } catch (Exception e) {
                 return unauthorized(exchange, "Invalid token");
             }
@@ -175,4 +201,3 @@ public class GatewayConfig {
         return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(body)));
     }
 }
-

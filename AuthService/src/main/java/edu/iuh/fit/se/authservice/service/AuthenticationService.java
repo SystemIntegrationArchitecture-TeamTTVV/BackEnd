@@ -276,8 +276,17 @@ public class AuthenticationService {
     public void logout(String refreshToken, String accessToken) {
         deviceSessionService.onLogout(refreshToken);
         tokenStoreService.deleteRefreshToken(refreshToken);
+        // Blacklist the Access Token's JTI for its remaining TTL.
+        // This ensures the token is rejected at the Gateway even though
+        // Access Tokens are Stateless (not stored in Redis).
         if (accessToken != null && !accessToken.isBlank()) {
-            tokenStoreService.deleteAccessToken(accessToken);
+            try {
+                String jti = jwtUtil.extractJti(accessToken);
+                long remainingTtl = jwtUtil.extractRemainingTtlMs(accessToken);
+                tokenStoreService.blacklistAccessToken(jti, remainingTtl);
+            } catch (Exception e) {
+                // Token already expired or invalid — no need to blacklist
+            }
         }
     }
 

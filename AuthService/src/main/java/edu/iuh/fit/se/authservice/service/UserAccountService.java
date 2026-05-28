@@ -33,6 +33,7 @@ public class UserAccountService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final TokenStoreService tokenStoreService;
 
     @Transactional(readOnly = true)
     public List<UserDTO> getAllUsers() {
@@ -301,8 +302,19 @@ public class UserAccountService {
     public UserDTO updateUserStatus(String id, String status) {
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-        user.setActive("ACTIVE".equalsIgnoreCase(status));
+        boolean isActive = "ACTIVE".equalsIgnoreCase(status);
+        user.setActive(isActive);
         user.setUpdatedAt(LocalDateTime.now());
+
+        // Hybrid Token Management: blacklist/un-blacklist user's Access Tokens
+        if (!isActive) {
+            // Admin locked the account → blacklist ALL active Access Tokens
+            tokenStoreService.blacklistUser(id);
+        } else {
+            // Admin re-activated the account → remove blacklist
+            tokenStoreService.removeUserBlacklist(id);
+        }
+
         return userMapper.toDto(userRepository.save(user));
     }
 
@@ -313,6 +325,9 @@ public class UserAccountService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
         user.setActive(false);
         userRepository.save(user);
+
+        // Hybrid Token Management: blacklist ALL active Access Tokens for this user
+        tokenStoreService.blacklistUser(id);
     }
 
     private UserEntity toNewEntity(UserDTO dto) {

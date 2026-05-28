@@ -233,7 +233,13 @@ services:
       COMMON_SERVICE_URL: http://common-service:8081
       MESSAGE_SERVICE_URL: http://message-service:8082
       AUTH_SERVICE_URL: http://auth-service:8083
+      # Redis — Hybrid Token Management (Blacklist check)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     depends_on:
+      redis:
+        condition: service_healthy
       auth-service:
         condition: service_healthy
       common-service:

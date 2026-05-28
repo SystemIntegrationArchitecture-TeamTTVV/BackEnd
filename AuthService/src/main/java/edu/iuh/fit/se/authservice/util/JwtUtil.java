@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Component
@@ -68,6 +69,7 @@ public class JwtUtil {
         claims.put("role", role);
         claims.put("userId", userId);
         claims.put("tokenType", "ACCESS");
+        claims.put("jti", UUID.randomUUID().toString());
         return createToken(claims, username, accessTokenExpiration);
     }
 
@@ -85,5 +87,23 @@ public class JwtUtil {
     public Boolean validateToken(String token, String username) {
         final String extractedUsername = extractUsername(token);
         return (extractedUsername.equals(username) && !isTokenExpired(token));
+    }
+
+    /**
+     * Extract the JTI (JWT ID) claim from the token.
+     * Used for token blacklisting on logout.
+     */
+    public String extractJti(String token) {
+        return extractClaim(token, claims -> claims.get("jti", String.class));
+    }
+
+    /**
+     * Calculate the remaining time-to-live of a token in milliseconds.
+     * Used to set the TTL for blacklist entries so they auto-expire.
+     */
+    public long extractRemainingTtlMs(String token) {
+        Date expiration = extractExpiration(token);
+        long remaining = expiration.getTime() - System.currentTimeMillis();
+        return Math.max(remaining, 0);
     }
 }
