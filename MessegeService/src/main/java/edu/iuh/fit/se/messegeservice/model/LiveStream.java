@@ -51,6 +51,12 @@ public class LiveStream {
     /** Optional: conversation ID for live chat */
     private String chatConversationId;
 
+    /** VIP level of the host at stream creation */
+    private int vipLevel = 0;
+
+    /** Max allowed duration in minutes (5, 120, 480, or -1 for unlimited) */
+    private int maxLiveDurationMinutes = 5;
+
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private LocalDateTime createdAt;

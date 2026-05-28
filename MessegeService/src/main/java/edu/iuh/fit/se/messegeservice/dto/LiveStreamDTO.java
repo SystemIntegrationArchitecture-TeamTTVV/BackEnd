@@ -42,6 +42,12 @@ public class LiveStreamDTO {
     /** LiveKit server URL — only returned when joining */
     private String livekitUrl;
 
+    /** VIP level of the host */
+    private int vipLevel;
+
+    /** Max allowed duration in minutes */
+    private int maxLiveDurationMinutes;
+
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private LocalDateTime createdAt;

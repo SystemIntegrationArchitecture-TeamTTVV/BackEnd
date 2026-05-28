@@ -16,6 +16,7 @@ import java.util.Map;
 public class BillingController {
 
     private final BillingService billingService;
+    private final VipService vipService;
 
     // ══════════════════════════════════════════════════════════════════════════
     // ── Wallet ────────────────────────────────────────────────────────────────
@@ -241,5 +242,61 @@ public class BillingController {
     @GetMapping("/admin/report")
     public ResponseEntity<Map<String, Object>> getAdminReport() {
         return ResponseEntity.ok(billingService.getAdminReport());
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── VIP Livestream Subscriptions ──────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Get current VIP info for a user */
+    @GetMapping("/vip/info")
+    public ResponseEntity<Map<String, Object>> getVipInfo(@RequestParam String userId) {
+        var sub = vipService.getVipInfo(userId);
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("userId", sub.getUserId());
+        result.put("vipLevel", sub.getVipLevel());
+        result.put("status", sub.getStatus());
+        result.put("priceVnd", sub.getPriceVnd());
+        result.put("maxLiveDurationMinutes", sub.getMaxLiveDurationMinutes());
+        result.put("activatedAt", sub.getActivatedAt());
+        result.put("expiresAt", sub.getExpiresAt());
+        return ResponseEntity.ok(result);
+    }
+
+    /** Get available VIP packages */
+    @GetMapping("/vip/packages")
+    public ResponseEntity<List<Map<String, Object>>> getVipPackages() {
+        return ResponseEntity.ok(vipService.getVipPackages());
+    }
+
+    /** Create a VIP payment order (Step 1 — like coin purchase) */
+    @PostMapping("/vip/purchase")
+    public ResponseEntity<PaymentTransaction> purchaseVip(
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest request) {
+        String userId = (String) body.get("userId");
+        int vipLevel = body.get("vipLevel") instanceof Integer
+                ? (Integer) body.get("vipLevel")
+                : Integer.parseInt(body.get("vipLevel").toString());
+        String ipAddr = request.getHeader("X-Forwarded-For");
+        if (ipAddr == null || ipAddr.isBlank()) {
+            ipAddr = request.getRemoteAddr();
+        }
+        PaymentTransaction pt = vipService.createVipPaymentOrder(userId, vipLevel, ipAddr);
+        return ResponseEntity.ok(pt);
+    }
+
+    /** Process VNPAY callback for VIP purchase (Step 2) */
+    @PostMapping("/vip/vnpay-callback")
+    public ResponseEntity<PaymentTransaction> processVipCallback(@RequestBody Map<String, String> body) {
+        String orderCode = body.get("orderCode");
+        String vnpResponseCode = body.get("vnpResponseCode");
+        String vnpTransactionNo = body.getOrDefault("vnpTransactionNo", "");
+        String vnpBankCode = body.getOrDefault("vnpBankCode", "");
+        String vnpCardType = body.getOrDefault("vnpCardType", "");
+        String vnpPayDate = body.getOrDefault("vnpPayDate", "");
+        PaymentTransaction result = vipService.processVipPaymentCallback(
+                orderCode, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
+        return ResponseEntity.ok(result);
     }
 }
