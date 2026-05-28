@@ -2,6 +2,7 @@ package edu.iuh.fit.se.messegeservice.controller;
 
 import edu.iuh.fit.se.messegeservice.model.*;
 import edu.iuh.fit.se.messegeservice.service.BillingService;
+import edu.iuh.fit.se.messegeservice.service.VipService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
