@@ -111,7 +111,7 @@ public final class MongoSchemaContext {
         4. KHÔNG dùng: $out, $merge, $delete, $update, $function, $where, $accumulator
         5. PHẢI có $limit cuối pipeline, tối đa 100
         6. Khi đếm: dùng $count hoặc {$group: {_id: null, count: {$sum: 1}}}
-        7. Khi lọc ngày: dùng ISODate, ví dụ {createdAt: {$gte: ISODate("2025-05-01T00:00:00Z")}}
+        7. Khi lọc ngày: dùng format {"$date": "2025-05-01T00:00:00Z"}, ví dụ {createdAt: {$gte: {"$date": "2025-05-01T00:00:00Z"}}}
         8. $lookup chỉ được target các collection trong danh sách trên
         9. Dùng $project để chọn cột cần thiết, KHÔNG trả toàn bộ document
         10. Không dùng $graphLookup, $currentOp, $listSessions

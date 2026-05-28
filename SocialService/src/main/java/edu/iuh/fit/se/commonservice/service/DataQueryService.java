@@ -89,7 +89,7 @@ public class DataQueryService {
             if (collection == null || pipelineJson == null) {
                 return new AIChatResponseDTO(
                         "❌ AI không thể phân tích câu hỏi này thành truy vấn dữ liệu. Vui lòng thử lại với câu hỏi rõ ràng hơn.",
-                        null, generatedQueryJson, null, "DATA_QUERY"
+                        null, null, null, "DATA_QUERY"
                 );
             }
 
@@ -114,7 +114,7 @@ public class DataQueryService {
                 saveFewShot(message, generatedQueryJson, collection, queryVector, false);
                 return new AIChatResponseDTO(
                         "❌ Truy vấn bị hệ thống bảo mật từ chối:\n" + validationError,
-                        null, generatedQueryJson, null, "DATA_QUERY"
+                        null, null, null, "DATA_QUERY"
                 );
             }
 
@@ -125,7 +125,7 @@ public class DataQueryService {
             saveFewShot(message, generatedQueryJson, collection, queryVector, false);
             return new AIChatResponseDTO(
                     "❌ Đã xảy ra lỗi khi truy vấn dữ liệu:\n" + e.getMessage(),
-                    null, generatedQueryJson, null, "DATA_QUERY"
+                    null, null, null, "DATA_QUERY"
             );
         }
 
@@ -142,7 +142,7 @@ public class DataQueryService {
         // === Lưu RAG (thành công) ===
         saveFewShot(message, generatedQueryJson, collection, queryVector, true);
 
-        return new AIChatResponseDTO(finalAnswer, null, generatedQueryJson, data, "DATA_QUERY");
+        return new AIChatResponseDTO(finalAnswer, null, null, data, "DATA_QUERY");
     }
 
     /**
@@ -257,10 +257,18 @@ public class DataQueryService {
      */
     private String buildFallbackAnswer(String question, List<Map<String, Object>> data) {
         if (data == null || data.isEmpty()) {
-            return "Hệ thống không tìm thấy bản ghi nào phù hợp với câu hỏi của bạn.";
+            return "Hệ thống không tìm thấy kết quả nào phù hợp với câu hỏi của bạn.";
         }
-        return "Hệ thống tìm thấy " + data.size() + " bản ghi phù hợp cho câu hỏi: " + question
-                + ". Bạn có thể xem kết quả chi tiết ở bảng dữ liệu bên dưới.";
+        if (data.size() == 1) {
+            Map<String, Object> row = new java.util.HashMap<>(data.get(0));
+            row.remove("_id"); // Ignore group by null _id
+            if (row.size() == 1) {
+                Object val = row.values().iterator().next();
+                return "Kết quả tìm kiếm cho câu hỏi của bạn là: " + val;
+            }
+        }
+        return "Hệ thống tìm thấy " + data.size() + " kết quả phù hợp cho câu hỏi: " + question
+                + ". Bạn có thể xem bảng dữ liệu chi tiết bên dưới.";
     }
 
     /**

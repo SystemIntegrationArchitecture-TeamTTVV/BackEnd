@@ -100,10 +100,12 @@ public class MongoQueryFirewall {
             // 3c. Kiểm tra $lookup chỉ target allowed collections
             if ("$lookup".equals(stageName)) {
                 Object lookupObj = stage.get("$lookup");
-                if (lookupObj instanceof Document lookupDoc) {
-                    String fromCollection = lookupDoc.getString("from");
-                    if (fromCollection != null && !ALLOWED_COLLECTIONS.contains(fromCollection)) {
-                        return "$lookup targets disallowed collection: " + fromCollection;
+                if (lookupObj instanceof Map<?, ?> lookupMap) {
+                    Object fromObj = lookupMap.get("from");
+                    if (fromObj instanceof String fromCollection) {
+                        if (!ALLOWED_COLLECTIONS.contains(fromCollection)) {
+                            return "$lookup targets disallowed collection: " + fromCollection;
+                        }
                     }
                 }
             }
@@ -115,19 +117,30 @@ public class MongoQueryFirewall {
         if (!firstStage.containsKey("$match")) {
             return "Pipeline must start with $match containing user filter";
         }
-        Document matchDoc = (Document) firstStage.get("$match");
-        String matchJson = matchDoc.toJson().toLowerCase();
+        Object matchObj = firstStage.get("$match");
+        if (!(matchObj instanceof Map)) {
+            return "Invalid $match stage format";
+        }
+        Map<?, ?> matchMap = (Map<?, ?>) matchObj;
+        String matchJson;
+        try {
+            matchJson = objectMapper.writeValueAsString(matchMap).toLowerCase();
+        } catch (Exception e) {
+            matchJson = matchMap.toString().toLowerCase();
+        }
 
         boolean hasUserFilter = matchJson.contains("authorid")
                 || matchJson.contains("userid")
                 || matchJson.contains("recipientid")
                 || matchJson.contains("sellerid")
                 || matchJson.contains("senderid")
+                || matchJson.contains("receiverid")
                 || matchJson.contains("friendid")
+                || matchJson.contains("adminid")
                 || matchJson.contains("reporterid");
 
         if (!hasUserFilter) {
-            return "Security Policy Violation: Pipeline must include user context filter (authorId/userId/recipientId/sellerId)";
+            return "Security Policy Violation: Pipeline must include user context filter (authorId/userId/recipientId/sellerId/senderId/receiverId/adminId)";
         }
 
         // Kiểm tra userId value có khớp với user hiện tại
@@ -162,7 +175,14 @@ public class MongoQueryFirewall {
                     pipelineJson, new TypeReference<List<Map<String, Object>>>() {}
             );
             return rawList.stream()
-                    .map(map -> new Document(map))
+                    .map(map -> {
+                        try {
+                            String json = objectMapper.writeValueAsString(map);
+                            return Document.parse(json);
+                        } catch (Exception e) {
+                            return new Document(map);
+                        }
+                    })
                     .collect(Collectors.toList());
         } catch (Exception e) {
             throw new RuntimeException("Invalid pipeline JSON: " + e.getMessage());
