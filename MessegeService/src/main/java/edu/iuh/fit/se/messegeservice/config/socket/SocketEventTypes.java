@@ -85,4 +85,8 @@ public final class SocketEventTypes {
     public static final String COIN_DEPOSITED = "COIN_DEPOSITED";
     public static final String LIVE_VIEWER_APPROVED = "LIVE_VIEWER_APPROVED";
     public static final String LIVE_KICKED = "LIVE_KICKED";
+
+    // ── VIP Subscription Events ─────────────────────────────────────────────
+    public static final String LIVE_TIME_EXPIRED = "LIVE_TIME_EXPIRED";
+    public static final String VIP_UPGRADED = "VIP_UPGRADED";
 }

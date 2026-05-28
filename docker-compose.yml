@@ -1,6 +1,6 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# TTVV Social Network — All-in-One Docker Compose
-# Gộp Infra + Services vào 1 file duy nhất.
+# TTVV Social Network — All-in-One Docker Compose (Tối Giản)
+# Gộp Infra (Kafka KRaft, Redis) + Services vào 1 file duy nhất.
 #
 # Chạy:   docker compose up -d --build
 # Dừng:   docker compose down
@@ -12,11 +12,8 @@ networks:
     driver: bridge
 
 volumes:
-  zookeeper-data:
   kafka-data:
   redis-data:
-  prometheus-data:
-  grafana-data:
 
 services:
 
@@ -24,41 +21,27 @@ services:
   #  INFRASTRUCTURE
   # ═══════════════════════════════════════════════════════════════════════
 
-  # ─── Zookeeper ────────────────────────────────────────────────────────
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-      KAFKA_HEAP_OPTS: "-Xmx128M -Xms128M"
-    ports:
-      - "2181:2181"
-    volumes:
-      - zookeeper-data:/var/lib/zookeeper/data
-    networks:
-      - ttvv
-
-  # ─── Kafka ────────────────────────────────────────────────────────────
+  # ─── Kafka (KRaft mode - Không ZooKeeper) ──────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
     restart: unless-stopped
-    depends_on:
-      zookeeper:
-        condition: service_started
     ports:
       - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://${DO_PUBLIC_HOST:-localhost}:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://${DO_PUBLIC_HOST:-localhost}:9092'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      CLUSTER_ID: '4L62Tx1qnT8wDxScO9wuQA'
       KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
     volumes:
       - kafka-data:/var/lib/kafka/data
@@ -69,7 +52,7 @@ services:
       interval: 15s
       timeout: 15s
       retries: 12
-      start_period: 90s
+      start_period: 30s
 
   # ─── Redis ────────────────────────────────────────────────────────────
   redis:
@@ -93,69 +76,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  # ─── Kafka UI ─────────────────────────────────────────────────────────
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    restart: unless-stopped
-    depends_on:
-      kafka:
-        condition: service_healthy
-    ports:
-      - "8085:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: ttvv-kafka
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      DYNAMIC_CONFIG_ENABLED: "true"
-    networks:
-      - ttvv
-
-  # ─── Prometheus ───────────────────────────────────────────────────────
-  prometheus:
-    image: prom/prometheus:v2.53.1
-    container_name: prometheus
-    restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=15d
-      - --web.enable-lifecycle
-    volumes:
-      - ../ops/observability-stack/prometheus/prometheus.remote.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - ttvv
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-  # ─── Grafana ──────────────────────────────────────────────────────────
-  grafana:
-    image: grafana/grafana:11.1.4
-    container_name: grafana
-    restart: unless-stopped
-    depends_on:
-      prometheus:
-        condition: service_healthy
-    ports:
-      - "3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ../ops/observability-stack/grafana/provisioning:/etc/grafana/provisioning:ro
-    networks:
-      - ttvv
 
   # ═══════════════════════════════════════════════════════════════════════
   #  APPLICATION SERVICES

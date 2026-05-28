@@ -7,10 +7,12 @@ import edu.iuh.fit.se.commonservice.model.Friend;
 import edu.iuh.fit.se.commonservice.model.FriendRequest;
 import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.event.FriendAcceptedEvent;
 import edu.iuh.fit.se.commonservice.repository.FriendRepository;
 import edu.iuh.fit.se.commonservice.repository.FriendRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,6 +30,7 @@ public class FriendRequestService {
     private final AuthServiceClient authServiceClient;
     private final SocketService socketService;
     private final NotificationService notificationService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public List<FriendRequestDTO> getFriendRequestsBySenderId(String senderId) {
         return toDTOs(friendRequestRepository.findBySenderId(senderId));
@@ -203,7 +206,21 @@ public class FriendRequestService {
         log.info("📤 Sending socket notification to user {} (username={}): {}", 
             friendRequestDTO.getSenderId(), senderUsername, socketEvent.getType());
         socketService.sendNotification(senderUsername, socketEvent);
-        
+
+        // Async: publish friend accepted event for cross-service processing
+        try {
+            kafkaTemplate.send("ttvv.friend.accepted", friendRequestDTO.getSenderId(),
+                    new FriendAcceptedEvent(
+                            friendRequestDTO.getSenderId(),
+                            friendRequestDTO.getReceiverId(),
+                            java.time.Instant.now()
+                    ));
+            log.info("[Kafka] Published friend.accepted event: {} ↔ {}",
+                    friendRequestDTO.getSenderId(), friendRequestDTO.getReceiverId());
+        } catch (Exception e) {
+            log.warn("[Kafka] Failed to publish friend.accepted event: {}", e.getMessage());
+        }
+
         return friendRequestDTO;
     }
 

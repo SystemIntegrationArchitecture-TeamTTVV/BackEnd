@@ -13,6 +13,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +34,7 @@ public class LiveStreamService {
     private final LiveKitRoomAdminService liveKitRoomAdminService;
     private final S3StorageService s3StorageService;
     private final CloudinaryStorageService cloudinaryStorageService;
+    private final VipService vipService;
 
     @Value("${livekit.api.key:devkey}")
     private String livekitApiKey;
@@ -83,6 +85,13 @@ public class LiveStreamService {
         if (StringUtils.hasText(thumbnailUrl)) {
             stream.setThumbnailUrl(thumbnailUrl.trim());
         }
+
+        // Set VIP-based duration limits
+        int vipLevel = vipService.getVipLevel(streamerId);
+        int maxMinutes = vipService.getMaxLiveDuration(streamerId);
+        stream.setVipLevel(vipLevel);
+        stream.setMaxLiveDurationMinutes(maxMinutes);
+
         stream.setCreatedAt(LocalDateTime.now());
         stream.setStartedAt(LocalDateTime.now());
         stream.setUpdatedAt(LocalDateTime.now());
@@ -523,6 +532,8 @@ public class LiveStreamService {
         dto.setViewerIds(stream.getViewerIds());
         dto.setChatConversationId(stream.getChatConversationId());
         dto.setRequiresApproval(stream.isRequiresApproval());
+        dto.setVipLevel(stream.getVipLevel());
+        dto.setMaxLiveDurationMinutes(stream.getMaxLiveDurationMinutes());
         if (includeApprovedList) {
             dto.setApprovedViewerIds(stream.getApprovedViewerIds());
         }
@@ -530,5 +541,57 @@ public class LiveStreamService {
         dto.setEndedAt(stream.getEndedAt());
         dto.setCreatedAt(stream.getCreatedAt());
         return dto;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ═══ Scheduled: Auto-end streams that exceed VIP time limit ═══════════════
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Scheduled(fixedRate = 30_000) // every 30 seconds
+    public void autoEndExpiredStreams() {
+        List<LiveStream> liveStreams = liveStreamRepository.findByStatusOrderByStartedAtDesc("LIVE");
+        LocalDateTime now = LocalDateTime.now();
+
+        for (LiveStream stream : liveStreams) {
+            int maxMinutes = stream.getMaxLiveDurationMinutes();
+            if (maxMinutes <= 0) continue; // unlimited
+
+            LocalDateTime startedAt = stream.getStartedAt();
+            if (startedAt == null) continue;
+
+            long elapsedMinutes = java.time.Duration.between(startedAt, now).toMinutes();
+            if (elapsedMinutes >= maxMinutes) {
+                log.info("⏰ Auto-ending stream {} (VIP {}): {}min >= {}min limit",
+                        stream.getId(), stream.getVipLevel(), elapsedMinutes, maxMinutes);
+
+                stream.setStatus("ENDED");
+                stream.setEndedAt(now);
+                stream.setUpdatedAt(now);
+                stream.setViewerCount(0);
+                stream.setViewerIds(new ArrayList<>());
+                liveStreamRepository.save(stream);
+
+                liveKitRoomAdminService.deleteRoom(stream.getRoomName());
+
+                // Emit time-expired event so all clients show the modal
+                emitTimeExpiredEvent(stream);
+                emitLiveEvent(SocketEventTypes.LIVE_ENDED, stream);
+            }
+        }
+    }
+
+    private void emitTimeExpiredEvent(LiveStream stream) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("streamId", stream.getId());
+            payload.put("roomName", stream.getRoomName());
+            payload.put("vipLevel", stream.getVipLevel());
+            payload.put("maxMinutes", stream.getMaxLiveDurationMinutes());
+            SocketEventDTO event = SocketEventDTO.of(
+                    SocketEventTypes.LIVE_TIME_EXPIRED, stream.getStreamerId(), payload);
+            socketEmitterService.emitToAll(event);
+        } catch (Exception e) {
+            log.error("Failed to emit LIVE_TIME_EXPIRED: {}", e.getMessage());
+        }
     }
 }

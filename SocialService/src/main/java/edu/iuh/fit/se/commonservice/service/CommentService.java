@@ -17,8 +17,13 @@ import edu.iuh.fit.se.commonservice.repository.CommentRepository;
 import edu.iuh.fit.se.commonservice.repository.PostRepository;
 import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.event.CommentCreatedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
+import org.springframework.kafka.core.KafkaTemplate;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CommentService {
@@ -31,6 +36,8 @@ public class CommentService {
     private final VideoRepository videoRepository;
     private final AIViolationCheckService aiViolationCheckService;
     private final org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final CacheManager cacheManager;
 
     public List<CommentDTO> getCommentsByPostId(String postId) {
         org.springframework.data.mongodb.core.query.Criteria criteria = new org.springframework.data.mongodb.core.query.Criteria().orOperator(
@@ -61,50 +68,54 @@ public class CommentService {
     public CommentDTO createComment(CommentDTO commentDTO) {
         aiViolationCheckService.checkOrThrow(commentDTO.getContent(), "COMMENT");
 
-        Comment comment = toEntity(commentDTO);
+        String preGeneratedId = new org.bson.types.ObjectId().toHexString();
+        commentDTO.setId(preGeneratedId);
+        commentDTO.setCreatedAt(LocalDateTime.now());
+        commentDTO.setLikeCount(0);
+        commentDTO.setReplyCount(0);
 
-        // Fetch and store user info at creation time (denormalized)
-        if (commentDTO.getUserId() != null && comment.getAuthorName() == null) {
+        if (commentDTO.getUserId() != null) {
             try {
                 UserDTO user = authServiceClient.getUserById(commentDTO.getUserId());
                 if (user != null) {
-                    comment.setAuthorName(user.getFullName());
-                    comment.setAuthorAvatar(user.getAvatar());
+                    commentDTO.setUserName(user.getFullName());
+                    commentDTO.setUserAvatar(user.getAvatar());
                 }
             } catch (Exception e) {
-                // Proceed without user info — display will fall back to authorId
+                commentDTO.setUserName("User");
             }
         }
 
+        try {
+            kafkaTemplate.send("ttvv.comment.created", preGeneratedId, new CommentCreatedEvent(
+                    preGeneratedId,
+                    commentDTO.getPostId(),
+                    commentDTO.getUserId(),
+                    commentDTO.getContent(),
+                    commentDTO.getParentCommentId(),
+                    java.time.Instant.now()
+            ));
+            log.info("[Kafka] Published ttvv.comment.created for commentId={}", preGeneratedId);
+        } catch (Exception e) {
+            log.warn("[Kafka] Failed to publish comment created event. Falling back to synchronous creation: {}", e.getMessage());
+            return createCommentSync(commentDTO, preGeneratedId);
+        }
+
+        return commentDTO;
+    }
+
+    private CommentDTO createCommentSync(CommentDTO commentDTO, String preGeneratedId) {
+        Comment comment = toEntity(commentDTO);
+        comment.setId(preGeneratedId);
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
         Comment saved = commentRepository.save(comment);
 
-        // Update comment count
         if (commentDTO.getPostId() != null) {
             Post post = postRepository.findById(commentDTO.getPostId())
                     .orElseThrow(() -> new RuntimeException("Post not found"));
             post.setCommentCount(post.getCommentCount() + 1);
             postRepository.save(post);
-
-        } else if (commentDTO.getVideoId() != null) {  // ✨ THÊM MỚI
-            Video video = videoRepository.findById(commentDTO.getVideoId())
-                    .orElseThrow(() -> new RuntimeException("Video not found"));
-            video.setCommentCount(video.getCommentCount() + 1);
-            videoRepository.save(video);
-
-            // Notify video author
-            notifyVideoAuthor(commentDTO, video);
-        }
-
-        // Handle reply notification
-        if (commentDTO.getParentCommentId() != null) {
-            updateReplyCount(commentDTO.getParentCommentId());
-        }
-
-        // Notify mentioned users
-        if (commentDTO.getMentionedUserIds() != null && !commentDTO.getMentionedUserIds().isEmpty()) {
-            notifyMentionedUsersInComment(commentDTO, saved);
         }
 
         return toDTO(saved);
@@ -146,6 +157,12 @@ public class CommentService {
         comment.setUpdatedAt(LocalDateTime.now());
         
         Comment updated = commentRepository.save(comment);
+        
+        // Evict comment list cache for CQRS sync
+        if (comment.getPost() != null) {
+            evictCommentsCache(comment.getPost().getId());
+        }
+
         return toDTO(updated);
     }
 
@@ -160,6 +177,22 @@ public class CommentService {
         postRepository.save(post);
         
         commentRepository.deleteById(id);
+
+        if (comment.getPost() != null) {
+            evictCommentsCache(comment.getPost().getId());
+        }
+    }
+
+    private void evictCommentsCache(String postId) {
+        try {
+            var cache = cacheManager.getCache("post-comments");
+            if (cache != null && postId != null) {
+                cache.evict(postId);
+                log.info("[CQRS-Comments] Evicted post-comments cache for postId={}", postId);
+            }
+        } catch (Exception e) {
+            log.warn("[CQRS-Comments] Failed to evict post-comments cache: {}", e.getMessage());
+        }
     }
 
     private CommentDTO toDTO(Comment comment) {

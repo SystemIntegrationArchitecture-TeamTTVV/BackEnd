@@ -11,10 +11,14 @@ import edu.iuh.fit.se.commonservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.commonservice.dto.VideoDTO;
 import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.event.VideoCreatedEvent;
 import edu.iuh.fit.se.commonservice.model.Video;
 import edu.iuh.fit.se.commonservice.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VideoService {
@@ -24,6 +28,7 @@ public class VideoService {
     private final SocketService socketService;
     private final NotificationService notificationService;
     private final FriendService friendService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     /**
      * Lấy tất cả videos (giống News Feed trên Facebook)
@@ -86,8 +91,21 @@ public class VideoService {
         Video saved = videoRepository.save(video);
         VideoDTO savedDTO = toDTO(saved);
 
-        // Thông báo cho bạn bè về video mới
-        notifyFriendsAboutVideo(savedDTO);
+        // Async: notify friends via Kafka (instead of synchronous loop)
+        if (savedDTO.getAuthorId() != null) {
+            try {
+                kafkaTemplate.send("ttvv.video.created", savedDTO.getId(),
+                        new VideoCreatedEvent(
+                                savedDTO.getId(),
+                                savedDTO.getAuthorId(),
+                                savedDTO.getAuthorName(),
+                                savedDTO.getTitle(),
+                                java.time.Instant.now()
+                        ));
+            } catch (Exception e) {
+                log.warn("[Kafka] Failed to publish video.created event: {}", e.getMessage());
+            }
+        }
 
         return savedDTO;
     }

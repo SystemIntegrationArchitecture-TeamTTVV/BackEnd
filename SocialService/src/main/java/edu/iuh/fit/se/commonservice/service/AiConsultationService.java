@@ -108,7 +108,8 @@ public class AiConsultationService {
                         emailService.sendLivestreamQuotationEmail(
                             user.getEmail(), 
                             user.getFullName(), 
-                            logEntry.getRecommendedPackage()
+                            logEntry.getRecommendedPackage(),
+                            user.getId()
                         );
                     }
                 });

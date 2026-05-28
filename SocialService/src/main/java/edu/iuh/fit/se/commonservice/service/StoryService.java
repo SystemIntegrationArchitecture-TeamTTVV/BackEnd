@@ -12,8 +12,12 @@ import edu.iuh.fit.se.commonservice.model.Story;
 import edu.iuh.fit.se.commonservice.repository.StoryRepository;
 import edu.iuh.fit.se.commonservice.client.AuthServiceClient;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
+import edu.iuh.fit.se.commonservice.event.StoryCreatedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StoryService {
@@ -22,6 +26,7 @@ public class StoryService {
     private final AuthServiceClient authServiceClient;
     private final NotificationService notificationService;
     private final FriendService friendService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public List<StoryDTO> getAllActiveStories() {
         LocalDateTime now = LocalDateTime.now();
@@ -81,6 +86,14 @@ public class StoryService {
         
         // Notify friends about new story
         notifyFriendsAboutStory(savedDTO);
+
+        try {
+            kafkaTemplate.send("ttvv.story.created", savedDTO.getId(),
+                    new StoryCreatedEvent(savedDTO.getId(), savedDTO.getAuthorId(), java.time.Instant.now()));
+            log.info("[Kafka] Published ttvv.story.created for storyId={}", savedDTO.getId());
+        } catch (Exception e) {
+            log.warn("[Kafka] Failed to publish story created event: {}", e.getMessage());
+        }
         
         return savedDTO;
     }
@@ -146,6 +159,13 @@ public class StoryService {
                 .orElseThrow(() -> new RuntimeException("Story not found with id: " + id));
         story.setActive(false);
         storyRepository.save(story);
+
+        try {
+            kafkaTemplate.send("ttvv.story.deleted", id);
+            log.info("[Kafka] Published ttvv.story.deleted for storyId={}", id);
+        } catch (Exception e) {
+            log.warn("[Kafka] Failed to publish story deleted event: {}", e.getMessage());
+        }
     }
 
     public void deleteExpiredStories() {
