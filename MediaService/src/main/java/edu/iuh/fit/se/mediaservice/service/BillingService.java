@@ -5,6 +5,7 @@ import edu.iuh.fit.se.mediaservice.dto.SocketEventDTO;
 import edu.iuh.fit.se.mediaservice.exception.ResourceNotFoundException;
 import edu.iuh.fit.se.mediaservice.model.*;
 import edu.iuh.fit.se.mediaservice.repository.*;
+import edu.iuh.fit.se.mediaservice.saga.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
@@ -29,6 +30,8 @@ public class BillingService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final MongoTemplate mongoTemplate;
     private final SocketEmitterService socketEmitterService;
+    private final DonationSaga donationSaga;
+    private final VnpayCallbackSaga vnpayCallbackSaga;
 
     // ══════════════════════════════════════════════════════════════════════════
     // ── Wallet ────────────────────────────────────────────────────────────────
@@ -187,53 +190,21 @@ public class BillingService {
         pt.setCompletedAt(LocalDateTime.now());
 
         if ("00".equals(vnpResponseCode)) {
-            // ── SUCCESS ──
-            pt.setStatus("SUCCESS");
-            pt.setCoinsCredited(true);
-
-            // Credit coins to wallet
-            Wallet wallet = getOrCreateWallet(pt.getUserId());
-            wallet.setBalance(wallet.getBalance() + pt.getCoinAmount());
-            wallet.setUpdatedAt(LocalDateTime.now());
-            walletRepository.save(wallet);
-
-            // Record transaction
-            Transaction tx = new Transaction();
-            tx.setUserId(pt.getUserId());
-            tx.setType("deposit");
-            tx.setAmount(pt.getCoinAmount());
-            tx.setStatus("success");
-            tx.setCreatedAt(LocalDateTime.now());
-            transactionRepository.save(tx);
-
-            log.info("✅ VNPAY payment SUCCESS: orderCode={}, userId={}, coins={}, newBalance={}",
-                    orderCode, pt.getUserId(), pt.getCoinAmount(), wallet.getBalance());
-
-            // Emit socket event
-            try {
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("balance", wallet.getBalance());
-                payload.put("coinAmount", pt.getCoinAmount());
-                payload.put("packageName", pt.getCoinPackageName());
-                payload.put("orderCode", orderCode);
-
-                SocketEventDTO event = SocketEventDTO.of(
-                        SocketEventTypes.COIN_DEPOSITED, pt.getUserId(), payload);
-                socketEmitterService.emitToUserById(pt.getUserId(), event);
-            } catch (Exception e) {
-                log.error("Failed to emit COIN_DEPOSITED: {}", e.getMessage());
-            }
+            // Orchestrate success flow using VnpayCallbackSaga
+            pt = vnpayCallbackSaga.execute(pt);
         } else if ("24".equals(vnpResponseCode)) {
             // ── CANCELLED ──
             pt.setStatus("CANCELLED");
             log.info("❌ VNPAY payment CANCELLED: orderCode={}", orderCode);
+            pt = paymentTransactionRepository.save(pt);
         } else {
             // ── FAILED ──
             pt.setStatus("FAILED");
             log.info("❌ VNPAY payment FAILED: orderCode={}, responseCode={}", orderCode, vnpResponseCode);
+            pt = paymentTransactionRepository.save(pt);
         }
 
-        return paymentTransactionRepository.save(pt);
+        return pt;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -332,81 +303,50 @@ public class BillingService {
             throw new IllegalStateException("Quà tặng này hiện không khả dụng");
         }
 
-        Wallet senderWallet = getOrCreateWallet(senderId);
-        if (senderWallet.getBalance() < gift.getPrice()) {
-            throw new IllegalStateException("Insufficient balance. Need " + gift.getPrice() + " coins, have " + senderWallet.getBalance());
+        // Run the DonationSaga in a retry loop to handle OptimisticLockingFailureException
+        int maxAttempts = 3;
+        int attempt = 0;
+        while (true) {
+            try {
+                attempt++;
+                DonationSaga.DonateCommand cmd = DonationSaga.DonateCommand.builder()
+                        .senderId(senderId)
+                        .senderName(senderName)
+                        .receiverId(receiverId)
+                        .receiverName(receiverName)
+                        .gift(gift)
+                        .roomId(roomId)
+                        .giftMessage(giftMessage)
+                        .build();
+
+                Map<String, Object> sagaResult = donationSaga.execute(cmd);
+
+                // Construct result map matching original contract
+                Wallet updatedSenderWallet = getOrCreateWallet(senderId);
+                String senderTxId = (String) sagaResult.get("senderTxId");
+                Transaction senderTx = transactionRepository.findById(senderTxId).orElse(null);
+
+                Map<String, Object> result = new HashMap<>();
+                result.put("senderBalance", updatedSenderWallet.getBalance());
+                result.put("gift", gift);
+                result.put("transaction", senderTx);
+                return result;
+
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                log.warn("[DONATE-RETRY] OptimisticLockingFailureException on attempt {} of {}: {}", attempt, maxAttempts, e.getMessage());
+                if (attempt >= maxAttempts) {
+                    log.error("[DONATE-RETRY] Failed to complete donate transaction after {} attempts due to concurrent updates", maxAttempts);
+                    throw e;
+                }
+                // Small backoff before retrying
+                try {
+                    Thread.sleep(50 + (int) (Math.random() * 50));
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
         }
-
-        // Atomic balance update
-        senderWallet.setBalance(senderWallet.getBalance() - gift.getPrice());
-        senderWallet.setUpdatedAt(LocalDateTime.now());
-        walletRepository.save(senderWallet);
-
-        Wallet receiverWallet = getOrCreateWallet(receiverId);
-        receiverWallet.setBalance(receiverWallet.getBalance() + gift.getPrice());
-        receiverWallet.setUpdatedAt(LocalDateTime.now());
-        walletRepository.save(receiverWallet);
-
-        // Create transactions
-        LocalDateTime now = LocalDateTime.now();
-
-        Transaction senderTx = new Transaction();
-        senderTx.setUserId(senderId);
-        senderTx.setType("donate");
-        senderTx.setAmount(gift.getPrice());
-        senderTx.setGiftId(giftId);
-        senderTx.setGiftName(gift.getName());
-        senderTx.setRoomId(roomId);
-        senderTx.setSenderId(senderId);
-        senderTx.setSenderName(senderName);
-        senderTx.setReceiverId(receiverId);
-        senderTx.setReceiverName(receiverName);
-        senderTx.setGiftMessage(giftMessage);
-        senderTx.setCreatedAt(now);
-        transactionRepository.save(senderTx);
-
-        Transaction receiverTx = new Transaction();
-        receiverTx.setUserId(receiverId);
-        receiverTx.setType("receive");
-        receiverTx.setAmount(gift.getPrice());
-        receiverTx.setGiftId(giftId);
-        receiverTx.setGiftName(gift.getName());
-        receiverTx.setRoomId(roomId);
-        receiverTx.setSenderId(senderId);
-        receiverTx.setSenderName(senderName);
-        receiverTx.setReceiverId(receiverId);
-        receiverTx.setReceiverName(receiverName);
-        receiverTx.setGiftMessage(giftMessage);
-        receiverTx.setCreatedAt(now);
-        transactionRepository.save(receiverTx);
-
-        log.info("🎁 Donate: {} → {} | gift={} price={}", senderName, receiverName, gift.getName(), gift.getPrice());
-
-        // Emit socket event for gift received
-        try {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("senderId", senderId);
-            payload.put("senderName", senderName);
-            payload.put("giftId", giftId);
-            payload.put("giftName", gift.getName());
-            payload.put("giftEmoji", gift.getEmoji());
-            payload.put("giftPrice", gift.getPrice());
-            payload.put("roomId", roomId);
-            payload.put("receiverId", receiverId);
-            payload.put("giftMessage", giftMessage);
-
-            SocketEventDTO event = SocketEventDTO.of(
-                    SocketEventTypes.LIVE_GIFT_RECEIVED, senderId, payload);
-            socketEmitterService.emitToAll(event);
-        } catch (Exception e) {
-            log.error("Failed to emit LIVE_GIFT_RECEIVED: {}", e.getMessage());
-        }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("senderBalance", senderWallet.getBalance());
-        result.put("gift", gift);
-        result.put("transaction", senderTx);
-        return result;
     }
 
     // ══════════════════════════════════════════════════════════════════════════

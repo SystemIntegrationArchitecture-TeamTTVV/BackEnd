@@ -1,7 +1,7 @@
 package edu.iuh.fit.se.mediaservice.service;
 
 import edu.iuh.fit.se.mediaservice.dto.SocketEventDTO;
-import edu.iuh.fit.se.mediaservice.dto.UserDTO;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -71,35 +71,39 @@ public class SocketEmitterService {
         emitToUser(username, event);
     }
 
+    @CircuitBreaker(name = "redisSocket", fallbackMethod = "emitToUserFallback")
     public void emitToUser(String username, SocketEventDTO event) {
-        try {
-            redisSocketPublisher.publishToUser(username, event);
-        } catch (Exception e) {
-            log.error("Failed to publish socket event to user {}: {}", username, e.getMessage());
-        }
+        redisSocketPublisher.publishToUser(username, event);
     }
 
+    public void emitToUserFallback(String username, SocketEventDTO event, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] Redis socket publisher is down! Failed to emit to user {}: {}", username, t.getMessage());
+    }
+
+    @CircuitBreaker(name = "redisSocket", fallbackMethod = "emitToAllFallback")
     public void emitToAll(SocketEventDTO event) {
-        try {
-            redisSocketPublisher.publishToAll(event);
-        } catch (Exception e) {
-            log.error("Failed to publish socket event to all: {}", e.getMessage());
-        }
+        redisSocketPublisher.publishToAll(event);
     }
 
+    public void emitToAllFallback(SocketEventDTO event, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] Redis socket publisher is down! Failed to emit to all: {}", t.getMessage());
+    }
+
+    @CircuitBreaker(name = "redisSocket", fallbackMethod = "emitToTopicFallback")
     public void emitToTopic(String topic, SocketEventDTO event) {
-        try {
-            redisSocketPublisher.publishToTopic(topic, event);
-        } catch (Exception e) {
-            log.error("Failed to publish socket event to topic {}: {}", topic, e.getMessage());
-        }
+        redisSocketPublisher.publishToTopic(topic, event);
     }
 
+    public void emitToTopicFallback(String topic, SocketEventDTO event, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] Redis socket publisher is down! Failed to emit to topic {}: {}", topic, t.getMessage());
+    }
+
+    @CircuitBreaker(name = "redisSocket", fallbackMethod = "emitToRoomFallback")
     public void emitToRoom(String roomId, SocketEventDTO event) {
-        try {
-            redisSocketPublisher.publishToRoom(roomId, event);
-        } catch (Exception e) {
-            log.error("Failed to publish socket event to room {}: {}", roomId, e.getMessage());
-        }
+        redisSocketPublisher.publishToRoom(roomId, event);
+    }
+
+    public void emitToRoomFallback(String roomId, SocketEventDTO event, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] Redis socket publisher is down! Failed to emit to room {}: {}", roomId, t.getMessage());
     }
 }

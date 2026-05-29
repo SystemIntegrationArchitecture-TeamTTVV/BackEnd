@@ -1,5 +1,6 @@
 package edu.iuh.fit.se.mediaservice.service;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.livekit.server.RoomServiceClient;
 import livekit.LivekitModels;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * LiveKit Server API — duyệt quyền participant, kick, xóa phòng (ThamKhao parity).
+ * LiveKit Server API — duyệt quyền participant, kick, xóa phòng.
  */
 @Service
 @Slf4j
@@ -48,33 +49,44 @@ public class LiveKitRoomAdminService {
         return enabled;
     }
 
+    @CircuitBreaker(name = "livekitService", fallbackMethod = "deleteRoomFallback")
     public void deleteRoom(String roomName) {
         if (!enabled || roomName == null || roomName.isBlank()) return;
         try {
             Response<Void> r = roomClient.deleteRoom(roomName).execute();
             if (!r.isSuccessful()) {
-                log.warn("deleteRoom {} failed: {}", roomName, r.code());
+                throw new RuntimeException("deleteRoom " + roomName + " failed with code: " + r.code());
             }
         } catch (Exception e) {
-            log.warn("deleteRoom {} error: {}", roomName, e.getMessage());
+            throw new RuntimeException("deleteRoom " + roomName + " error: " + e.getMessage(), e);
         }
     }
 
+    public void deleteRoomFallback(String roomName, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] LiveKit deleteRoom failed for room {}: {}", roomName, t.getMessage());
+    }
+
+    @CircuitBreaker(name = "livekitService", fallbackMethod = "removeParticipantFallback")
     public void removeParticipant(String roomName, String identity) {
         if (!enabled || roomName == null || identity == null) return;
         try {
             Response<Void> r = roomClient.removeParticipant(roomName, identity).execute();
             if (!r.isSuccessful()) {
-                log.warn("removeParticipant {}/{} failed: {}", roomName, identity, r.code());
+                throw new RuntimeException("removeParticipant " + roomName + "/" + identity + " failed with code: " + r.code());
             }
         } catch (Exception e) {
-            log.warn("removeParticipant {}/{} error: {}", roomName, identity, e.getMessage());
+            throw new RuntimeException("removeParticipant " + roomName + "/" + identity + " error: " + e.getMessage(), e);
         }
+    }
+
+    public void removeParticipantFallback(String roomName, String identity, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] LiveKit removeParticipant failed for {}/{}: {}", roomName, identity, t.getMessage());
     }
 
     /**
      * Cấp quyền subscribe + metadata approved (giống ThamKhao approveParticipant).
      */
+    @CircuitBreaker(name = "livekitService", fallbackMethod = "approveParticipantSubscribeFallback")
     public void approveParticipantSubscribe(String roomName, String identity) {
         if (!enabled || roomName == null || identity == null) return;
         try {
@@ -87,13 +99,18 @@ public class LiveKitRoomAdminService {
             Response<LivekitModels.ParticipantInfo> r =
                     roomClient.updateParticipant(roomName, identity, "", metadata, perm, null).execute();
             if (!r.isSuccessful()) {
-                log.warn("updateParticipant approve {}/{} failed: {}", roomName, identity, r.code());
+                throw new RuntimeException("updateParticipant approve " + roomName + "/" + identity + " failed with code: " + r.code());
             }
         } catch (Exception e) {
-            log.warn("approveParticipantSubscribe {}/{} error: {}", roomName, identity, e.getMessage());
+            throw new RuntimeException("approveParticipantSubscribe " + roomName + "/" + identity + " error: " + e.getMessage(), e);
         }
     }
 
+    public void approveParticipantSubscribeFallback(String roomName, String identity, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] LiveKit approveParticipantSubscribe failed for {}/{}: {}", roomName, identity, t.getMessage());
+    }
+
+    @CircuitBreaker(name = "livekitService", fallbackMethod = "listParticipantsFallback")
     public List<LivekitModels.ParticipantInfo> listParticipants(String roomName) {
         if (!enabled || roomName == null || roomName.isBlank()) {
             return Collections.emptyList();
@@ -103,9 +120,14 @@ public class LiveKitRoomAdminService {
             if (r.isSuccessful() && r.body() != null) {
                 return r.body();
             }
+            throw new RuntimeException("listParticipants " + roomName + " failed with code: " + r.code());
         } catch (Exception e) {
-            log.warn("listParticipants {} error: {}", roomName, e.getMessage());
+            throw new RuntimeException("listParticipants " + roomName + " error: " + e.getMessage(), e);
         }
+    }
+
+    public List<LivekitModels.ParticipantInfo> listParticipantsFallback(String roomName, Throwable t) {
+        log.error("🚨 [CB-FALLBACK] LiveKit listParticipants failed for room {}: {}", roomName, t.getMessage());
         return Collections.emptyList();
     }
 }

@@ -6,6 +6,8 @@ import edu.iuh.fit.se.mediaservice.model.PaymentTransaction;
 import edu.iuh.fit.se.mediaservice.model.VipSubscription;
 import edu.iuh.fit.se.mediaservice.repository.PaymentTransactionRepository;
 import edu.iuh.fit.se.mediaservice.repository.VipSubscriptionRepository;
+import edu.iuh.fit.se.mediaservice.payment.*;
+import edu.iuh.fit.se.mediaservice.statemachine.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class VipService {
     private final VipSubscriptionRepository vipSubscriptionRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final SocketEmitterService socketEmitterService;
+    private final PaymentStrategyFactory paymentStrategyFactory;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ═══ Static VIP Configuration ══════════════════════════════════════════════
@@ -121,29 +124,14 @@ public class VipService {
 
         long priceVnd = getVipPrice(vipLevel);
         String packageName = getVipName(vipLevel);
-        int maxMinutes = getMaxMinutesForLevel(vipLevel);
 
-        // Generate unique order code with VIP prefix
-        String orderCode = "VIP" + System.currentTimeMillis() + (int) (Math.random() * 1000);
+        // Resolve payment strategy
+        PaymentStrategy strategy = paymentStrategyFactory.getStrategy("VNPAY");
+        PaymentTransaction pt = strategy.createOrder(userId, "VIP_" + vipLevel, packageName, priceVnd, ipAddress, true);
 
-        PaymentTransaction pt = new PaymentTransaction();
-        pt.setOrderCode(orderCode);
-        pt.setUserId(userId);
-        pt.setCoinPackageId("VIP_" + vipLevel);
-        pt.setCoinPackageName(packageName);
-        pt.setCoinAmount(0); // no coins — this is a VIP purchase
-        pt.setAmountVnd(priceVnd);
-        pt.setPaymentProvider("VNPAY");
-        pt.setStatus("PENDING");
-        pt.setCoinsCredited(false);
-        pt.setIpAddress(ipAddress);
-        pt.setCreatedAt(LocalDateTime.now());
-        pt.setUpdatedAt(LocalDateTime.now());
-
-        PaymentTransaction saved = paymentTransactionRepository.save(pt);
-        log.info("💎 VIP payment order created: orderCode={}, userId={}, level={}, amount={}₫",
-                orderCode, userId, vipLevel, priceVnd);
-        return saved;
+        log.info("💎 VIP payment order created using strategy {}: orderCode={}, userId={}, level={}, amount={}₫",
+                strategy.getProviderName(), pt.getOrderCode(), userId, vipLevel, priceVnd);
+        return pt;
     }
 
     /**
@@ -156,22 +144,23 @@ public class VipService {
         PaymentTransaction pt = paymentTransactionRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + orderCode));
 
-        // Idempotency check
-        if (!"PENDING".equals(pt.getStatus())) {
-            log.warn("⚠️ VIP payment already processed: orderCode={}, status={}", orderCode, pt.getStatus());
-            return pt;
-        }
+        // State Machine validation and transition
+        PaymentStateMachine.PaymentState currentState = PaymentStateMachine.PaymentState.valueOf(pt.getStatus());
+        PaymentStateMachine.PaymentEvent event = "00".equals(vnpResponseCode) ? PaymentStateMachine.PaymentEvent.PAY_SUCCESS
+                : "24".equals(vnpResponseCode) ? PaymentStateMachine.PaymentEvent.PAY_CANCEL
+                : PaymentStateMachine.PaymentEvent.PAY_FAIL;
 
-        pt.setVnpResponseCode(vnpResponseCode);
-        pt.setVnpTransactionNo(vnpTransactionNo);
-        pt.setVnpBankCode(vnpBankCode);
-        pt.setVnpCardType(vnpCardType);
-        pt.setVnpPayDate(vnpPayDate);
-        pt.setUpdatedAt(LocalDateTime.now());
-        pt.setCompletedAt(LocalDateTime.now());
+        // Verify and apply transition using state machine
+        PaymentStateMachine.PaymentState nextState = PaymentStateMachine.transition(currentState, event);
 
-        if ("00".equals(vnpResponseCode)) {
-            pt.setStatus("SUCCESS");
+        // Resolve Strategy
+        PaymentStrategy strategy = paymentStrategyFactory.getStrategy(pt.getPaymentProvider());
+
+        // Delegate callback population to Strategy
+        pt = strategy.processCallback(pt, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
+        pt.setStatus(nextState.name());
+
+        if (nextState == PaymentStateMachine.PaymentState.SUCCESS) {
             pt.setCoinsCredited(true); // reuse flag to mean "applied"
 
             // Determine VIP level from coinPackageId
@@ -183,11 +172,9 @@ public class VipService {
 
             // Emit socket event
             emitVipUpgraded(pt.getUserId(), vipLevel);
-        } else if ("24".equals(vnpResponseCode)) {
-            pt.setStatus("CANCELLED");
+        } else if (nextState == PaymentStateMachine.PaymentState.CANCELLED) {
             log.info("❌ VIP payment CANCELLED: orderCode={}", orderCode);
         } else {
-            pt.setStatus("FAILED");
             log.info("❌ VIP payment FAILED: orderCode={}, responseCode={}", orderCode, vnpResponseCode);
         }
 

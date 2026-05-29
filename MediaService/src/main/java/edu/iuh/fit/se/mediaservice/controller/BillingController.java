@@ -3,6 +3,7 @@ package edu.iuh.fit.se.mediaservice.controller;
 import edu.iuh.fit.se.mediaservice.model.*;
 import edu.iuh.fit.se.mediaservice.service.BillingService;
 import edu.iuh.fit.se.mediaservice.service.VipService;
+import edu.iuh.fit.se.mediaservice.service.IdempotencyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ public class BillingController {
 
     private final BillingService billingService;
     private final VipService vipService;
+    private final IdempotencyService idempotencyService;
 
     // ══════════════════════════════════════════════════════════════════════════
     // ── Wallet ────────────────────────────────────────────────────────────────
@@ -195,7 +197,16 @@ public class BillingController {
 
     /** Send a gift (donate) */
     @PostMapping("/donate")
-    public ResponseEntity<Map<String, Object>> donate(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> donate(
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody Map<String, String> body) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank() && idempotencyService.isProcessed(idempotencyKey)) {
+            Map<String, Object> cachedResponse = idempotencyService.getResponse(idempotencyKey);
+            if (cachedResponse != null) {
+                return ResponseEntity.ok(cachedResponse);
+            }
+        }
+
         String senderId = body.get("senderId");
         String senderName = body.get("senderName");
         String receiverId = body.get("receiverId");
@@ -207,6 +218,11 @@ public class BillingController {
         Map<String, Object> result = billingService.donate(
                 senderId, senderName, receiverId, receiverName, giftId, roomId, giftMessage
         );
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyService.saveResponse(idempotencyKey, result, 86400); // 24 hours
+        }
+
         return ResponseEntity.ok(result);
     }
 

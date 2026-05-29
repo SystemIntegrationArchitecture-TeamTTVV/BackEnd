@@ -4,28 +4,38 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-@Document(collection = "wallets")
+@Document(collection = "wallet_events")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Wallet {
+public class WalletEvent {
     @Id
     private String id;
 
-    @Indexed(unique = true)
+    @Indexed
+    private String walletId;
+
+    @Indexed
     private String userId;
 
-    private int balance = 1000; // default starting balance
+    /** CREDIT | DEBIT */
+    private String eventType;
 
-    @Version
-    private Long version;
+    private int amount;
+
+    private int balanceBefore;
+
+    private int balanceAfter;
+
+    /** DONATE | DEPOSIT | GIFT_RECEIVE */
+    private String referenceType;
+
+    private String referenceId; // Transaction or PaymentTransaction ID
 
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }
