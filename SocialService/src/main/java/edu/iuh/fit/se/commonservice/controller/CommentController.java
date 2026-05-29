@@ -1,6 +1,7 @@
 package edu.iuh.fit.se.commonservice.controller;
 
 import edu.iuh.fit.se.commonservice.dto.CommentDTO;
+import edu.iuh.fit.se.commonservice.service.CommentQueryService;
 import edu.iuh.fit.se.commonservice.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,20 +16,21 @@ import java.util.List;
 public class CommentController {
 
     private final CommentService commentService;
+    private final CommentQueryService commentQueryService;
 
     @GetMapping("/post/{postId}")
     public ResponseEntity<List<CommentDTO>> getCommentsByPostId(@PathVariable String postId) {
-        return ResponseEntity.ok(commentService.getCommentsByPostId(postId));
+        return ResponseEntity.ok(commentQueryService.getCommentsByPostId(postId));
     }
 
     @GetMapping("/parent/{parentCommentId}/replies")
     public ResponseEntity<List<CommentDTO>> getRepliesByParentCommentId(@PathVariable String parentCommentId) {
-        return ResponseEntity.ok(commentService.getRepliesByParentCommentId(parentCommentId));
+        return ResponseEntity.ok(commentQueryService.getRepliesByParentCommentId(parentCommentId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<CommentDTO> getCommentById(@PathVariable String id) {
-        return ResponseEntity.ok(commentService.getCommentById(id));
+        return ResponseEntity.ok(commentQueryService.getCommentById(id));
     }
 
     @PostMapping
