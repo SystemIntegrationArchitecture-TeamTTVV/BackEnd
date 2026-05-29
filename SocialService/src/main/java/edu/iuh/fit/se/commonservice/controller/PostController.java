@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import edu.iuh.fit.se.commonservice.dto.PostDTO;
+import edu.iuh.fit.se.commonservice.service.PostQueryService;
 import edu.iuh.fit.se.commonservice.service.PostService;
 import edu.iuh.fit.se.commonservice.service.UserIdentityService;
 import edu.iuh.fit.se.commonservice.util.JwtUtil;
@@ -30,24 +31,25 @@ import lombok.RequiredArgsConstructor;
 public class PostController {
 
     private final PostService postService;
+    private final PostQueryService postQueryService;
     private final JwtUtil jwtUtil;
     private final UserIdentityService userIdentityService;
 
     @GetMapping
     public ResponseEntity<List<PostDTO>> getAllPosts(@RequestParam(required = false) String viewerId) {
-        return ResponseEntity.ok(postService.getAllPosts(viewerId));
+        return ResponseEntity.ok(postQueryService.getAllPosts(viewerId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PostDTO> getPostById(@PathVariable String id) {
-        return ResponseEntity.ok(postService.getPostById(id));
+        return ResponseEntity.ok(postQueryService.getPostById(id));
     }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<PostDTO>> getPostsByUserId(
             @PathVariable String userId,
             @RequestParam(required = false) String viewerId) {
-        return ResponseEntity.ok(postService.getPostsByUserId(userId, viewerId));
+        return ResponseEntity.ok(postQueryService.getPostsByUserId(userId, viewerId));
     }
 
     @GetMapping("/group/{groupId}")

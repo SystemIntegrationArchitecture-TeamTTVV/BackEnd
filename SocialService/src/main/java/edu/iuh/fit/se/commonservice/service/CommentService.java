@@ -66,8 +66,6 @@ public class CommentService {
     }
 
     public CommentDTO createComment(CommentDTO commentDTO) {
-        aiViolationCheckService.checkOrThrow(commentDTO.getContent(), "COMMENT");
-
         String preGeneratedId = new org.bson.types.ObjectId().toHexString();
         commentDTO.setId(preGeneratedId);
         commentDTO.setCreatedAt(LocalDateTime.now());

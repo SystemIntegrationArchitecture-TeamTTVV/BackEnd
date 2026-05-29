@@ -10,6 +10,7 @@ import edu.iuh.fit.se.messegeservice.dto.AppointmentJoinRequest;
 import edu.iuh.fit.se.messegeservice.dto.SeenEventRequest;
 import edu.iuh.fit.se.messegeservice.dto.TypingEventRequest;
 import edu.iuh.fit.se.messegeservice.service.MessageService;
+import edu.iuh.fit.se.messegeservice.service.MessageQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,13 +24,14 @@ import java.util.List;
 public class MessageController {
 
     private final MessageService messageService;
+    private final MessageQueryService messageQueryService;
 
     @GetMapping("/conversation/{conversationId}")
     public ResponseEntity<List<MessageDTO>> getMessagesByConversationId(
             @PathVariable String conversationId,
             @RequestParam(required = false) String userId
     ) {
-        return ResponseEntity.ok(messageService.getMessagesByConversationId(conversationId, userId));
+        return ResponseEntity.ok(messageQueryService.getMessagesByConversationId(conversationId, userId));
     }
 
     @GetMapping("/conversation/{conversationId}/cursor")
@@ -39,17 +41,17 @@ public class MessageController {
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String userId
     ) {
-        return ResponseEntity.ok(messageService.getMessagesByConversationCursor(conversationId, before, limit, userId));
+        return ResponseEntity.ok(messageQueryService.getMessagesByConversationCursor(conversationId, before, limit, userId));
     }
 
     @GetMapping("/sender/{senderId}")
     public ResponseEntity<List<MessageDTO>> getMessagesBySenderId(@PathVariable String senderId) {
-        return ResponseEntity.ok(messageService.getMessagesBySenderId(senderId));
+        return ResponseEntity.ok(messageQueryService.getMessagesBySenderId(senderId));
     }
 
     @GetMapping("/conversation/{conversationId}/count")
     public ResponseEntity<Long> getMessageCountByConversationId(@PathVariable String conversationId) {
-        return ResponseEntity.ok(messageService.getMessageCountByConversationId(conversationId));
+        return ResponseEntity.ok(messageQueryService.getMessageCountByConversationId(conversationId));
     }
 
     @GetMapping("/conversation/{conversationId}/pinned")
@@ -57,7 +59,7 @@ public class MessageController {
             @PathVariable String conversationId,
             @RequestParam String userId
     ) {
-        return ResponseEntity.ok(messageService.getPinnedMessages(conversationId, userId));
+        return ResponseEntity.ok(messageQueryService.getPinnedMessages(conversationId, userId));
     }
 
     @GetMapping("/conversation/{conversationId}/media")
@@ -66,7 +68,7 @@ public class MessageController {
             @RequestParam String userId,
             @RequestParam(required = false) String type
     ) {
-        return ResponseEntity.ok(messageService.getMediaMessages(conversationId, userId, type));
+        return ResponseEntity.ok(messageQueryService.getMediaMessages(conversationId, userId, type));
     }
 
     @GetMapping("/conversation/{conversationId}/storage-stats")
@@ -74,7 +76,7 @@ public class MessageController {
             @PathVariable String conversationId,
             @RequestParam String userId
     ) {
-        return ResponseEntity.ok(messageService.getStorageStats(conversationId, userId));
+        return ResponseEntity.ok(messageQueryService.getStorageStats(conversationId, userId));
     }
 
     @GetMapping("/conversation/{conversationId}/search")
@@ -84,7 +86,7 @@ public class MessageController {
             @RequestParam String userId,
             @RequestParam(required = false) String senderId
     ) {
-        return ResponseEntity.ok(messageService.searchMessages(conversationId, keyword, userId, senderId));
+        return ResponseEntity.ok(messageQueryService.searchMessages(conversationId, keyword, userId, senderId));
     }
 
     @PostMapping("/conversation/{conversationId}/typing")
@@ -116,7 +118,7 @@ public class MessageController {
 
     @GetMapping("/{id}")
     public ResponseEntity<MessageDTO> getMessageById(@PathVariable String id) {
-        return ResponseEntity.ok(messageService.getMessageById(id));
+        return ResponseEntity.ok(messageQueryService.getMessageById(id));
     }
 
     @PostMapping

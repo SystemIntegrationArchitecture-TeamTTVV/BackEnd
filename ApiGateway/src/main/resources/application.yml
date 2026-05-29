@@ -5,9 +5,9 @@ spring:
   # Shares the same Redis instance as AuthService
   data:
     redis:
-      host: ${REDIS_HOST:52.77.216.200}
+      host: ${REDIS_HOST:54.255.247.158}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:mypassword123}
+      password: ${REDIS_PASSWORD:MatKhauRatManh123}
       database: 0
       timeout: 1000
   # Gateway buffer body in memory; default ~256KB causes 413 on multipart story/post uploads
