@@ -24,6 +24,8 @@ public class SavedPostController {
 
     private final SavedPostService savedPostService;
     private final UserIdentityService userIdentityService;
+    private final edu.iuh.fit.se.commonservice.util.JwtUtil jwtUtil;
+    private final jakarta.servlet.http.HttpServletRequest request;
 
     @PostMapping("/{postId}/save")
     public ResponseEntity<Void> savePost(@PathVariable String postId) {
@@ -60,6 +62,26 @@ public class SavedPostController {
     }
 
     private String resolveCurrentUserId() {
+        // 1. Check X-User-Id header injected by Gateway
+        String xUserId = request.getHeader("X-User-Id");
+        if (xUserId != null && !xUserId.isBlank()) {
+            return xUserId;
+        }
+
+        // 2. Fallback: Parse JWT token directly from Authorization header
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                String userId = jwtUtil.extractClaim(token, claims -> claims.get("userId", String.class));
+                if (userId != null && !userId.isBlank()) {
+                    return userId;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        // 3. Fallback: DB lookup via SecurityContextHolder
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null || "anonymousUser".equals(authentication.getName())) {
             return null;

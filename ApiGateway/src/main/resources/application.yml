@@ -361,6 +361,35 @@ spring:
                 name: messageService
                 fallbackUri: forward:/fallback/message
 
+        - id: media-service-billing
+          uri: ${MEDIA_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/message/billing/**
+          filters:
+            - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: mediaService
+                fallbackUri: forward:/fallback/media
+
+        - id: media-service-livestream
+          uri: ${MEDIA_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/message/livestream/**
+          filters:
+            - StripPrefix=2
+            - name: CircuitBreaker
+              args:
+                name: mediaService
+                fallbackUri: forward:/fallback/media
+
+        - id: media-service-api-docs
+          uri: ${MEDIA_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/media-svc/v3/api-docs
+          filters:
+            - SetPath=/v3/api-docs
+
         - id: message-service-all
           uri: ${MESSAGE_SERVICE_URL:http://localhost:8082}
           predicates:
@@ -417,6 +446,9 @@ resilience4j:
       authService:
         timeoutDuration: 30s
         cancelRunningFuture: true
+      mediaService:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
   circuitbreaker:
     instances:
       commonService:
@@ -436,6 +468,14 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 10
         automaticTransitionFromOpenToHalfOpenEnabled: true
       authService:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 95
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 10
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      mediaService:
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 50
         minimumNumberOfCalls: 20
@@ -476,4 +516,6 @@ springdoc:
         url: /api/common/v3/api-docs
       - name: Message Service
         url: /api/message/v3/api-docs
+      - name: Media Service
+        url: /api/media-svc/v3/api-docs
     urls-primary-name: Auth Service

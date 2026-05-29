@@ -1,9 +1,10 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# TTVV Social Network — Docker Compose (All-in-One)
-# Chạy toàn bộ 4 microservices trong 1 lệnh duy nhất.
+# TTVV Social Network — Docker Compose (All-in-One + Horizontal Scaling)
+# Chạy toàn bộ hệ thống trong 1 lệnh duy nhất.
 # Infra (Kafka, Redis, MongoDB, PostgreSQL) đã host remote — không cần container.
 #
 # Chạy:   docker compose up -d --build
+# Scale:  docker compose up -d --scale common-service=3 --scale message-service=2
 # Dừng:   docker compose down
 # Logs:   docker compose logs -f <service-name>
 # ═══════════════════════════════════════════════════════════════════════════
@@ -19,10 +20,12 @@ services:
     build:
       context: ./AuthService
       dockerfile: Dockerfile
-    container_name: auth-service
     restart: unless-stopped
-    ports:
-      - "8083:8083"
+    # Không fix port → cho phép scale nhiều instance
+    expose:
+      - "8083"
+    deploy:
+      replicas: 2
     networks:
       - ttvv
     healthcheck:
@@ -37,15 +40,15 @@ services:
     build:
       context: ./SocialService
       dockerfile: Dockerfile
-    container_name: common-service
     restart: unless-stopped
     depends_on:
       auth-service:
         condition: service_started
-    ports:
-      - "8081:8081"
+    expose:
+      - "8081"
+    deploy:
+      replicas: 2
     environment:
-      # Override URL nội bộ Docker (properties default trỏ remote, cần đổi sang Docker DNS)
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
       MESSAGE_SERVICE_BASE_URL: http://message-service:8082
     networks:
@@ -62,15 +65,15 @@ services:
     build:
       context: ./MessegeService
       dockerfile: Dockerfile
-    container_name: message-service
     restart: unless-stopped
     depends_on:
       auth-service:
         condition: service_started
-    ports:
-      - "8082:8082"
+    expose:
+      - "8082"
+    deploy:
+      replicas: 2
     environment:
-      # Override URL nội bộ Docker (properties default trỏ remote, cần đổi sang Docker DNS)
       COMMON_SERVICE_URL: http://common-service:8081
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
     networks:
@@ -82,32 +85,52 @@ services:
       retries: 5
       start_period: 60s
 
-  # ─── API Gateway ──────────────────────────────────────────────────────
+  # ─── Media Service (MongoDB — Atlas remote) ────────────────────────
+  media-service:
+    build:
+      context: ./MediaService
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_started
+    expose:
+      - "8084"
+    deploy:
+      replicas: 2
+    environment:
+      COMMON_SERVICE_URL: http://common-service:8081
+      AUTH_SERVICE_BASE_URL: http://auth-service:8083
+    networks:
+      - ttvv
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── API Gateway (Entry Point — Load Balancer) ────────────────────────
   api-gateway:
     build:
       context: ./ApiGateway
       dockerfile: Dockerfile
-    container_name: api-gateway
     restart: unless-stopped
     ports:
       - "8088:8088"
     environment:
-      # Override URL nội bộ Docker (Gateway cần biết 3 service downstream)
       COMMON_SERVICE_URL: http://common-service:8081
       MESSAGE_SERVICE_URL: http://message-service:8082
+      MEDIA_SERVICE_URL: http://media-service:8084
       AUTH_SERVICE_URL: http://auth-service:8083
-      # Redis — Hybrid Token Management (Blacklist check)
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     depends_on:
-      redis:
-        condition: service_healthy
       auth-service:
         condition: service_healthy
       common-service:
         condition: service_healthy
       message-service:
+        condition: service_healthy
+      media-service:
         condition: service_healthy
     networks:
       - ttvv
