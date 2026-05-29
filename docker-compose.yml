@@ -85,6 +85,31 @@ services:
       retries: 5
       start_period: 60s
 
+  # ─── Media Service (MongoDB — Atlas remote) ────────────────────────
+  media-service:
+    build:
+      context: ./MediaService
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_started
+    expose:
+      - "8084"
+    deploy:
+      replicas: 2
+    environment:
+      COMMON_SERVICE_URL: http://common-service:8081
+      AUTH_SERVICE_BASE_URL: http://auth-service:8083
+    networks:
+      - ttvv
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   # ─── API Gateway (Entry Point — Load Balancer) ────────────────────────
   api-gateway:
     build:
@@ -96,6 +121,7 @@ services:
     environment:
       COMMON_SERVICE_URL: http://common-service:8081
       MESSAGE_SERVICE_URL: http://message-service:8082
+      MEDIA_SERVICE_URL: http://media-service:8084
       AUTH_SERVICE_URL: http://auth-service:8083
     depends_on:
       auth-service:
@@ -103,6 +129,8 @@ services:
       common-service:
         condition: service_healthy
       message-service:
+        condition: service_healthy
+      media-service:
         condition: service_healthy
     networks:
       - ttvv

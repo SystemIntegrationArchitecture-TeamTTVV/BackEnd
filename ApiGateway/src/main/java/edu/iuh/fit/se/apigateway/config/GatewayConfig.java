@@ -60,6 +60,10 @@ public class GatewayConfig {
         }
 
         String normalizedPath = path == null ? "" : path.trim();
+        if (normalizedPath.contains("/saved") || normalizedPath.contains("/save")) {
+            return false;
+        }
+
         return normalizedPath.equals("/api/social/posts")
                 || normalizedPath.startsWith("/api/social/posts/")
                 || normalizedPath.equals("/api/common/posts")
