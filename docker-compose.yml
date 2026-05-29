@@ -1,6 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# TTVV Social Network — All-in-One Docker Compose (Tối Giản)
-# Gộp Infra (Kafka KRaft, Redis) + Services vào 1 file duy nhất.
+# TTVV Social Network — Docker Compose (All-in-One)
+# Chạy toàn bộ 4 microservices trong 1 lệnh duy nhất.
+# Infra (Kafka, Redis, MongoDB, PostgreSQL) đã host remote — không cần container.
 #
 # Chạy:   docker compose up -d --build
 # Dừng:   docker compose down
@@ -11,75 +12,7 @@ networks:
   ttvv:
     driver: bridge
 
-volumes:
-  kafka-data:
-  redis-data:
-
 services:
-
-  # ═══════════════════════════════════════════════════════════════════════
-  #  INFRASTRUCTURE
-  # ═══════════════════════════════════════════════════════════════════════
-
-  # ─── Kafka (KRaft mode - Không ZooKeeper) ──────────────────────────────
-  kafka:
-    image: confluentinc/cp-kafka:7.6.1
-    container_name: kafka
-    restart: unless-stopped
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://${DO_PUBLIC_HOST:-localhost}:9092'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      CLUSTER_ID: '4L62Tx1qnT8wDxScO9wuQA'
-      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
-    volumes:
-      - kafka-data:/var/lib/kafka/data
-    networks:
-      - ttvv
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
-      interval: 15s
-      timeout: 15s
-      retries: 12
-      start_period: 30s
-
-  # ─── Redis ────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: >
-      redis-server
-      --appendonly yes
-      --maxmemory 128mb
-      --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - ttvv
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # ═══════════════════════════════════════════════════════════════════════
-  #  APPLICATION SERVICES
-  # ═══════════════════════════════════════════════════════════════════════
 
   # ─── Auth Service (PostgreSQL — Supabase remote) ──────────────────────
   auth-service:
@@ -88,23 +21,8 @@ services:
       dockerfile: Dockerfile
     container_name: auth-service
     restart: unless-stopped
-    depends_on:
-      redis:
-        condition: service_healthy
     ports:
       - "8083:8083"
-    environment:
-      PORT: 8083
-      SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
-      DB_URL: ${DB_URL:-jdbc:postgresql://aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0}
-      DB_USER: ${DB_USER:-postgres.pogzbnvnzuhmmadhkryl}
-      DB_PASSWORD: ${DB_PASSWORD:-VoSJaMsFmV2PSx3j}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-true}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     networks:
       - ttvv
     healthcheck:
@@ -122,40 +40,14 @@ services:
     container_name: common-service
     restart: unless-stopped
     depends_on:
-      redis:
-        condition: service_healthy
       auth-service:
         condition: service_started
     ports:
       - "8081:8081"
     environment:
-      PORT: 8081
-      SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
-      MONGODB_URI: ${MONGODB_URI:-}
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      APP_TOKEN_STORE_ENABLED: ${APP_TOKEN_STORE_ENABLED:-true}
-      # Kafka
-      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-true}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      # AI keys
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_VIOLATION_API_KEY: ${GEMINI_VIOLATION_API_KEY:-}
-      # Cloudinary
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
-      # AWS S3
-      AWS_S3_ENABLED: ${AWS_S3_ENABLED:-true}
-      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-}
-      AWS_S3_REGION: ${AWS_S3_REGION:-ap-southeast-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      # Resend Email
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # Override URL nội bộ Docker (properties default trỏ remote, cần đổi sang Docker DNS)
+      AUTH_SERVICE_BASE_URL: http://auth-service:8083
+      MESSAGE_SERVICE_BASE_URL: http://message-service:8082
     networks:
       - ttvv
     healthcheck:
@@ -173,40 +65,14 @@ services:
     container_name: message-service
     restart: unless-stopped
     depends_on:
-      redis:
-        condition: service_healthy
       auth-service:
         condition: service_started
     ports:
       - "8082:8082"
     environment:
-      PORT: 8082
-      SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
-      MONGODB_URI: ${MONGODB_URI:-}
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # Kafka
-      APP_KAFKA_ENABLED: ${APP_KAFKA_ENABLED:-true}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      # Cloudinary
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
-      # AWS S3
-      AWS_S3_ENABLED: ${AWS_S3_ENABLED:-true}
-      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-}
-      AWS_S3_REGION: ${AWS_S3_REGION:-ap-southeast-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      # LiveKit
-      LIVEKIT_URL: ${LIVEKIT_URL:-}
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
-      # Gemini (moderation)
-      GEMINI_VIOLATION_API_KEY: ${GEMINI_VIOLATION_API_KEY:-}
+      # Override URL nội bộ Docker (properties default trỏ remote, cần đổi sang Docker DNS)
+      COMMON_SERVICE_URL: http://common-service:8081
+      AUTH_SERVICE_BASE_URL: http://auth-service:8083
     networks:
       - ttvv
     healthcheck:
@@ -226,10 +92,7 @@ services:
     ports:
       - "8088:8088"
     environment:
-      PORT: 8088
-      SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}
-      # Service URLs — Docker DNS
+      # Override URL nội bộ Docker (Gateway cần biết 3 service downstream)
       COMMON_SERVICE_URL: http://common-service:8081
       MESSAGE_SERVICE_URL: http://message-service:8082
       AUTH_SERVICE_URL: http://auth-service:8083
