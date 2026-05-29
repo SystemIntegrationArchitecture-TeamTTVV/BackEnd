@@ -1,29 +1,62 @@
-# CD (DigitalOcean / VPS): bổ sung khi đã có Droplet + secrets.
-# - CI (build) nằm ở ci.yml — chạy mỗi push/PR.
-# - File này: deploy thủ công hoặc sau khi CI xanh (workflow_run).
+# ═══════════════════════════════════════════════════════════════════════════
+# TTVV Social Network — Backend CD (Continuous Deployment)
+# Tự động deploy lên server sau khi CI build xanh.
 #
-# Gợi ý triển khai:
-#   • SSH: appleboy/ssh-action — trên server: git pull + docker compose up -d
-#   • Hoặc: build JAR/Docker image → push DO Container Registry → server pull
+# Flow: CI xanh → SSH vào server → git pull → docker compose up
 #
-# Compose hạ tầng (Kafka, Redis, Grafana) nằm ở monorepo KIenTruc/ops/ nếu bạn clone cả workspace;
-# repo chỉ có BE thì copy ops/ lên server hoặc dùng image có sẵn.
+# Secrets cần thiết (GitHub → Settings → Secrets):
+#   - SERVER_HOST:     IP/domain server (VD: 52.77.216.200)
+#   - SERVER_USER:     SSH username (VD: ubuntu)
+#   - SERVER_SSH_KEY:  SSH private key
+# ═══════════════════════════════════════════════════════════════════════════
 
-name: Deploy (manual)
+name: Backend CD
 
 on:
+  # Tự động chạy sau khi CI thành công
+  workflow_run:
+    workflows: ["Backend CI"]
+    types: [completed]
+    branches: [main, master, develop, dev/main]
+
+  # Hoặc trigger thủ công
   workflow_dispatch:
     inputs:
       environment:
-        description: "Môi trường (ví dụ staging / production)"
+        description: "Môi trường deploy (staging / production)"
         required: false
-        default: "staging"
+        default: "production"
 
 jobs:
-  placeholder:
+  deploy:
+    name: Deploy to Server
     runs-on: ubuntu-latest
+    # Chỉ deploy khi CI thành công (hoặc trigger thủ công)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     steps:
-      - name: Chưa cấu hình deploy
-        run: |
-          echo "Thêm bước SSH hoặc registry deploy tại đây."
-          echo "Environment: ${{ github.event.inputs.environment }}"
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            echo "🚀 Deploying TTVV Backend..."
+            cd ~/BackEnd || exit 1
+
+            echo "📥 Pulling latest code..."
+            git pull origin ${{ github.event.workflow_run.head_branch || 'main' }}
+
+            echo "🐳 Building & restarting services..."
+            docker compose up -d --build --remove-orphans
+
+            echo "⏳ Waiting for services to be healthy..."
+            sleep 30
+
+            echo "🩺 Health check..."
+            docker compose ps
+
+            echo "✅ Deploy complete!"
