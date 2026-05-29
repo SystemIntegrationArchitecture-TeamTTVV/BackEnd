@@ -1,22 +1,21 @@
 package edu.iuh.fit.se.commonservice.saga;
 
-import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.event.PostCreatedEvent;
+import edu.iuh.fit.se.commonservice.event.NotificationBulkDispatchEvent;
 import edu.iuh.fit.se.commonservice.service.FriendService;
-import edu.iuh.fit.se.commonservice.service.NotificationService;
 import edu.iuh.fit.se.commonservice.service.UserIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Kafka consumer that handles post creation events asynchronously.
- * Notifies friends about new posts in the background — user gets instant response.
+ * Dispatches bulk notification event for friends in a non-blocking way.
  */
 @Slf4j
 @Component
@@ -24,8 +23,8 @@ import java.util.List;
 public class PostEventConsumer {
 
     private final FriendService friendService;
-    private final NotificationService notificationService;
     private final UserIdentityService userIdentityService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @KafkaListener(topics = "ttvv.post.created", groupId = "commonservice-post")
     public void onPostCreated(PostCreatedEvent event) {
@@ -43,22 +42,23 @@ public class PostEventConsumer {
                     .map(f -> f.getFriendId())
                     .toList();
 
-            for (String friendId : friendIds) {
-                NotificationDTO dto = new NotificationDTO();
-                dto.setType("POST");
-                dto.setActorId(event.authorId());
-                dto.setActorName(author.getFullName());
-                dto.setActorAvatar(author.getAvatar());
-                dto.setRecipientId(friendId);
-                dto.setRelatedId(event.postId());
-                dto.setRelatedType("POST");
-                dto.setTitle("Bài viết mới");
-                dto.setContent(author.getFullName() + " đã đăng bài viết mới");
-                dto.setRead(false);
-                dto.setCreatedAt(LocalDateTime.now());
-                notificationService.createNotification(dto);
-            }
-            log.info("[Kafka] Notified {} friends about post {}", friendIds.size(), event.postId());
+            if (friendIds.isEmpty()) return;
+
+            // Dispatch as a single bulk event to Kafka - immediate non-blocking return!
+            NotificationBulkDispatchEvent bulkEvent = new NotificationBulkDispatchEvent(
+                    "POST",
+                    event.authorId(),
+                    author.getFullName(),
+                    author.getAvatar(),
+                    friendIds,
+                    event.postId(),
+                    "POST",
+                    "Bài viết mới",
+                    author.getFullName() + " đã đăng bài viết mới"
+            );
+
+            kafkaTemplate.send("ttvv.notification.bulk", event.postId(), bulkEvent);
+            log.info("[Kafka] Queued bulk post notifications for {} friends of author {}", friendIds.size(), event.authorId());
         } catch (Exception e) {
             log.error("[Kafka] Failed to process post created event: {}", e.getMessage(), e);
         }

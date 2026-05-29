@@ -6,10 +6,16 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.DBRef;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 
 import java.time.LocalDateTime;
 
 @Document(collection = "notifications")
+@CompoundIndexes({
+    @CompoundIndex(name = "recipient_created", def = "{'recipientId': 1, 'createdAt': -1}"),
+    @CompoundIndex(name = "recipient_read_created", def = "{'recipientId': 1, 'isRead': 1, 'createdAt': -1}")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

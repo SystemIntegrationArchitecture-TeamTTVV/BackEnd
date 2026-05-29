@@ -1,22 +1,21 @@
 package edu.iuh.fit.se.commonservice.saga;
 
-import edu.iuh.fit.se.commonservice.dto.NotificationDTO;
 import edu.iuh.fit.se.commonservice.dto.UserDTO;
 import edu.iuh.fit.se.commonservice.event.VideoCreatedEvent;
+import edu.iuh.fit.se.commonservice.event.NotificationBulkDispatchEvent;
 import edu.iuh.fit.se.commonservice.service.FriendService;
-import edu.iuh.fit.se.commonservice.service.NotificationService;
 import edu.iuh.fit.se.commonservice.service.UserIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Kafka consumer that handles video creation events asynchronously.
- * Notifies friends about new videos in the background.
+ * Dispatches bulk notification event for friends in a non-blocking way.
  */
 @Slf4j
 @Component
@@ -24,8 +23,8 @@ import java.util.List;
 public class VideoEventConsumer {
 
     private final FriendService friendService;
-    private final NotificationService notificationService;
     private final UserIdentityService userIdentityService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @KafkaListener(topics = "ttvv.video.created", groupId = "commonservice-video")
     public void onVideoCreated(VideoCreatedEvent event) {
@@ -39,22 +38,23 @@ public class VideoEventConsumer {
                     .map(f -> f.getFriendId())
                     .toList();
 
-            for (String friendId : friendIds) {
-                NotificationDTO dto = new NotificationDTO();
-                dto.setType("VIDEO");
-                dto.setActorId(event.authorId());
-                dto.setActorName(author.getFullName());
-                dto.setActorAvatar(author.getAvatar());
-                dto.setRecipientId(friendId);
-                dto.setRelatedId(event.videoId());
-                dto.setRelatedType("VIDEO");
-                dto.setTitle("Video mới");
-                dto.setContent(author.getFullName() + " đã đăng video mới: " + event.title());
-                dto.setRead(false);
-                dto.setCreatedAt(LocalDateTime.now());
-                notificationService.createNotification(dto);
-            }
-            log.info("[Kafka] Notified {} friends about video {}", friendIds.size(), event.videoId());
+            if (friendIds.isEmpty()) return;
+
+            // Dispatch as a single bulk event to Kafka - immediate non-blocking return!
+            NotificationBulkDispatchEvent bulkEvent = new NotificationBulkDispatchEvent(
+                    "VIDEO",
+                    event.authorId(),
+                    author.getFullName(),
+                    author.getAvatar(),
+                    friendIds,
+                    event.videoId(),
+                    "VIDEO",
+                    "Video mới",
+                    author.getFullName() + " đã đăng video mới: " + event.title()
+            );
+
+            kafkaTemplate.send("ttvv.notification.bulk", event.videoId(), bulkEvent);
+            log.info("[Kafka] Queued bulk video notifications for {} friends of author {}", friendIds.size(), event.authorId());
         } catch (Exception e) {
             log.error("[Kafka] Failed to process video created event: {}", e.getMessage(), e);
         }
