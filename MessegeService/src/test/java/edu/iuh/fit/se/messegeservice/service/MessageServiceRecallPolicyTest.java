@@ -66,7 +66,6 @@ class MessageServiceRecallPolicyTest {
 
         when(messageRepository.findById("m1")).thenReturn(Optional.of(message));
         when(conversationRepository.findById("c1")).thenReturn(Optional.of(conversation));
-        when(messageRepository.findByConversationIdOrderByCreatedAtAsc("c1")).thenReturn(List.of(message));
         when(conversationRepository.save(any(Conversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         messageService.deleteMessage("m1", "u1");
