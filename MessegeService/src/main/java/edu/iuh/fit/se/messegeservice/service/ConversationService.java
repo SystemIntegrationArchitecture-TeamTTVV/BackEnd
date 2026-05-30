@@ -1676,27 +1676,23 @@ public class ConversationService {
      * then fetch them in a SINGLE batch HTTP call. Returns a userId → UserDTO map.
      */
     private Map<String, UserDTO> batchPrefetchUsers(List<Conversation> conversations) {
-        Set<String> missingIds = new java.util.LinkedHashSet<>();
+        Set<String> allIds = new java.util.LinkedHashSet<>();
         for (Conversation conv : conversations) {
             List<String> ids = conv.getParticipantIds();
-            List<String> names = conv.getParticipantNames();
-            List<String> avatars = conv.getParticipantAvatars();
             if (ids == null) continue;
-            for (int i = 0; i < ids.size(); i++) {
-                String existingName = (names != null && i < names.size()) ? names.get(i) : null;
-                String existingAvatar = (avatars != null && i < avatars.size()) ? avatars.get(i) : null;
-                if (existingName == null || existingName.isBlank() || existingAvatar == null) {
-                    missingIds.add(ids.get(i));
+            for (String id : ids) {
+                if (id != null && !id.isBlank()) {
+                    allIds.add(id);
                 }
             }
         }
 
-        if (missingIds.isEmpty()) {
+        if (allIds.isEmpty()) {
             return java.util.Collections.emptyMap();
         }
 
         try {
-            List<UserDTO> users = commonServiceClientFacade.batchLookup(new ArrayList<>(missingIds));
+            List<UserDTO> users = commonServiceClientFacade.batchLookup(new ArrayList<>(allIds));
             Map<String, UserDTO> map = new java.util.HashMap<>();
             if (users != null) {
                 for (UserDTO u : users) {
@@ -1734,29 +1730,38 @@ public class ConversationService {
         boolean modified = false;
 
         for (int i = 0; i < participantIds.size(); i++) {
-            String existingName = participantNames.get(i);
-            String existingAvatar = participantAvatars.get(i);
-            if (existingName != null && !existingName.isBlank() && existingAvatar != null) {
-                continue;
-            }
-
             String participantId = participantIds.get(i);
             UserDTO user = userCache.get(participantId);
+            String existingName = participantNames.get(i);
+            String existingAvatar = participantAvatars.get(i);
+
             if (user != null) {
-                if (existingName == null || existingName.isBlank()) {
-                    String resolvedName = user.getFullName() != null && !user.getFullName().isBlank()
-                            ? user.getFullName()
-                            : user.getUsername();
-                    participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                String resolvedName = user.getFullName() != null && !user.getFullName().isBlank()
+                        ? user.getFullName()
+                        : user.getUsername();
+                if (resolvedName == null || resolvedName.isBlank()) {
+                    resolvedName = "Unknown User";
+                }
+                
+                if (!resolvedName.equals(existingName)) {
+                    participantNames.set(i, resolvedName);
                     modified = true;
                 }
+                boolean avatarChanged = false;
                 if (existingAvatar == null) {
+                    avatarChanged = user.getAvatar() != null;
+                } else {
+                    avatarChanged = !existingAvatar.equals(user.getAvatar());
+                }
+                if (avatarChanged) {
                     participantAvatars.set(i, user.getAvatar());
                     modified = true;
                 }
-            } else if (existingName == null || existingName.isBlank()) {
-                participantNames.set(i, "Unknown User");
-                modified = true;
+            } else {
+                if (existingName == null || existingName.isBlank()) {
+                    participantNames.set(i, "Unknown User");
+                    modified = true;
+                }
             }
         }
 
@@ -1827,30 +1832,37 @@ public class ConversationService {
         boolean modified = false;
 
         for (int i = 0; i < participantIds.size(); i++) {
+            String participantId = participantIds.get(i);
             String existingName = participantNames.get(i);
             String existingAvatar = participantAvatars.get(i);
-            if (existingName != null && !existingName.isBlank() && existingAvatar != null) {
-                continue;
-            }
-
-            String participantId = participantIds.get(i);
             try {
                 UserDTO user = commonServiceClientFacade.getUserById(participantId);
                 if (user != null) {
-                    if (existingName == null || existingName.isBlank()) {
-                        String resolvedName = user.getFullName() != null && !user.getFullName().isBlank()
-                                ? user.getFullName()
-                                : user.getUsername();
-                        participantNames.set(i, (resolvedName != null && !resolvedName.isBlank()) ? resolvedName : "Unknown User");
+                    String resolvedName = user.getFullName() != null && !user.getFullName().isBlank()
+                            ? user.getFullName()
+                            : user.getUsername();
+                    if (resolvedName == null || resolvedName.isBlank()) {
+                        resolvedName = "Unknown User";
+                    }
+                    if (!resolvedName.equals(existingName)) {
+                        participantNames.set(i, resolvedName);
                         modified = true;
                     }
+                    boolean avatarChanged = false;
                     if (existingAvatar == null) {
+                        avatarChanged = user.getAvatar() != null;
+                    } else {
+                        avatarChanged = !existingAvatar.equals(user.getAvatar());
+                    }
+                    if (avatarChanged) {
                         participantAvatars.set(i, user.getAvatar());
                         modified = true;
                     }
-                } else if (existingName == null || existingName.isBlank()) {
-                    participantNames.set(i, "Unknown User");
-                    modified = true;
+                } else {
+                    if (existingName == null || existingName.isBlank()) {
+                        participantNames.set(i, "Unknown User");
+                        modified = true;
+                    }
                 }
             } catch (Exception e) {
                 if (existingName == null || existingName.isBlank()) {
