@@ -119,6 +119,88 @@ public class AiConsultationService {
         return logRepository.save(logEntry);
     }
 
+    public AiConsultationLog createAndCompleteWebLog(Map<String, Object> data) {
+        try {
+            String userId = (String) data.get("userId");
+            String result = (String) data.get("result");
+            String notes = (String) data.get("notes");
+            String recommendedPackage = (String) data.get("recommendedPackage");
+            
+            Integer duration = null;
+            if (data.get("duration") != null) {
+                duration = ((Number) data.get("duration")).intValue();
+            }
+
+            // Tìm thông tin User
+            String userName = "Khách hàng Web";
+            String userAvatar = null;
+            String phoneNumber = null;
+            if (userId != null && !userId.isBlank()) {
+                var userOpt = userIdentityService.findById(userId);
+                if (userOpt.isPresent()) {
+                    userName = userOpt.get().getFullName() != null ? userOpt.get().getFullName() : userOpt.get().getUsername();
+                    userAvatar = userOpt.get().getAvatar();
+                    phoneNumber = userOpt.get().getPhoneNumber();
+                }
+            }
+
+            // Tìm xem có log email_sent nào của user này để cập nhật đè lên cho đồng bộ
+            AiConsultationLog logEntry = null;
+            if (userId != null && !userId.isBlank()) {
+                List<AiConsultationLog> existing = logRepository.findAll();
+                for (AiConsultationLog l : existing) {
+                    if (userId.equals(l.getUserId()) && "email_sent".equals(l.getStatus())) {
+                        logEntry = l;
+                        break;
+                    }
+                }
+            }
+
+            if (logEntry == null) {
+                logEntry = new AiConsultationLog();
+                logEntry.setUserId(userId);
+                logEntry.setUserName(userName);
+                logEntry.setUserAvatar(userAvatar);
+                logEntry.setPhoneNumber(phoneNumber);
+                logEntry.setCreatedAt(LocalDateTime.now());
+            }
+
+            logEntry.setStatus("completed");
+            logEntry.setResult(result);
+            logEntry.setNotes(notes);
+            logEntry.setRecommendedPackage(recommendedPackage);
+            logEntry.setDuration(duration);
+            logEntry.setUpdatedAt(LocalDateTime.now());
+
+            // Gửi email nếu trạng thái là "registered"
+            if ("registered".equals(result) && userId != null) {
+                final String finalPkg = recommendedPackage;
+                final String finalUser = userId;
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    try {
+                        userIdentityService.findById(finalUser).ifPresent(user -> {
+                            if (user.getEmail() != null) {
+                                emailService.sendLivestreamQuotationEmail(
+                                    user.getEmail(), 
+                                    user.getFullName(), 
+                                    finalPkg,
+                                    user.getId()
+                                );
+                            }
+                        });
+                    } catch (Exception ex) {
+                        log.error("❌ Lỗi trong tiến trình gửi email báo giá async: ", ex);
+                    }
+                });
+            }
+
+            return logRepository.save(logEntry);
+        } catch (Exception e) {
+            log.error("❌ Lỗi xử lý createAndCompleteWebLog: ", e);
+            throw new RuntimeException("Lỗi xử lý lưu cuộc gọi: " + e.getMessage(), e);
+        }
+    }
+
     public StartCallResponseDTO startCall(StartCallRequestDTO request) {
         try {
             // Retrieve User Info
@@ -186,6 +268,62 @@ public class AiConsultationService {
         } catch (Exception e) {
             log.error("Failed to start AI call", e);
             return new StartCallResponseDTO(false, null, "Lỗi kết nối: " + e.getMessage());
+        }
+    }
+
+    public Map<String, Object> sendEmailLink(Map<String, String> request) {
+        String userId = request.get("userId");
+        if (userId == null || userId.isBlank()) {
+            return Map.of("success", false, "message", "UserId không được để trống!");
+        }
+
+        var userOpt = userIdentityService.findById(userId);
+        if (userOpt.isEmpty()) {
+            return Map.of("success", false, "message", "Không tìm thấy người dùng!");
+        }
+
+        var user = userOpt.get();
+        String toEmail = user.getEmail();
+        if (toEmail == null || toEmail.isBlank()) {
+            return Map.of("success", false, "message", "Người dùng chưa cấu hình email!");
+        }
+
+        String userName = user.getFullName() != null ? user.getFullName() : user.getUsername();
+        AiConsultationSettings settings = getSettings();
+
+        try {
+            String clientBaseUrl = emailService.getBaseUrl();
+            if (clientBaseUrl == null || clientBaseUrl.isBlank() || clientBaseUrl.contains("websitedev.software")) {
+                clientBaseUrl = "http://localhost:5173";
+            } else if (clientBaseUrl.endsWith("/")) {
+                clientBaseUrl = clientBaseUrl.substring(0, clientBaseUrl.length() - 1);
+            }
+
+            String encodedName = java.net.URLEncoder.encode(userName, java.nio.charset.StandardCharsets.UTF_8.toString());
+            String encodedPackages = java.net.URLEncoder.encode(settings.getPackages() != null ? settings.getPackages() : "", java.nio.charset.StandardCharsets.UTF_8.toString());
+            String encodedInstructions = java.net.URLEncoder.encode(settings.getInstructions() != null ? settings.getInstructions() : "", java.nio.charset.StandardCharsets.UTF_8.toString());
+
+            String webClientUrl = String.format("%s/web_client.html?userId=%s&name=%s&package=livestream&packages=%s&instructions=%s",
+                    clientBaseUrl, userId, encodedName, encodedPackages, encodedInstructions);
+
+            emailService.sendConsultationInvitationEmail(toEmail, userName, webClientUrl);
+
+            // Log entry for the sent invitation
+            AiConsultationLog logEntry = new AiConsultationLog();
+            logEntry.setUserId(userId);
+            logEntry.setUserName(userName);
+            logEntry.setUserAvatar(user.getAvatar());
+            logEntry.setPhoneNumber(user.getPhoneNumber());
+            logEntry.setStatus("email_sent");
+            logEntry.setResult("pending");
+            logEntry.setCreatedAt(LocalDateTime.now());
+            logEntry.setUpdatedAt(LocalDateTime.now());
+            logRepository.save(logEntry);
+
+            return Map.of("success", true, "message", "Gửi email lời mời tư vấn thành công!");
+        } catch (Exception e) {
+            log.error("Failed to send consultation email link", e);
+            return Map.of("success", false, "message", "Lỗi gửi email: " + e.getMessage());
         }
     }
 

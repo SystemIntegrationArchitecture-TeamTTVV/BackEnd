@@ -54,11 +54,22 @@ public class AiConsultationController {
         return ResponseEntity.ok(aiConsultationService.startCall(request));
     }
 
+    @PostMapping("/send-email-link")
+    public ResponseEntity<Map<String, Object>> sendEmailLink(@RequestBody Map<String, String> request) {
+        return ResponseEntity.ok(aiConsultationService.sendEmailLink(request));
+    }
+
     @PutMapping("/logs/{id}")
     public ResponseEntity<Map<String, Boolean>> updateLogResult(
             @PathVariable String id,
             @RequestBody UpdateLogResultDTO request) {
         aiConsultationService.updateLogResult(id, request);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PostMapping("/logs/web-complete")
+    public ResponseEntity<Map<String, Boolean>> createAndCompleteWebLog(@RequestBody Map<String, Object> request) {
+        aiConsultationService.createAndCompleteWebLog(request);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
