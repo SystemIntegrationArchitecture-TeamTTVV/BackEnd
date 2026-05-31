@@ -78,7 +78,7 @@ public class VnpayCallbackSaga {
             w.setBalance(1000); // starting
             w.setCreatedAt(LocalDateTime.now());
             w.setUpdatedAt(LocalDateTime.now());
-            return w;
+            return walletRepository.save(w); // Save immediately
         });
         wallet.setBalance(wallet.getBalance() + amount);
         wallet.setUpdatedAt(LocalDateTime.now());
