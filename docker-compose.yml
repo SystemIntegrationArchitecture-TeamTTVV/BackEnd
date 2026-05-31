@@ -24,8 +24,10 @@ services:
     # Không fix port → cho phép scale nhiều instance
     expose:
       - "8083"
+    env_file:
+      - .env
     deploy:
-      replicas: 2
+      replicas: 1
     networks:
       - ttvv
     healthcheck:
@@ -46,8 +48,10 @@ services:
         condition: service_started
     expose:
       - "8081"
+    env_file:
+      - .env
     deploy:
-      replicas: 2
+      replicas: 1
     environment:
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
       MESSAGE_SERVICE_BASE_URL: http://message-service:8082
@@ -71,8 +75,10 @@ services:
         condition: service_started
     expose:
       - "8082"
+    env_file:
+      - .env
     deploy:
-      replicas: 2
+      replicas: 1
     environment:
       COMMON_SERVICE_URL: http://common-service:8081
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
@@ -96,8 +102,10 @@ services:
         condition: service_started
     expose:
       - "8084"
+    env_file:
+      - .env
     deploy:
-      replicas: 2
+      replicas: 1
     environment:
       COMMON_SERVICE_URL: http://common-service:8081
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
