@@ -14,13 +14,13 @@ import java.util.Optional;
 public interface ConversationRepository extends MongoRepository<Conversation, String> {
 
     // ── Primary listing query ─────────────────────────────────────────────────
-    // Uses $in which maps to the compound index {participantIds:1, lastMessageAt:-1}
+    // Uses the compound index {participantIds:1, lastMessageAt:-1}
     // much more efficiently than Spring's "Containing" derived query on Atlas.
-    @Query("{ 'participantIds': { $in: [?0] }, 'isDisbanded': { $ne: true } }")
+    @Query("{ 'participantIds': ?0, 'isDisbanded': { $ne: true } }")
     List<Conversation> findByParticipantIdsContainingOrderByLastMessageAtDesc(String userId);
 
     // ── Excluding hidden conversations at DB level (avoids in-memory filter) ──
-    @Query("{ 'participantIds': { $in: [?0] }, '_id': { $nin: ?1 }, 'isDisbanded': { $ne: true } }")
+    @Query("{ 'participantIds': ?0, '_id': { $nin: ?1 }, 'isDisbanded': { $ne: true } }")
     List<Conversation> findVisibleConversations(String userId, Collection<String> hiddenIds, Pageable pageable);
 
     // ── Group / direct listing ─────────────────────────────────────────────────
