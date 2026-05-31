@@ -54,6 +54,7 @@ public class ConversationService {
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
     private final MessageService messageService;
+    private final org.springframework.cache.CacheManager cacheManager;
     
     @Value("${common.service.url:http://localhost:8081}")
     private String commonServiceUrl;
@@ -1691,21 +1692,44 @@ public class ConversationService {
             return java.util.Collections.emptyMap();
         }
 
-        try {
-            List<UserDTO> users = commonServiceClientFacade.batchLookup(new ArrayList<>(allIds));
-            Map<String, UserDTO> map = new java.util.HashMap<>();
-            if (users != null) {
-                for (UserDTO u : users) {
-                    if (u != null && u.getId() != null) {
-                        map.put(u.getId(), u);
-                    }
+        Map<String, UserDTO> map = new java.util.HashMap<>();
+        
+        // 1. Check Spring Cache first to avoid querying DB for already-fetched users
+        org.springframework.cache.Cache cache = cacheManager != null ? cacheManager.getCache("msg-user-cache") : null;
+        List<String> missingIds = new ArrayList<>();
+        
+        for (String id : allIds) {
+            if (cache != null) {
+                UserDTO cachedUser = cache.get(id, UserDTO.class);
+                if (cachedUser != null && !"unknown".equals(cachedUser.getUsername())) {
+                    map.put(id, cachedUser);
+                    continue;
                 }
             }
-            return map;
-        } catch (Exception e) {
-            log.warn("⚠️ Batch user prefetch failed: {}", e.getMessage());
-            return java.util.Collections.emptyMap();
+            missingIds.add(id);
         }
+
+        // 2. Only batch lookup the missing ones from DB/AuthService
+        if (!missingIds.isEmpty()) {
+            try {
+                List<UserDTO> users = commonServiceClientFacade.batchLookup(missingIds);
+                if (users != null) {
+                    for (UserDTO u : users) {
+                        if (u != null && u.getId() != null) {
+                            map.put(u.getId(), u);
+                            // Write back to cache for subsequent calls
+                            if (cache != null && !"unknown".equals(u.getUsername())) {
+                                cache.put(u.getId(), u);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Batch user prefetch failed: {}", e.getMessage());
+            }
+        }
+        
+        return map;
     }
 
     /**
