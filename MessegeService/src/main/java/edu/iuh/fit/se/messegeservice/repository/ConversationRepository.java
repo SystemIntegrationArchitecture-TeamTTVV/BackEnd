@@ -23,6 +23,9 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
     @Query("{ 'participantIds': ?0, '_id': { $nin: ?1 }, 'isDisbanded': { $ne: true } }")
     List<Conversation> findVisibleConversations(String userId, Collection<String> hiddenIds, Pageable pageable);
 
+    @Query("{ 'participantIds': ?0, 'isDisbanded': { $ne: true } }")
+    List<Conversation> findActiveConversations(String userId, Pageable pageable);
+
     // ── Group / direct listing ─────────────────────────────────────────────────
     List<Conversation> findByIsGroupTrueOrderByLastMessageAtDesc();
     List<Conversation> findByIsGroupFalseOrderByLastMessageAtDesc();
