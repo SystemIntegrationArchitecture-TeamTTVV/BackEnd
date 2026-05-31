@@ -12,6 +12,7 @@ import edu.iuh.fit.se.messegeservice.model.PollOption;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.HiddenConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
+import edu.iuh.fit.se.messegeservice.service.ConversationCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +52,7 @@ public class MessageService {
     private final SocketEmitterService socketEmitterService;
     private final CommonServiceClientFacade commonServiceClientFacade;
     private final ModerationService moderationService;
+    private final ConversationCacheService conversationCacheService;
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
     private final org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -744,6 +746,8 @@ public class MessageService {
         Conversation conversation = conversationRepository.findById(message.getConversationId()).orElse(null);
         if (conversation != null && conversation.getParticipantIds() != null) {
             refreshConversationLastMessage(conversation);
+            // Invalidate Redis cache so conversation list reflects updated lastMessage
+            try { conversationCacheService.invalidateForConversation(conversation); } catch (Exception ignored) {}
             emitConversationMetaUpdated(conversation);
             Map<String, String> payload = new HashMap<>();
             payload.put("conversationId", message.getConversationId());
@@ -832,6 +836,8 @@ public class MessageService {
 
         updateConversationLastMessage(targetConversation, saved);
         conversationRepository.save(targetConversation);
+        // Invalidate Redis cache for all participants of the target conversation
+        try { conversationCacheService.invalidateForConversation(targetConversation); } catch (Exception ignored) {}
         emitConversationMetaUpdated(targetConversation);
 
         MessageDTO dto = toDTO(saved);
@@ -1227,6 +1233,8 @@ public class MessageService {
 
         updateConversationLastMessage(conversation, savedSystemMessage);
         conversationRepository.save(conversation);
+        // Invalidate Redis cache so conversation list reflects system message
+        try { conversationCacheService.invalidateForConversation(conversation); } catch (Exception ignored) {}
 
         emitMessageReceivedToConversation(conversation, toDTO(savedSystemMessage));
 

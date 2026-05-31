@@ -5,6 +5,7 @@ import edu.iuh.fit.se.messegeservice.model.Conversation;
 import edu.iuh.fit.se.messegeservice.model.Message;
 import edu.iuh.fit.se.messegeservice.repository.ConversationRepository;
 import edu.iuh.fit.se.messegeservice.repository.MessageRepository;
+import edu.iuh.fit.se.messegeservice.service.ConversationCacheService;
 import edu.iuh.fit.se.messegeservice.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class MessageEventConsumer {
     private final MessageRepository messageRepository;
     private final ConversationRepository conversationRepository;
     private final MessageService messageService;
+    private final ConversationCacheService conversationCacheService;
 
     @KafkaListener(topics = "ttvv.message.created", groupId = "messegeservice-message")
     public void handleMessageCreatedEvent(MessageDTO messageDTO) {
@@ -46,14 +48,24 @@ public class MessageEventConsumer {
             Conversation conversation = conversationOpt.get();
             Message message = messageService.toEntity(messageDTO, conversation);
             message.setId(messageDTO.getId());
-            
+
             // Thực hiện tác vụ I/O nặng nề dưới background
             messageRepository.save(message);
-            
+
             messageService.updateConversationLastMessage(conversation, message);
             conversationRepository.save(conversation);
-            
+
             log.info("✅ [Kafka] Đã lưu thành công tin nhắn {} vào MongoDB ngầm!", message.getId());
+
+            // ── CQRS: Invalidate conversation-list Redis cache for all participants ──
+            // Next time any participant calls getConversationsByUserId(), it will be a
+            // cache miss and rebuild from MongoDB with the updated lastMessage.
+            try {
+                conversationCacheService.invalidateForConversation(conversation);
+            } catch (Exception e) {
+                log.warn("⚠️ [ConvCache] Failed to invalidate after Kafka message {}: {}",
+                        message.getId(), e.getMessage());
+            }
 
         } catch (Exception e) {
             log.error("❌ Lỗi xử lý sự kiện lưu tin nhắn Kafka: {}", e.getMessage(), e);
