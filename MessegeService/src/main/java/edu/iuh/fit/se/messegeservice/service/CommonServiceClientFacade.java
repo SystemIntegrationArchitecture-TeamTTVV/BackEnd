@@ -122,6 +122,9 @@ public class CommonServiceClientFacade {
     @Retry(name = "commonService", fallbackMethod = "canMessageFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "canMessageFallback")
     public boolean canMessage(String senderId, String receiverId) {
+        if (!privacyBlockCheckEnabled) {
+            return true;
+        }
         if (!checkBlockPolicy("MESSAGE", senderId, receiverId)) {
             return false;
         }
@@ -140,6 +143,9 @@ public class CommonServiceClientFacade {
     @Retry(name = "commonService", fallbackMethod = "canCallFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "canCallFallback")
     public boolean canCall(String callerId, String receiverId) {
+        if (!privacyBlockCheckEnabled) {
+            return true;
+        }
         if (!checkBlockPolicy("CALL", callerId, receiverId)) {
             return false;
         }
@@ -158,6 +164,9 @@ public class CommonServiceClientFacade {
     @Retry(name = "commonService", fallbackMethod = "canInviteGroupFallback")
     @CircuitBreaker(name = "commonService", fallbackMethod = "canInviteGroupFallback")
     public boolean canInviteGroup(String inviterId, String targetUserId) {
+        if (!privacyBlockCheckEnabled) {
+            return true;
+        }
         if (!checkBlockPolicy("INVITE_GROUP", inviterId, targetUserId)) {
             return false;
         }
