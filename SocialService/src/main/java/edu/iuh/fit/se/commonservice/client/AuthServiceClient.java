@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
 import java.util.Map;
 
-@FeignClient(name = "authService", url = "${auth.service.base-url:http://localhost:8083}")
+import edu.iuh.fit.se.commonservice.config.FeignClientConfiguration;
+
+@FeignClient(name = "authService", url = "${auth.service.base-url:http://localhost:8083}", configuration = FeignClientConfiguration.class)
 public interface AuthServiceClient {
 
     @GetMapping("/api/users/{id}")
