@@ -115,7 +115,7 @@ public class DonationSaga {
             wallet.setBalance(1000); // default balance
             wallet.setCreatedAt(LocalDateTime.now());
             wallet.setUpdatedAt(LocalDateTime.now());
-            return wallet;
+            return walletRepository.save(wallet); // Save immediately to database to generate ID
         });
         receiverWallet.setBalance(receiverWallet.getBalance() + amount);
         receiverWallet.setUpdatedAt(LocalDateTime.now());
