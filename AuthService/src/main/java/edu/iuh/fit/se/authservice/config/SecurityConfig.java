@@ -86,6 +86,11 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     .requestMatchers("/actuator/**").permitAll()
+                    // Internal service-to-service endpoints — no user JWT available
+                    .requestMatchers("/api/users/batch-lookup").permitAll()
+                    .requestMatchers("/api/users/{id}").permitAll()
+                    .requestMatchers("/api/users/username/{username}").permitAll()
+                    .requestMatchers("/api/users/privacy/**").permitAll()
                     .requestMatchers("/api/users/**").authenticated()
                     .anyRequest().authenticated()
             )
