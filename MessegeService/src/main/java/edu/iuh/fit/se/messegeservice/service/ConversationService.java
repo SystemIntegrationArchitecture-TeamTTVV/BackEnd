@@ -55,12 +55,24 @@ public class ConversationService {
     private final CommonServiceClientFacade commonServiceClientFacade;
     private final MessageService messageService;
     private final org.springframework.cache.CacheManager cacheManager;
-    
+    private final ConversationCacheService conversationCacheService;
+
     @Value("${common.service.url:http://localhost:8081}")
     private String commonServiceUrl;
 
     public List<ConversationDTO> getConversationsByUserId(String userId) {
         long t0 = System.currentTimeMillis();
+
+        // ── ① CQRS Read Model: Redis Cache-Aside ─────────────────────────────
+        List<ConversationDTO> cached = conversationCacheService.getFromCache(userId);
+        if (cached != null) {
+            long elapsed = System.currentTimeMillis() - t0;
+            log.info("[PERF] getConversationsByUserId CACHE HIT: {}ms (count: {})", elapsed, cached.size());
+            return cached;
+        }
+        // ── ② Cache MISS — fallback to MongoDB ──────────────────────────────
+        log.debug("[ConvCache] MISS for user={}, querying MongoDB...", userId);
+
         List<HiddenConversation> visibilityRows = hiddenConversationRepository.findByUserId(userId);
         long t1 = System.currentTimeMillis();
         Set<String> hiddenConversationIds = visibilityRows.stream()
@@ -105,7 +117,11 @@ public class ConversationService {
         if (!modifiedConversations.isEmpty()) {
             conversationRepository.saveAll(modifiedConversations);
         }
-        log.info("[PERF] getConversationsByUserId total: {}ms (visibility: {}ms, fetchConvs: {}ms, prefetchUsers: {}ms, toDTO: {}ms, count: {})",
+
+        // ── ③ Populate Redis cache for next requests ─────────────────────────
+        conversationCacheService.putToCache(userId, result);
+
+        log.info("[PERF] getConversationsByUserId CACHE MISS: {}ms (visibility: {}ms, fetchConvs: {}ms, prefetchUsers: {}ms, toDTO: {}ms, count: {})",
                 (t4 - t0), (t1 - t0), (t2 - t1), (t3 - t2), (t4 - t3), result.size());
         return result;
     }
@@ -436,7 +452,7 @@ public class ConversationService {
         conversation.setCreatedAt(LocalDateTime.now());
         conversation.setUpdatedAt(LocalDateTime.now());
         conversation.setLastMessageAt(LocalDateTime.now());
-        Conversation saved = conversationRepository.save(conversation);
+        Conversation saved = saveAndInvalidate(conversation);
 
         return toDTO(saved);
     }
@@ -450,8 +466,8 @@ public class ConversationService {
         conversation.setLastMessagePreview(conversationDTO.getLastMessagePreview());
         conversation.setLastMessageAt(conversationDTO.getLastMessageAt());
         conversation.setUpdatedAt(LocalDateTime.now());
-        
-        Conversation updated = conversationRepository.save(conversation);
+
+        Conversation updated = saveAndInvalidate(conversation);
         return toDTO(updated);
     }
 
@@ -498,7 +514,7 @@ public class ConversationService {
         }
 
         conversation.setUpdatedAt(LocalDateTime.now());
-        Conversation saved = conversationRepository.save(conversation);
+        Conversation saved = saveAndInvalidate(conversation);
 
         if (conversation.isGroup()) {
             String actor = getParticipantDisplayName(conversation, request.getRequesterId());
@@ -575,7 +591,7 @@ public class ConversationService {
 
         conversation.setDisbanded(true);
         conversation.setUpdatedAt(LocalDateTime.now());
-        Conversation saved = conversationRepository.save(conversation);
+        Conversation saved = saveAndInvalidate(conversation);
 
         try {
             Map<String, Object> payload = new java.util.HashMap<>();
@@ -649,7 +665,9 @@ public class ConversationService {
             conversation.getAdminIds().remove(request.getRequesterId());
         }
         conversation.setUpdatedAt(LocalDateTime.now());
-        Conversation saved = conversationRepository.save(conversation);
+        // Invalidate cache for BOTH old participants (including the leaver) and new list
+        conversationCacheService.invalidate(request.getRequesterId());
+        Conversation saved = saveAndInvalidate(conversation);
 
         emitGroupSystemEvent(saved, request.getRequesterId(), SocketEventTypes.MEMBER_LEFT, actorName + " da roi nhom");
 
@@ -1967,6 +1985,25 @@ public class ConversationService {
         conversation.setBackgroundUrl(dto.getBackgroundUrl());
         conversation.setAiAssistantEnabled(dto.getAiAssistantEnabled() != null && dto.getAiAssistantEnabled());
         return conversation;
+    }
+
+    // ── Cache Helper ─────────────────────────────────────────────────────────
+
+    /**
+     * Saves the conversation to MongoDB and immediately evicts the Redis
+     * conversation-list cache for all its participants.
+     * Use this instead of bare {@code conversationRepository.save()} whenever
+     * the change should be reflected in the user's conversation list.
+     */
+    private Conversation saveAndInvalidate(Conversation conversation) {
+        Conversation saved = conversationRepository.save(conversation);
+        try {
+            conversationCacheService.invalidateForConversation(saved);
+        } catch (Exception e) {
+            log.warn("⚠️ [ConvCache] Failed to invalidate after save conv={}: {}",
+                    saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 }
 
