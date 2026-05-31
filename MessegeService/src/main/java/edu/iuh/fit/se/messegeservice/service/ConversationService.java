@@ -70,11 +70,12 @@ public class ConversationService {
         java.util.Map<String, HiddenConversation> visibilityByConversationId = visibilityRows.stream()
             .collect(Collectors.toMap(HiddenConversation::getConversationId, row -> row, (a, b) -> a));
 
+        // Push hidden-id exclusion & sort to MongoDB instead of filtering in Java
+        Pageable sortByLastMsg = PageRequest.of(0, 200,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "lastMessageAt"));
         List<Conversation> conversations = conversationRepository
-                .findByParticipantIdsContainingOrderByLastMessageAtDesc(userId)
-                .stream()
-                .filter(conversation -> !hiddenConversationIds.contains(conversation.getId()))
-                .collect(Collectors.toList());
+                .findVisibleConversations(userId, hiddenConversationIds.isEmpty()
+                        ? java.util.List.of("__none__") : hiddenConversationIds, sortByLastMsg);
         long t2 = System.currentTimeMillis();
 
         // ── Batch-prefetch all participant info in ONE call ──
