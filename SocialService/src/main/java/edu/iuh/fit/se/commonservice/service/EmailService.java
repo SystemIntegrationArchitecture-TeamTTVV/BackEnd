@@ -27,21 +27,34 @@ public class EmailService {
     @Value("${app.base-url:http://localhost:5311}")
     private String baseUrl;
 
+    @Value("${RESEND_API_KEY:}")
+    private String resendApiKey;
+
+    @Value("${RESEND_FROM_EMAIL:onboarding@resend.dev}")
+    private String resendFromEmail;
+
     public String getBaseUrl() {
         return this.baseUrl;
     }
 
     public void sendPasswordResetEmail(String toEmail, String resetToken, String userName) {
+        String resetLink = baseUrl + "/auth/reset-password?token=" + resetToken;
+        String htmlContent = buildPasswordResetEmailHtml(userName, resetLink);
+        String subject = "Reset Your Password - TTVV Social Network";
+
+        // Try Resend HTTP API first (port 443, never blocked)
+        if (sendEmailViaResend(toEmail, subject, htmlContent)) {
+            return;
+        }
+
+        // Fallback to traditional SMTP
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            String resetLink = baseUrl + "/auth/reset-password?token=" + resetToken;
-            String htmlContent = buildPasswordResetEmailHtml(userName, resetLink);
-
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("Reset Your Password - TTVV Social Network");
+            helper.setSubject(subject);
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
@@ -107,21 +120,28 @@ public class EmailService {
     }
 
     public void sendLivestreamQuotationEmail(String toEmail, String userName, String packageName, String userId) {
+        String htmlContent = buildLivestreamQuotationEmailHtml(userName, packageName, userId);
+        String subject = "Xác nhận đăng ký dịch vụ Livestream - TTVV";
+
+        // Try Resend HTTP API first (port 443, never blocked)
+        if (sendEmailViaResend(toEmail, subject, htmlContent)) {
+            return;
+        }
+
+        // Fallback to traditional SMTP
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            String htmlContent = buildLivestreamQuotationEmailHtml(userName, packageName, userId);
-
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("Xác nhận đăng ký dịch vụ Livestream - TTVV");
+            helper.setSubject(subject);
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
             log.info("✅ Livestream quotation email sent successfully via SMTP. To: {}", toEmail);
 
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (Exception e) {
             log.error("❌ Failed to send livestream quotation email via SMTP: {}", e.getMessage());
         }
     }
@@ -178,15 +198,22 @@ public class EmailService {
     }
 
     public void sendConsultationInvitationEmail(String toEmail, String userName, String webClientUrl) {
+        String htmlContent = buildConsultationInvitationEmailHtml(userName, webClientUrl);
+        String subject = "Lời mời tư vấn giải pháp Livestream AI - TTVV";
+
+        // Try Resend HTTP API first (port 443, never blocked)
+        if (sendEmailViaResend(toEmail, subject, htmlContent)) {
+            return;
+        }
+
+        // Fallback to traditional SMTP
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            String htmlContent = buildConsultationInvitationEmailHtml(userName, webClientUrl);
-
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("Lời mời tư vấn giải pháp Livestream AI - TTVV");
+            helper.setSubject(subject);
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
@@ -241,5 +268,52 @@ public class EmailService {
             </body>
             </html>
             """.formatted(userName != null ? userName : "Quý khách", webClientUrl);
+    }
+
+    private boolean sendEmailViaResend(String to, String subject, String htmlContent) {
+        if (resendApiKey == null || resendApiKey.isBlank()) {
+            log.debug("ℹ️ Resend API Key is not configured, skipping HTTP email sending.");
+            return false;
+        }
+        try {
+            String from = (resendFromEmail != null && !resendFromEmail.isBlank()) 
+                ? resendFromEmail 
+                : "onboarding@resend.dev";
+                
+            // Clean up htmlContent quotes and linebreaks to make a safe JSON string
+            String escapedHtml = htmlContent
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "");
+
+            String json = String.format(
+                "{\"from\":\"%s\",\"to\":[\"%s\"],\"subject\":\"%s\",\"html\":\"%s\"}",
+                from,
+                to,
+                subject.replace("\\", "\\\\").replace("\"", "\\\""),
+                escapedHtml
+            );
+
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create("https://api.resend.com/emails"))
+                    .header("Authorization", "Bearer " + resendApiKey.trim())
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json, java.nio.charset.StandardCharsets.UTF_8))
+                    .build();
+
+            java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                log.info("✅ Email sent successfully via Resend HTTP API. To: {}", to);
+                return true;
+            } else {
+                log.warn("⚠️ Resend HTTP API returned status {}: {}", response.statusCode(), response.body());
+                return false;
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to send email via Resend HTTP API: {}", e.getMessage());
+            return false;
+        }
     }
 }
