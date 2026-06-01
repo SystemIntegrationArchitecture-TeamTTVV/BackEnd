@@ -60,3 +60,13 @@ jobs:
             docker compose ps
 
             echo "✅ Deploy complete!"
+
+      # ── [DEMO] Smoke Test — Bỏ comment để bật ─────────────────────────
+      # Sau khi deploy xong, tự động kiểm tra API Gateway có hoạt động không.
+      # Mai demo: bỏ dấu # ở 4 dòng dưới → commit → push → thầy thấy CI/CD chạy!
+      #
+      # - name: Smoke Test API Gateway
+      #   run: |
+      #     echo "🧪 Running smoke test..."
+      #     curl -sf --max-time 10 http://${{ secrets.SERVER_HOST }}:8080/actuator/health || echo "⚠️ API Gateway chưa sẵn sàng"
+      #     echo "✅ Smoke test done!"
