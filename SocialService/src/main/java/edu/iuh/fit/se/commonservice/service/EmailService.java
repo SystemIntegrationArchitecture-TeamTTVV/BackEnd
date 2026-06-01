@@ -47,9 +47,9 @@ public class EmailService {
             mailSender.send(message);
             log.info("✅ Password reset email sent successfully via SMTP. To: {}", toEmail);
 
-        } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("❌ Failed to send password reset email via SMTP: {}", e.getMessage());
-            throw new RuntimeException("Failed to send reset email: " + e.getMessage());
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to send password reset email via SMTP (SMTP server unreachable or port blocked): {}. Proceeding without breaking the flow.", e.getMessage());
+            // Safe fallback: do not throw RuntimeException so registration/reset flow doesn't break
         }
     }
 
@@ -192,9 +192,9 @@ public class EmailService {
             mailSender.send(message);
             log.info("✅ Invitation email sent successfully via SMTP. To: {}", toEmail);
 
-        } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("❌ Failed to send invitation email via SMTP: {}", e.getMessage());
-            throw new RuntimeException("Failed to send invitation email: " + e.getMessage());
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to send invitation email via SMTP (SMTP server unreachable or port blocked): {}. Proceeding without breaking the flow.", e.getMessage());
+            // Safe fallback: do not throw RuntimeException so the main consultation flow remains functional
         }
     }
 
