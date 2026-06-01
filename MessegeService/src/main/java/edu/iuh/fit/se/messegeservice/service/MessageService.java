@@ -77,6 +77,30 @@ public class MessageService {
             messageDTO.getConversationId(), messageDTO.getSenderId(), 
             messageDTO.getContent() != null ? messageDTO.getContent().substring(0, Math.min(50, messageDTO.getContent().length())) : "null");
         
+        // ── Idempotency guard: reject duplicate sends within 2-second window ──
+        try {
+            String contentHash = String.valueOf(
+                (messageDTO.getContent() != null ? messageDTO.getContent().trim() : "").hashCode());
+            String dedupKey = "msg:dedup:" + messageDTO.getSenderId() + ":"
+                    + messageDTO.getConversationId() + ":" + contentHash;
+            Boolean isNew = stringRedisTemplate.opsForValue()
+                    .setIfAbsent(dedupKey, "1", Duration.ofSeconds(2));
+            if (Boolean.FALSE.equals(isNew)) {
+                log.warn("⚠️ Duplicate message rejected: senderId={}, convId={}, content={}",
+                        messageDTO.getSenderId(), messageDTO.getConversationId(),
+                        messageDTO.getContent() != null
+                                ? messageDTO.getContent().substring(0, Math.min(30, messageDTO.getContent().length()))
+                                : "null");
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Duplicate message detected, please wait before resending");
+            }
+        } catch (ResponseStatusException e) {
+            throw e; // re-throw our own 429
+        } catch (Exception e) {
+            log.warn("⚠️ Dedup check failed (Redis unavailable?), proceeding anyway: {}", e.getMessage());
+            // If Redis is down, we still allow the message to go through
+        }
+
         // Validate required fields
         if (messageDTO.getConversationId() == null || messageDTO.getConversationId().isEmpty()) {
             log.error("❌ conversationId is null or empty");
