@@ -1496,6 +1496,8 @@ public class ConversationService {
         List<String> blockedBy = conversation.getBlockedByUserIds();
         if (blockedBy == null) {
             blockedBy = new ArrayList<>();
+        } else {
+            blockedBy = new ArrayList<>(blockedBy);
         }
 
         boolean wasBlocked = blockedBy.contains(requesterId);
@@ -1534,6 +1536,8 @@ public class ConversationService {
         List<String> blocked = conversation.getMessageBlockedByUserIds();
         if (blocked == null) {
             blocked = new ArrayList<>();
+        } else {
+            blocked = new ArrayList<>(blocked);
         }
 
         boolean wasBlocked = blocked.contains(requesterId);
@@ -1571,6 +1575,8 @@ public class ConversationService {
         List<String> blocked = conversation.getCallBlockedByUserIds();
         if (blocked == null) {
             blocked = new ArrayList<>();
+        } else {
+            blocked = new ArrayList<>(blocked);
         }
 
         boolean wasBlocked = blocked.contains(requesterId);
@@ -1607,16 +1613,25 @@ public class ConversationService {
 
         // Remove from all block lists
         List<String> blockedAll = conversation.getBlockedByUserIds();
-        if (blockedAll != null) blockedAll.remove(requesterId);
-        conversation.setBlockedByUserIds(blockedAll);
+        if (blockedAll != null) {
+            blockedAll = new ArrayList<>(blockedAll);
+            blockedAll.remove(requesterId);
+            conversation.setBlockedByUserIds(blockedAll);
+        }
 
         List<String> blockedMsg = conversation.getMessageBlockedByUserIds();
-        if (blockedMsg != null) blockedMsg.remove(requesterId);
-        conversation.setMessageBlockedByUserIds(blockedMsg);
+        if (blockedMsg != null) {
+            blockedMsg = new ArrayList<>(blockedMsg);
+            blockedMsg.remove(requesterId);
+            conversation.setMessageBlockedByUserIds(blockedMsg);
+        }
 
         List<String> blockedCall = conversation.getCallBlockedByUserIds();
-        if (blockedCall != null) blockedCall.remove(requesterId);
-        conversation.setCallBlockedByUserIds(blockedCall);
+        if (blockedCall != null) {
+            blockedCall = new ArrayList<>(blockedCall);
+            blockedCall.remove(requesterId);
+            conversation.setCallBlockedByUserIds(blockedCall);
+        }
 
         conversation.setUpdatedAt(LocalDateTime.now());
         Conversation saved = conversationRepository.save(conversation);

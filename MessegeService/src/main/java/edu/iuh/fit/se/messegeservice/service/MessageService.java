@@ -1116,7 +1116,7 @@ public class MessageService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are banned from this conversation");
         }
 
-        // Check block status in 1-on-1 conversation
+        // Check block status in 1-on-1 conversation (Two-way blocking: both participants are restricted if either blocks)
         if (!conversation.isGroup() && conversation.getParticipantIds() != null) {
             String otherParticipantId = conversation.getParticipantIds().stream()
                     .filter(pid -> !pid.equals(userId))
