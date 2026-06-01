@@ -293,7 +293,7 @@ public class AiConsultationService {
 
         try {
             String clientBaseUrl = emailService.getBaseUrl();
-            if (clientBaseUrl == null || clientBaseUrl.isBlank() || clientBaseUrl.contains("websitedev.software")) {
+            if (clientBaseUrl == null || clientBaseUrl.isBlank()) {
                 clientBaseUrl = "http://localhost:5173";
             } else if (clientBaseUrl.endsWith("/")) {
                 clientBaseUrl = clientBaseUrl.substring(0, clientBaseUrl.length() - 1);
