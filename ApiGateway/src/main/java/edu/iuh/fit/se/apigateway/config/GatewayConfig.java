@@ -55,6 +55,8 @@ public class GatewayConfig {
             // VNPay callbacks (must be public as they are called by VN_PAY backend service)
             "/api/message/billing/payment/vnpay-callback",
             "/api/message/billing/vip/vnpay-callback",
+            "/billing/payment/vnpay-callback",
+            "/billing/vip/vnpay-callback",
             // AI Consultation public endpoints for Twilio/Python bot
             "/api/common/ai-consultation/logs",
             "/api/common/ai-consultation/twiml",
