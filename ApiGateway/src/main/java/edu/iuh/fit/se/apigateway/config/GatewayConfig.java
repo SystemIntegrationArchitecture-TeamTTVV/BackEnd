@@ -51,7 +51,12 @@ public class GatewayConfig {
             "/api/auth-svc/v3/api-docs",
             // WebSocket — also handled in isWsPath block with JWT extraction
             "/api/common/ws",
-            "/api/social/ws"
+            "/api/social/ws",
+            // AI Consultation public endpoints for Twilio/Python bot
+            "/api/common/ai-consultation/logs",
+            "/api/common/ai-consultation/twiml",
+            "/api/social/ai-consultation/logs",
+            "/api/social/ai-consultation/twiml"
     );
 
     private boolean isPublicGetPath(String method, String path) {
