@@ -1494,19 +1494,28 @@ public class ConversationService {
         ensureParticipant(conversation, requesterId);
 
         List<String> blockedBy = conversation.getBlockedByUserIds();
-        if (blockedBy == null) {
-            blockedBy = new ArrayList<>();
-        } else {
-            blockedBy = new ArrayList<>(blockedBy);
-        }
+        blockedBy = (blockedBy == null) ? new ArrayList<>() : new ArrayList<>(blockedBy);
+
+        List<String> blockedMsg = conversation.getMessageBlockedByUserIds();
+        blockedMsg = (blockedMsg == null) ? new ArrayList<>() : new ArrayList<>(blockedMsg);
+
+        List<String> blockedCall = conversation.getCallBlockedByUserIds();
+        blockedCall = (blockedCall == null) ? new ArrayList<>() : new ArrayList<>(blockedCall);
 
         boolean wasBlocked = blockedBy.contains(requesterId);
         if (wasBlocked) {
             blockedBy.remove(requesterId);
+            blockedMsg.remove(requesterId);
+            blockedCall.remove(requesterId);
         } else {
-            blockedBy.add(requesterId);
+            if (!blockedBy.contains(requesterId)) blockedBy.add(requesterId);
+            if (!blockedMsg.contains(requesterId)) blockedMsg.add(requesterId);
+            if (!blockedCall.contains(requesterId)) blockedCall.add(requesterId);
         }
+
         conversation.setBlockedByUserIds(blockedBy);
+        conversation.setMessageBlockedByUserIds(blockedMsg);
+        conversation.setCallBlockedByUserIds(blockedCall);
         conversation.setUpdatedAt(LocalDateTime.now());
 
         Conversation saved = conversationRepository.save(conversation);
