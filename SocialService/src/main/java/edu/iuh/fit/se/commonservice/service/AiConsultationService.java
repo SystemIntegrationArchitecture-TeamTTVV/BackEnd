@@ -147,12 +147,9 @@ public class AiConsultationService {
             // Tìm xem có log email_sent nào của user này để cập nhật đè lên cho đồng bộ
             AiConsultationLog logEntry = null;
             if (userId != null && !userId.isBlank()) {
-                List<AiConsultationLog> existing = logRepository.findAll();
-                for (AiConsultationLog l : existing) {
-                    if (userId.equals(l.getUserId()) && "email_sent".equals(l.getStatus())) {
-                        logEntry = l;
-                        break;
-                    }
+                List<AiConsultationLog> existing = logRepository.findByUserIdAndStatus(userId, "email_sent");
+                if (!existing.isEmpty()) {
+                    logEntry = existing.get(0);
                 }
             }
 
