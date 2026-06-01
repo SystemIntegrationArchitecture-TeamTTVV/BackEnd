@@ -1116,19 +1116,27 @@ public class MessageService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are banned from this conversation");
         }
 
-        // Check block status in 1-on-1 conversation (One-way blocking: only the blocked user is restricted)
+        // Check block status in 1-on-1 conversation (Two-way blocking: both participants are restricted if either blocks)
         if (!conversation.isGroup() && conversation.getParticipantIds() != null) {
             String otherParticipantId = conversation.getParticipantIds().stream()
                     .filter(pid -> !pid.equals(userId))
                     .findFirst().orElse(null);
 
             if (otherParticipantId != null) {
-                // If the recipient (otherParticipantId) has blocked the sender (userId)
+                // 1. If recipient blocked the sender
                 if (conversation.getBlockedByUserIds() != null && conversation.getBlockedByUserIds().contains(otherParticipantId)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot send messages in a blocked conversation");
                 }
                 if (conversation.getMessageBlockedByUserIds() != null && conversation.getMessageBlockedByUserIds().contains(otherParticipantId)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You have been blocked from sending messages to this user");
+                }
+
+                // 2. If sender blocked the recipient (must unblock first)
+                if (conversation.getBlockedByUserIds() != null && conversation.getBlockedByUserIds().contains(userId)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You must unblock this user to send a message");
+                }
+                if (conversation.getMessageBlockedByUserIds() != null && conversation.getMessageBlockedByUserIds().contains(userId)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You must unblock messages from this user to send a message");
                 }
             }
         }
