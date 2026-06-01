@@ -56,7 +56,9 @@ public class GatewayConfig {
             "/api/common/ai-consultation/logs",
             "/api/common/ai-consultation/twiml",
             "/api/social/ai-consultation/logs",
-            "/api/social/ai-consultation/twiml"
+            "/api/social/ai-consultation/twiml",
+            "/api/ai-consultation/logs",
+            "/api/ai-consultation/twiml"
     );
 
     private boolean isPublicGetPath(String method, String path) {
