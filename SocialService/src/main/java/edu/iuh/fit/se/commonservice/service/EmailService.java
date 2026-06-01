@@ -33,6 +33,9 @@ public class EmailService {
     @Value("${RESEND_FROM_EMAIL:onboarding@resend.dev}")
     private String resendFromEmail;
 
+    @Value("${SPRING_MAIL_PASSWORD:}")
+    private String brevoApiKey;
+
     public String getBaseUrl() {
         return this.baseUrl;
     }
@@ -42,12 +45,17 @@ public class EmailService {
         String htmlContent = buildPasswordResetEmailHtml(userName, resetLink);
         String subject = "Reset Your Password - TTVV Social Network";
 
-        // Try Resend HTTP API first (port 443, never blocked)
+        // 1. Try Resend HTTP API first (port 443, never blocked)
         if (sendEmailViaResend(toEmail, subject, htmlContent)) {
             return;
         }
 
-        // Fallback to traditional SMTP
+        // 2. Try Brevo HTTP API next (port 443, never blocked)
+        if (sendEmailViaBrevoApi(toEmail, subject, htmlContent)) {
+            return;
+        }
+
+        // 3. Fallback to traditional SMTP
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -123,12 +131,17 @@ public class EmailService {
         String htmlContent = buildLivestreamQuotationEmailHtml(userName, packageName, userId);
         String subject = "Xác nhận đăng ký dịch vụ Livestream - TTVV";
 
-        // Try Resend HTTP API first (port 443, never blocked)
+        // 1. Try Resend HTTP API first (port 443, never blocked)
         if (sendEmailViaResend(toEmail, subject, htmlContent)) {
             return;
         }
 
-        // Fallback to traditional SMTP
+        // 2. Try Brevo HTTP API next (port 443, never blocked)
+        if (sendEmailViaBrevoApi(toEmail, subject, htmlContent)) {
+            return;
+        }
+
+        // 3. Fallback to traditional SMTP
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -201,12 +214,17 @@ public class EmailService {
         String htmlContent = buildConsultationInvitationEmailHtml(userName, webClientUrl);
         String subject = "Lời mời tư vấn giải pháp Livestream AI - TTVV";
 
-        // Try Resend HTTP API first (port 443, never blocked)
+        // 1. Try Resend HTTP API first (port 443, never blocked)
         if (sendEmailViaResend(toEmail, subject, htmlContent)) {
             return;
         }
 
-        // Fallback to traditional SMTP
+        // 2. Try Brevo HTTP API next (port 443, never blocked)
+        if (sendEmailViaBrevoApi(toEmail, subject, htmlContent)) {
+            return;
+        }
+
+        // 3. Fallback to traditional SMTP
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -313,6 +331,50 @@ public class EmailService {
             }
         } catch (Exception e) {
             log.warn("⚠️ Failed to send email via Resend HTTP API: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean sendEmailViaBrevoApi(String to, String subject, String htmlContent) {
+        if (brevoApiKey == null || brevoApiKey.isBlank()) {
+            log.debug("ℹ️ Brevo API Key is not configured, skipping HTTP email sending.");
+            return false;
+        }
+        try {
+            // Clean up htmlContent quotes and linebreaks to make a safe JSON string
+            String escapedHtml = htmlContent
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "");
+
+            String json = String.format(
+                "{\"sender\":{\"name\":\"%s\",\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"htmlContent\":\"%s\"}",
+                fromName.replace("\"", "\\\""),
+                fromEmail.replace("\"", "\\\""),
+                to,
+                subject.replace("\\", "\\\\").replace("\"", "\\\""),
+                escapedHtml
+            );
+
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create("https://api.brevo.com/v3/smtp/email"))
+                    .header("api-key", brevoApiKey.trim())
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json, java.nio.charset.StandardCharsets.UTF_8))
+                    .build();
+
+            java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                log.info("✅ Email sent successfully via Brevo HTTP API. To: {}", to);
+                return true;
+            } else {
+                log.warn("⚠️ Brevo HTTP API returned status {}: {}", response.statusCode(), response.body());
+                return false;
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to send email via Brevo HTTP API: {}", e.getMessage());
             return false;
         }
     }
