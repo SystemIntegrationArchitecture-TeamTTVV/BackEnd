@@ -101,10 +101,6 @@ public class BillingController {
         return ResponseEntity.ok(pt);
     }
 
-    /**
-     * Process VNPAY callback result.
-     * Called by VNPAY Node.js service after payment completion.
-     */
     @PostMapping("/payment/vnpay-callback")
     public ResponseEntity<PaymentTransaction> processVnpayCallback(@RequestBody Map<String, String> body) {
         String orderCode = body.get("orderCode");
@@ -113,6 +109,12 @@ public class BillingController {
         String vnpBankCode = body.getOrDefault("vnpBankCode", "");
         String vnpCardType = body.getOrDefault("vnpCardType", "");
         String vnpPayDate = body.getOrDefault("vnpPayDate", "");
+
+        if (orderCode != null && orderCode.startsWith("VIP")) {
+            PaymentTransaction result = vipService.processVipPaymentCallback(
+                    orderCode, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
+            return ResponseEntity.ok(result);
+        }
 
         PaymentTransaction result = billingService.processVnpayCallback(
                 orderCode, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
@@ -303,7 +305,6 @@ public class BillingController {
         return ResponseEntity.ok(pt);
     }
 
-    /** Process VNPAY callback for VIP purchase (Step 2) */
     @PostMapping("/vip/vnpay-callback")
     public ResponseEntity<PaymentTransaction> processVipCallback(@RequestBody Map<String, String> body) {
         String orderCode = body.get("orderCode");
@@ -312,6 +313,13 @@ public class BillingController {
         String vnpBankCode = body.getOrDefault("vnpBankCode", "");
         String vnpCardType = body.getOrDefault("vnpCardType", "");
         String vnpPayDate = body.getOrDefault("vnpPayDate", "");
+
+        if (orderCode != null && !orderCode.startsWith("VIP")) {
+            PaymentTransaction result = billingService.processVnpayCallback(
+                    orderCode, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
+            return ResponseEntity.ok(result);
+        }
+
         PaymentTransaction result = vipService.processVipPaymentCallback(
                 orderCode, vnpResponseCode, vnpTransactionNo, vnpBankCode, vnpCardType, vnpPayDate);
         return ResponseEntity.ok(result);

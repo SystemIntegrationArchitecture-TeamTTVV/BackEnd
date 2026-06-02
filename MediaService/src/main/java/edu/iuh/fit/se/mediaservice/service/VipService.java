@@ -144,6 +144,18 @@ public class VipService {
         PaymentTransaction pt = paymentTransactionRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + orderCode));
 
+        // Idempotency: if already processed, skip
+        if (pt.isCoinsCredited()) {
+            log.warn("⚠️ VIP payment already processed (idempotent skip): orderCode={}", orderCode);
+            return pt;
+        }
+
+        // If already in terminal state (not PENDING), skip
+        if (!"PENDING".equals(pt.getStatus())) {
+            log.warn("⚠️ VIP payment already in terminal state {}: orderCode={}", pt.getStatus(), orderCode);
+            return pt;
+        }
+
         // State Machine validation and transition
         PaymentStateMachine.PaymentState currentState = PaymentStateMachine.PaymentState.valueOf(pt.getStatus());
         PaymentStateMachine.PaymentEvent event = "00".equals(vnpResponseCode) ? PaymentStateMachine.PaymentEvent.PAY_SUCCESS
