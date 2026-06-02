@@ -28,6 +28,7 @@ services:
       - .env
     environment:
       TZ: Asia/Ho_Chi_Minh
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx256m -Xms64m"
     deploy:
       replicas: 1
     networks:
@@ -60,6 +61,7 @@ services:
       TZ: Asia/Ho_Chi_Minh
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
       MESSAGE_SERVICE_BASE_URL: http://message-service:8082
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx256m -Xms64m"
     networks:
       - ttvv
     healthcheck:
@@ -88,6 +90,7 @@ services:
       TZ: Asia/Ho_Chi_Minh
       COMMON_SERVICE_URL: http://common-service:8081
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx256m -Xms64m"
     networks:
       - ttvv
     healthcheck:
@@ -116,6 +119,7 @@ services:
       TZ: Asia/Ho_Chi_Minh
       COMMON_SERVICE_URL: http://common-service:8081
       AUTH_SERVICE_BASE_URL: http://auth-service:8083
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx256m -Xms64m"
     networks:
       - ttvv
     healthcheck:
@@ -138,6 +142,7 @@ services:
       MESSAGE_SERVICE_URL: http://message-service:8082
       MEDIA_SERVICE_URL: http://media-service:8084
       AUTH_SERVICE_URL: http://auth-service:8083
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx192m -Xms64m"
     depends_on:
       auth-service:
         condition: service_healthy

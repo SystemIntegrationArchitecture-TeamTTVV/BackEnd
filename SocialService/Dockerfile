@@ -19,7 +19,7 @@ RUN mvn -q -B clean package -DskipTests
 
 
 # ====== RUNTIME STAGE ======
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
